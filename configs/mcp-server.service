@@ -11,11 +11,8 @@ WorkingDirectory=/opt/vps-agent/core
 Environment=PYTHONPATH=/opt/vps-agent/core
 EnvironmentFile=/opt/vps-agent/configs/.env
 
-# Install dependencies if needed
-ExecStartPre=/bin/bash -c 'pip install -q -r /opt/vps-agent/core/requirements-mcp.txt'
-
-# Start MCP server
-ExecStart=/usr/bin/python3 mcp_server.py
+# Start MCP server (using venv)
+ExecStart=/opt/vps-agent/venv/bin/python /opt/vps-agent/core/mcp_server.py
 
 # Restart policy
 Restart=always
