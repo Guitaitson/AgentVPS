@@ -1,8 +1,8 @@
 # Estado Atual — VPS-Agente v2
 
-## Fase Atual: FASE 11 Completa
-## Última ação: FASE 11 completa — Memória Semântica Qdrant
-## Próxima ação: A definir
+## Fase Atual: FASE 12 Completa
+## Última ação: FASE 12 completa — FastAPI-MCP Integration
+## Próxima ação: Deploy MCP Server na VPS
 
 ## Checklist de Fases
 - [x] Fase 1: Fundação (Docker, PostgreSQL, Redis, estrutura)
@@ -16,6 +16,7 @@
 - [x] Fase 9: MiniMax M2.1 via Kilocode
 - [x] Fase 10: Roteamento Telegram → CLI
 - [x] Fase 11: Memória Semântica Qdrant
+- [x] Fase 12: FastAPI-MCP Integration
 
 ## Problemas Conhecidos
 - Nenhum
@@ -51,3 +52,10 @@
 - node_load_context: Carrega contexto + memória semântica Qdrant
 - node_save_memory: Salva em PostgreSQL + Qdrant
 - Fluxo: classify → load_context → plan → execute|call_cli → respond → save_memory
+
+## Resultados FASE 12
+- Servidor FastAPI-MCP criado em core/mcp_server.py
+- Ferramentas expostas: ram_status, containers, services, memory
+- Serviço systemd: configs/mcp-server.service
+- Documentação: docs/MCP_SERVER.md
+- Integração com Claude Desktop e outros clientes MCP

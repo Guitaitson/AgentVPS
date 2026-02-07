@@ -1,0 +1,34 @@
+[Unit]
+Description=VPS-Agent MCP Server
+Documentation=https://github.com/Guitaitson/AgentVPS
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vps-agent/core
+Environment=PYTHONPATH=/opt/vps-agent/core
+EnvironmentFile=/opt/vps-agent/configs/.env
+
+# Install dependencies if needed
+ExecStartPre=/bin/bash -c 'pip install -q -r /opt/vps-agent/core/requirements-mcp.txt'
+
+# Start MCP server
+ExecStart=/usr/bin/python3 mcp_server.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mcp-server
+
+# Resource limits (MCP server is lightweight)
+MemoryMax=200M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

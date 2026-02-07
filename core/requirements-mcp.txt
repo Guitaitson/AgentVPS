@@ -1,0 +1,13 @@
+# MCP Server Dependencies
+fastapi>=0.109.0
+fastapi-mcp>=0.2.0
+uvicorn>=0.27.0
+httpx>=0.26.0
+
+# Core Dependencies (already installed)
+# docker>=7.0.0
+# redis>=5.0.0
+# qdrant-client>=1.16.0
+# langgraph>=0.2.0
+# langchain-core>=0.2.0
+# python-telegram-bot>=21.0
