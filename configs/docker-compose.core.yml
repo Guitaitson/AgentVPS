@@ -1,0 +1,61 @@
+# /opt/vps-agent/core/docker-compose.core.yml
+# SERVIÇOS SEMPRE LIGADOS — ~350 MB total
+# NÃO alterar limites de memória sem aprovação
+
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vps-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: vps_agent
+    volumes:
+      - /opt/vps-agent/data/postgres:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "127.0.0.1:5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+        reservations:
+          memory: 100M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - core-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: vps-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 40mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - /opt/vps-agent/data/redis:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 60M
+        reservations:
+          memory: 30M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - core-network
+
+networks:
+  core-network:
+    name: vps-core-network
+    driver: bridge

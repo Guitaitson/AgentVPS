@@ -1,0 +1,18 @@
+[Unit]
+Description=VPS-Agent Telegram Bot
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vps-agent/core
+Environment=PATH=/opt/vps-agent/core/venv/bin
+ExecStart=/opt/vps-agent/core/venv/bin/python3 /opt/vps-agent/core/telegram-bot/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/vps-agent/logs/telegram-bot.log
+StandardError=append:/opt/vps-agent/logs/telegram-bot-error.log
+
+[Install]
+WantedBy=multi-user.target

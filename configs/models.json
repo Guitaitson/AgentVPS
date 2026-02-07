@@ -1,0 +1,49 @@
+{
+  "models": {
+    "minimax-m2.1": {
+      "provider": "openrouter",
+      "model": "minimax/minimax-m2.1",
+      "cost": "free",
+      "description": "MiniMax M2.1 - Fast and free",
+      "temperature": 0.7,
+      "max_tokens": 4096
+    },
+    "claude-3-5-sonnet": {
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022",
+      "cost": "paid",
+      "description": "Claude 3.5 Sonnet - Best for complex tasks",
+      "temperature": 0.7,
+      "max_tokens": 8192
+    },
+    "claude-3-haiku": {
+      "provider": "anthropic",
+      "model": "claude-3-haiku-20240307",
+      "cost": "paid",
+      "description": "Claude 3 Haiku - Fast and efficient",
+      "temperature": 0.7,
+      "max_tokens": 4096
+    },
+    "gpt-4o": {
+      "provider": "openrouter",
+      "model": "openai/gpt-4o",
+      "cost": "paid",
+      "description": "GPT-4o - OpenAI's flagship model",
+      "temperature": 0.7,
+      "max_tokens": 4096
+    }
+  },
+  "default_model": "minimax-m2.1",
+  "model_selection": {
+    "task_complexity": {
+      "simple": ["minimax-m2.1", "claude-3-haiku"],
+      "medium": ["minimax-m2.1", "claude-3-5-sonnet"],
+      "complex": ["claude-3-5-sonnet", "gpt-4o"]
+    },
+    "budget_mode": {
+      "enabled": true,
+      "prefer_free": true,
+      "fallback_model": "minimax-m2.1"
+    }
+  }
+}
