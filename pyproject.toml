@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vps-agent"
+version = "2.0.0"
+description = "VPS-Agent v2: Autonomous self-improving agent"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Guilherme Taitson"}
+]
+dependencies = [
+    "pydantic>=2.7.0",
+    "structlog>=24.0.0",
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0.0",
+    "psycopg2-binary>=2.9.9",
+    "redis>=5.0.0",
+    "httpx>=0.26.0",
+    "python-telegram-bot>=21.0",
+    "langgraph>=0.2.0",
+    "fastapi>=0.109.0",
+    "fastapi-mcp>=0.2.0",
+    "uvicorn>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+vps-agent = "telegram_bot.bot:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vps_agent*", "vps_langgraph*", "core*", "telegram_bot*"]

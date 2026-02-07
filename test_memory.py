@@ -1,18 +1,31 @@
 #!/usr/bin/env python3
 """Test memory connection."""
 import sys
-sys.path.insert(0, "/opt/vps-agent/core")
+from pathlib import Path
 
-from vps_langgraph.memory import AgentMemory
+# Add the project root to the path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
 
-print("Testing memory connection...")
+from core.vps_langgraph.memory import AgentMemory
 
-try:
-    m = AgentMemory()
-    print("AgentMemory instantiated")
-    facts = m.get_user_facts("test")
-    print(f"OK: Facts = {facts}")
-except Exception as e:
-    print(f"ERRO: {type(e).__name__}: {e}")
-    import traceback
-    traceback.print_exc()
+
+def test_memory():
+    """Test memory connection."""
+    print("Testing memory connection...")
+
+    try:
+        m = AgentMemory()
+        print("AgentMemory instantiated")
+        facts = m.get_user_facts("test")
+        print(f"OK: Facts = {facts}")
+        return True
+    except Exception as e:
+        print(f"ERRO: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+if __name__ == "__main__":
+    test_memory()
