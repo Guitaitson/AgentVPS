@@ -13,6 +13,7 @@ from resource_manager.manager import get_tools_status, start_tool, stop_tool
 
 from .state import AgentState
 from .memory import AgentMemory
+from .semantic_memory import semantic_memory
 
 memory = AgentMemory()
 
@@ -76,9 +77,22 @@ def node_classify_intent(state: AgentState) -> dict:
 def node_load_context(state: AgentState) -> dict:
     """Carrega contexto relevante da memória."""
     user_id = state["user_id"]
+    user_msg = state.get("user_message", "")
     
+    # Memória estruturada (PostgreSQL)
     user_facts = memory.get_user_facts(user_id)
     recent_msgs = memory.get_conversation_history(user_id, limit=5)
+    
+    # Memória semântica (Qdrant) - buscar conversas similares
+    semantic_context = []
+    if semantic_memory._initialized:
+        similar = semantic_memory.search_similar(user_msg, user_id=user_id, limit=3)
+        for s in similar:
+            semantic_context.append({
+                "message": s.get("message", ""),
+                "response": s.get("response", ""),
+                "score": s.get("score", 0),
+            })
     
     # Checar RAM disponível
     result = subprocess.run(
@@ -93,6 +107,7 @@ def node_load_context(state: AgentState) -> dict:
             {"role": m["role"], "content": m["content"]} 
             for m in recent_msgs
         ],
+        "semantic_context": semantic_context,
         "ram_available_mb": available,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -241,11 +256,16 @@ def node_call_cli(state: AgentState) -> dict:
     intent = state.get("intent", "task")
     user_msg = state.get("user_message", "")
     user_context = state.get("user_context", [])
+    semantic_ctx = state.get("semantic_context", [])
     
-    # Construir prompt com contexto
-    context_prompt = ""
-    if user_context:
-        context_prompt = "\nContexto do usuário:\n" + json.dumps(user_context, indent=2) + "\n"
+    # Construir contexto semântico
+    semantic_prompt = ""
+    if semantic_ctx:
+        semantic_prompt = "\n\nConversas similares anteriores:\n"
+        for i, ctx in enumerate(semantic_ctx, 1):
+            semantic_prompt += "{}. Usuário: {}\n   Resposta: {}\n".format(
+                i, ctx.get("message", ""), ctx.get("response", "")
+            )
     
     # Prompt completo
     full_prompt = """Você é um assistente VPS útil.
@@ -254,11 +274,14 @@ Contexto atual:
 - RAM disponível: {}MB
 {}
 
+Histórico de conversas similares:{}
+
 Mensagem do usuário: {}
 
 Responda de forma concisa e útil.""".format(
         state.get("ram_available_mb", 0),
-        context_prompt,
+        json.dumps(user_context, indent=2) if user_context else "- Nenhum contexto",
+        semantic_prompt if semantic_prompt else "- Nenhuma conversa similar",
         user_msg
     )
     
@@ -349,14 +372,24 @@ def node_save_memory(state: AgentState) -> dict:
     user_id = state.get("user_id")
     message = state.get("user_message", "")
     response = state.get("response", "")
+    intent = state.get("intent", "unknown")
     
-    # Salvar na memória estruturada
+    # Salvar na memória estruturada (PostgreSQL)
     if user_id and message:
         memory.add_fact(user_id, {
             "type": "conversation",
             "message": message,
             "response": response,
-            "intent": state.get("intent", "unknown"),
+            "intent": intent,
         })
+        
+        # Salvar na memória semântica (Qdrant)
+        if semantic_memory._initialized:
+            semantic_memory.save_conversation(
+                user_id=user_id,
+                message=message,
+                response=response,
+                intent=intent,
+            )
     
     return state

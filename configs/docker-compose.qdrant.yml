@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   qdrant:
-    image: qdrant/qdrant:v1.12.6
+    image: qdrant/qdrant:v1.16.2
     container_name: vps-qdrant
     restart: unless-stopped
     volumes:

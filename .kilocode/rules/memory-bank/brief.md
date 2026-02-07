@@ -1,8 +1,8 @@
 # Estado Atual — VPS-Agente v2
 
-## Fase Atual: FASE 11
-## Última ação: FASE 10 completa — CLI Routing implementado
-## Próxima ação: FASE 11.1 — Memória Semântica Qdrant
+## Fase Atual: FASE 11 Completa
+## Última ação: FASE 11 completa — Memória Semântica Qdrant
+## Próxima ação: A definir
 
 ## Checklist de Fases
 - [x] Fase 1: Fundação (Docker, PostgreSQL, Redis, estrutura)
@@ -15,7 +15,7 @@
 - [x] Fase 8: Interpretador de Intenções (LangGraph)
 - [x] Fase 9: MiniMax M2.1 via Kilocode
 - [x] Fase 10: Roteamento Telegram → CLI
-- [ ] Fase 11: Memória Semântica Qdrant
+- [x] Fase 11: Memória Semântica Qdrant
 
 ## Problemas Conhecidos
 - Nenhum
@@ -28,6 +28,7 @@
 - Moltbot NÃO faz parte deste projeto
 - MiniMax M2.1 via OpenRouter (gratuito) como modelo default
 - LangGraph classifica intents: command, task, question, chat
+- Qdrant para memória semântica (embeddings de conversas)
 
 ## Resultados FASE 1
 - Ubuntu 24.04 configurado
@@ -43,10 +44,10 @@
 - Telegram Bot @Molttaitbot rodando via systemd
 - Comandos implementados: /start, /status, /ram, /containers, /health, /help
 
-## Resultados FASE 8-10
+## Resultados FASE 8-11
 - Interpretador de Intenções LangGraph implementado
 - node_classify_intent: command, task, question, chat
 - node_call_cli: Chama MiniMax M2.1 via OpenRouter
-- node_generate_response: Gera respostas finais
-- node_save_memory: Salva histórico PostgreSQL
+- node_load_context: Carrega contexto + memória semântica Qdrant
+- node_save_memory: Salva em PostgreSQL + Qdrant
 - Fluxo: classify → load_context → plan → execute|call_cli → respond → save_memory
