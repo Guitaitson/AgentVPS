@@ -7,10 +7,11 @@ Usage:
 
 The server will be available at http://localhost:8000/mcp
 """
-import asyncio
+import subprocess
 import sys
+import os
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi_mcp import FastApiMCP
@@ -18,8 +19,13 @@ from fastapi_mcp import FastApiMCP
 # Add core to path
 sys.path.insert(0, '/opt/vps-agent/core')
 
-from resource_manager.manager import ResourceManager
-from vps_agent.memory import AgentMemory
+from resource_manager.manager import (
+    get_available_ram,
+    get_running_tools,
+    get_tools_status,
+    start_tool,
+    stop_tool,
+)
 
 
 @asynccontextmanager
@@ -41,27 +47,66 @@ app = FastAPI(
 )
 
 
-# Initialize managers
-resource_manager = ResourceManager()
-memory = AgentMemory()
+def get_docker_containers() -> list:
+    """Get all Docker containers with their status."""
+    result = subprocess.run(
+        ["docker", "ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.Image}}"],
+        capture_output=True, text=True
+    )
+    containers = []
+    for line in result.stdout.strip().split("\n"):
+        if line:
+            parts = line.split("|")
+            containers.append({
+                "name": parts[0] if len(parts) > 0 else "",
+                "status": parts[1] if len(parts) > 1 else "",
+                "image": parts[2] if len(parts) > 2 else "",
+            })
+    return containers
 
 
-# MCP Tools - Expose agent capabilities as MCP tools
+def get_system_info() -> dict:
+    """Get system information (CPU, RAM, Disk)."""
+    # RAM
+    ram_result = subprocess.run(["free", "-m"], capture_output=True, text=True)
+    ram_lines = ram_result.stdout.strip().split("\n")
+    ram_total = int(ram_lines[1].split()[1])
+    ram_used = int(ram_lines[1].split()[2])
+    ram_available = int(ram_lines[1].split()[6])
+    
+    # CPU
+    cpu_result = subprocess.run(["top", "-bn1"], capture_output=True, text=True)
+    cpu_line = [l for l in cpu_result.stdout.split("\n") if "Cpu(s)" in l][0]
+    cpu_parts = cpu_line.split()
+    cpu_idle = float(cpu_parts[3].replace(",", "."))
+    cpu_usage = 100.0 - cpu_idle
+    
+    return {
+        "ram_total_mb": ram_total,
+        "ram_used_mb": ram_used,
+        "ram_available_mb": ram_available,
+        "ram_percent": round((ram_used / ram_total) * 100, 1),
+        "cpu_usage_percent": round(cpu_usage, 1),
+    }
 
+
+# Health check endpoint
 @app.get("/health")
 async def health_check() -> dict:
     """Health check endpoint."""
     return {"status": "healthy", "service": "vps-agent-mcp"}
 
 
+# MCP Tools
+
 @app.get("/ram")
 async def get_ram_status() -> dict:
     """Get current RAM status of the VPS."""
     try:
-        ram_info = resource_manager.get_ram_status()
+        ram_info = get_available_ram()
         return {
             "status": "success",
-            "ram": ram_info
+            "available_ram_mb": ram_info
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -71,7 +116,7 @@ async def get_ram_status() -> dict:
 async def list_containers() -> dict:
     """List all Docker containers and their status."""
     try:
-        containers = resource_manager.list_containers()
+        containers = get_docker_containers()
         return {
             "status": "success",
             "containers": containers
@@ -80,53 +125,40 @@ async def list_containers() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/containers/{container_name}/status")
-async def get_container_status(container_name: str) -> dict:
-    """Get status of a specific container."""
+@app.get("/tools")
+async def list_tools() -> dict:
+    """List all on-demand tools and their status."""
     try:
-        status = resource_manager.get_container_status(container_name)
+        tools_status = get_tools_status()
         return {
             "status": "success",
-            "container": status
+            "tools": tools_status
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
-@app.post("/containers/{container_name}/stop")
-async def stop_container(container_name: str) -> dict:
-    """Stop a running container."""
+@app.post("/tools/{tool_name}/start")
+async def start_tool_endpoint(tool_name: str) -> dict:
+    """Start an on-demand tool."""
     try:
-        resource_manager.stop_container(container_name)
+        success, message = start_tool(tool_name)
         return {
-            "status": "success",
-            "message": f"Container {container_name} stopped"
+            "status": "success" if success else "error",
+            "message": message
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
-@app.post("/containers/{container_name}/start")
-async def start_container(container_name: str) -> dict:
-    """Start a stopped container."""
+@app.post("/tools/{tool_name}/stop")
+async def stop_tool_endpoint(tool_name: str) -> dict:
+    """Stop an on-demand tool."""
     try:
-        resource_manager.start_container(container_name)
+        success, message = stop_tool(tool_name)
         return {
-            "status": "success",
-            "message": f"Container {container_name} started"
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@app.post("/containers/{container_name}/restart")
-async def restart_container(container_name: str) -> dict:
-    """Restart a container."""
-    try:
-        resource_manager.restart_container(container_name)
-        return {
-            "status": "success",
-            "message": f"Container {container_name} restarted"
+            "status": "success" if success else "error",
+            "message": message
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -136,49 +168,27 @@ async def restart_container(container_name: str) -> dict:
 async def list_services() -> dict:
     """List all core services and their status."""
     try:
-        services = resource_manager.list_services()
+        containers = get_docker_containers()
+        # Filter for core services
+        core_names = ["postgres", "redis", "telegram-bot", "langgraph", "vps-agent"]
+        core_services = [c for c in containers if any(name in c["name"].lower() for name in core_names)]
+        
         return {
             "status": "success",
-            "services": services
+            "services": core_services
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
 @app.get("/system")
-async def get_system_info() -> dict:
+async def get_system_info_endpoint() -> dict:
     """Get system information (CPU, RAM, Disk)."""
     try:
-        info = resource_manager.get_system_info()
+        info = get_system_info()
         return {
             "status": "success",
             "system": info
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@app.get("/memory/search")
-async def search_memory(query: str, limit: int = 5) -> dict:
-    """Search conversation memory for similar contexts."""
-    try:
-        results = memory.search_similar(query, limit=limit)
-        return {
-            "status": "success",
-            "results": results
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@app.get("/memory/facts")
-async def get_facts(user_id: str = "default") -> dict:
-    """Get stored facts for a user."""
-    try:
-        facts = memory.get_all_facts(user_id)
-        return {
-            "status": "success",
-            "facts": facts
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -189,8 +199,8 @@ mcp = FastApiMCP(
     app,
     name="VPS-Agent MCP Server",
     description="Model Context Protocol server for VPS management",
-    include_health=True,  # Include /health endpoint
-    include_routes=True,   # Include all routes as tools
+    include_health=True,
+    include_routes=True,
 )
 
 
