@@ -91,7 +91,7 @@ def get_system_info() -> dict:
 
 
 # Health check endpoint
-@app.get("/health")
+@app.get("/health", tags=["mcp"])
 async def health_check() -> dict:
     """Health check endpoint."""
     return {"status": "healthy", "service": "vps-agent-mcp"}
@@ -99,7 +99,7 @@ async def health_check() -> dict:
 
 # MCP Tools
 
-@app.get("/ram")
+@app.get("/ram", tags=["mcp"])
 async def get_ram_status() -> dict:
     """Get current RAM status of the VPS."""
     try:
@@ -112,7 +112,7 @@ async def get_ram_status() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/containers")
+@app.get("/containers", tags=["mcp"])
 async def list_containers() -> dict:
     """List all Docker containers and their status."""
     try:
@@ -125,7 +125,7 @@ async def list_containers() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/tools")
+@app.get("/tools", tags=["mcp"])
 async def list_tools() -> dict:
     """List all on-demand tools and their status."""
     try:
@@ -138,7 +138,7 @@ async def list_tools() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.post("/tools/{tool_name}/start")
+@app.post("/tools/{tool_name}/start", tags=["mcp"])
 async def start_tool_endpoint(tool_name: str) -> dict:
     """Start an on-demand tool."""
     try:
@@ -151,7 +151,7 @@ async def start_tool_endpoint(tool_name: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.post("/tools/{tool_name}/stop")
+@app.post("/tools/{tool_name}/stop", tags=["mcp"])
 async def stop_tool_endpoint(tool_name: str) -> dict:
     """Stop an on-demand tool."""
     try:
@@ -164,7 +164,7 @@ async def stop_tool_endpoint(tool_name: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/services")
+@app.get("/services", tags=["mcp"])
 async def list_services() -> dict:
     """List all core services and their status."""
     try:
@@ -181,7 +181,7 @@ async def list_services() -> dict:
         return {"status": "error", "message": str(e)}
 
 
-@app.get("/system")
+@app.get("/system", tags=["mcp"])
 async def get_system_info_endpoint() -> dict:
     """Get system information (CPU, RAM, Disk)."""
     try:
@@ -199,8 +199,7 @@ mcp = FastApiMCP(
     app,
     name="VPS-Agent MCP Server",
     description="Model Context Protocol server for VPS management",
-    include_health=True,
-    include_routes=True,
+    include_tags=["mcp"]  # Tag our endpoints with 'mcp' to include them
 )
 
 
