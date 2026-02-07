@@ -8,8 +8,8 @@ from typing import Dict, Any
 # Adicionar core ao path
 sys.path.insert(0, "/opt/vps-agent/core")
 
-from langgraph.graph import build_agent_graph
-from langgraph.state import AgentState
+from vps_langgraph.graph import build_agent_graph
+from vps_langgraph.state import AgentState
 import structlog
 
 logger = structlog.get_logger()
