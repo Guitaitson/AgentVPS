@@ -59,6 +59,11 @@ A VPS é o agente. O CLI (Kilocode/Claude) é o CÉREBRO instalado na própria V
 - Porta SSH: 22
 - Usuário: root (CLI instalado localmente)
 
+## Repositório GitHub
+- URL: https://github.com/Guitaitson/AgentVPS
+- Estrutura CI/CD: `.github/workflows/ci.yml`
+- Status: Sempre manter atualizado após alterações
+
 ## Estrutura de Diretórios
 ```
 /opt/vps-agent/
