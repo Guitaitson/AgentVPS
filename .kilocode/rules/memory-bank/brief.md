@@ -1,8 +1,8 @@
 # Estado Atual — VPS-Agente v2
 
 ## Fase Atual: FASE 12 Completa
-## Última ação: FASE 12 completa — FastAPI-MCP Integration
-## Próxima ação: Deploy MCP Server na VPS
+## Última ação: FASE 12 completa — MCP Server deployado com sucesso
+## Próxima ação: Configurar SSH tunnel para acesso remoto ao MCP
 
 ## Checklist de Fases
 - [x] Fase 1: Fundação (Docker, PostgreSQL, Redis, estrutura)
@@ -55,7 +55,8 @@
 
 ## Resultados FASE 12
 - Servidor FastAPI-MCP criado em core/mcp_server.py
-- Ferramentas expostas: ram_status, containers, services, memory
-- Serviço systemd: configs/mcp-server.service
+- MCP Server rodando em http://localhost:8000 (systemd)
+- Ferramentas expostas: /ram, /containers, /tools, /services, /system
+- Endpoints REST: health, ram, containers, tools, services, system
 - Documentação: docs/MCP_SERVER.md
-- Integração com Claude Desktop e outros clientes MCP
+- Integração com Claude Desktop via SSH tunnel
