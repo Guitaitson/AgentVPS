@@ -1,8 +1,8 @@
 # Estado Atual — VPS-Agente v2
 
-## Fase Atual: FASE 12 Completa
-## Última ação: FASE 12 completa — MCP Server deployado com sucesso
-## Próxima ação: Configurar SSH tunnel para acesso remoto ao MCP
+## Fase Atual: FASE 13 Completa
+## Última ação: FASE 13 completa — Self-Improvement Agent implementado
+## Próxima ação: Testar fluxo completo com mensagem via Telegram
 
 ## Checklist de Fases
 - [x] Fase 1: Fundação (Docker, PostgreSQL, Redis, estrutura)
@@ -17,6 +17,7 @@
 - [x] Fase 10: Roteamento Telegram → CLI
 - [x] Fase 11: Memória Semântica Qdrant
 - [x] Fase 12: FastAPI-MCP Integration
+- [x] Fase 13: Self-Improvement Agent
 
 ## Problemas Conhecidos
 - Nenhum
@@ -60,3 +61,13 @@
 - Endpoints REST: health, ram, containers, tools, services, system
 - Documentação: docs/MCP_SERVER.md
 - Integração com Claude Desktop via SSH tunnel
+
+## Resultados FASE 13
+- Self-Improvement Agent implementado
+- Capabilities Registry criado em core/capabilities/registry.py
+- Interface vps_agent/agent.py (Telegram → LangGraph)
+- Novos nós LangGraph: check_capabilities, self_improve, implement_capability
+- Tabelas PostgreSQL: agent_capabilities, capability_requests
+- Arquitetura: core/vps_langgraph/ (renomeado para evitar conflito com langgraph package)
+- Telegram Bot @Molttaitbot rodando via systemd
+- Fluxo: classify → load_context → plan → execute → respond → check_capabilities → self_improve → implement
