@@ -6,6 +6,7 @@ import subprocess
 import json
 import sys
 import os
+import random
 sys.path.insert(0, "/opt/vps-agent/core")
 
 from datetime import datetime, timezone
@@ -335,6 +336,7 @@ def node_generate_response(state: AgentState) -> dict:
     intent = state.get("intent", "chat")
     exec_result = state.get("execution_result", "")
     cli_response = state.get("cli_response", "")
+    user_msg = state.get("user_message", "").lower()
     
     if intent == "command" and exec_result:
         return {
@@ -355,9 +357,77 @@ def node_generate_response(state: AgentState) -> dict:
             "should_save_memory": True,
         }
     
+    # Respostas para chat - mais naturais e conversacionais
+    if intent == "chat":
+        # Saudações
+        greetings = ["oi", "olá", "ola", "hello", "hi", "hey", "e aí", "eaí", "bom dia", "boa tarde", "boa noite"]
+        if any(g in user_msg for g in greetings):
+            return {
+                "response": random.choice([
+                    "Oi! 😊 Como você está?",
+                    "Olá! Tudo bem?",
+                    "Hey! Boa! E você?",
+                    "Oi! Bom te ver por aqui!",
+                ]),
+                "should_save_memory": True,
+            }
+        
+        # Como está / como vai
+        if "como" in user_msg and ("você" in user_msg or "vc" in user_msg):
+            return {
+                "response": random.choice([
+                    "Estou funcionando bem, obrigado por perguntar! 🤖",
+                    "Tudo certo por aqui! E com você?",
+                    "Online e pronto para ajudar! 💪",
+                ]),
+                "should_save_memory": True,
+            }
+        
+        # Quer conversar
+        if "conversar" in user_msg or "chat" in user_msg or "bater papo" in user_msg:
+            return {
+                "response": random.choice([
+                    "Claro! Vamos conversar. 🎉",
+                    "Adoraria bater papo! Sobre o que quer falar?",
+                    "Estou aqui para isso! Conta aí!",
+                    "Conversa boa é com a gente! 😄",
+                ]),
+                "should_save_memory": True,
+            }
+        
+        # Obrigado / thanks
+        if "obrigado" in user_msg or "thanks" in user_msg or "thank" in user_msg:
+            return {
+                "response": random.choice([
+                    "De nada! 😊",
+                    "Disponha!",
+                    "Sempre às ordens!",
+                    "Imagina! 😄",
+                ]),
+                "should_save_memory": True,
+            }
+        
+        # Tchau / bye
+        if "tchau" in user_msg or "bye" in user_msg or "flw" in user_msg:
+            return {
+                "response": random.choice([
+                    "Tchau! 👋",
+                    "Até mais! 😄",
+                    "Flw! Foi bom conversar!",
+                    "Tchau tchau!",
+                ]),
+                "should_save_memory": True,
+            }
+        
+        # Resposta padrão para chat
+        return {
+            "response": "Olá! Como posso ajudar hoje? 😊",
+            "should_save_memory": True,
+        }
+    
     if intent == "question":
         return {
-            "response": "❓ Entendi sua pergunta. Vou processá-la...",
+            "response": "Entendi sua pergunta. Vou processá-la...",
             "should_save_memory": True,
         }
     
@@ -376,7 +446,7 @@ def node_save_memory(state: AgentState) -> dict:
     
     # Salvar na memória estruturada (PostgreSQL)
     if user_id and message:
-        memory.add_fact(user_id, {
+        memory.save_fact(user_id, "conversation", {
             "type": "conversation",
             "message": message,
             "response": response,
