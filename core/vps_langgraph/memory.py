@@ -89,8 +89,8 @@ class AgentMemory:
         conn = self._get_conn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
-            "SELECT role, content, timestamp FROM conversation_log "
-            "WHERE user_id = %s ORDER BY timestamp DESC LIMIT %s",
+            "SELECT role, content, created_at as timestamp FROM conversation_log "
+            "WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
             (user_id, limit)
         )
         history = [

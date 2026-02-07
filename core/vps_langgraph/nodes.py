@@ -30,6 +30,22 @@ def node_classify_intent(state: AgentState) -> AgentState:
             "intent_confidence": 0.95,
         }
     
+    # Tarefas que requerem Self-Improvement (criar algo novo)
+    self_improve_keywords = [
+        "criar", "crie", "criando", "novo", "novos", "nova",
+        "implementar", "implementa", "implementando",
+        "agente", "subagente", "mcp", "ferramenta",
+        "buscar", "procurar", "monitorar", "pesquisar",
+        "integração", "integrar", "conectar",
+    ]
+    
+    if any(kw in message for kw in self_improve_keywords):
+        return {
+            **state,
+            "intent": "self_improve",
+            "intent_confidence": 0.90,
+        }
+    
     # Perguntas sobre o sistema
     system_keywords = ["ram", "memória", "cpu", "docker", "container", "status", "saúde"]
     if any(kw in message for kw in system_keywords):
@@ -229,18 +245,45 @@ def node_execute(state: AgentState) -> AgentState:
 
 
 def node_generate_response(state: AgentState) -> AgentState:
-    """Gera resposta final ao usuário."""
+    """Gera resposta final ao usuário com identidade VPS-Agent."""
+    import sys
+    sys.path.insert(0, "/opt/vps-agent/core")
+    
     intent = state.get("intent")
     execution_result = state.get("execution_result")
     user_context = state.get("user_context", {})
     user_message = state.get("user_message")
+    conversation_history = state.get("conversation_history", [])
     
+    # Se há resultado de execução, usar diretamente
     if execution_result:
         response = execution_result
-    elif intent == "chat":
-        response = f"Entendi sua mensagem: '{user_message}'. Como posso ajudar?"
+    
+    # Para conversas e perguntas, usar LLM com identidade VPS-Agent
+    elif intent in ["chat", "question"]:
+        try:
+            from llm.openrouter_client import generate_response_sync
+            
+            # Chamar LLM com contexto completo de identidade
+            response = generate_response_sync(
+                user_message=user_message,
+                conversation_history=conversation_history,
+                user_context=user_context,
+            )
+            
+            # Fallback se LLM falhou
+            if not response:
+                if intent == "chat":
+                    response = f"Oi! Sou o VPS-Agent, seu assistente autonomous. 😊\n\nPosso ajudar a gerenciar sua VPS, criar agentes, integrar ferramentas e muito mais!\n\nO que precisa hoje?"
+                else:
+                    response = f"Sobre '{user_message}': Posso ajudar com isso! Como VPS-Agent, tenho acesso a várias ferramentas.\n\nPode me dar mais detalhes?"
+                    
+        except Exception as e:
+            print(f"LLM error: {e}")
+            response = f"Sou o VPS-Agent! 😊\n\nEntendi sua mensagem. Posso ajudar com:\n• Gerenciamento da VPS (RAM, containers, serviços)\n• Criação de novos agentes\n• Integração de ferramentas\n• E muito mais!\n\nO que precisa?"
+    
     else:
-        response = "Comando executado com sucesso!"
+        response = "Comando executado com sucesso! ✅"
     
     # Salvar memória se foi uma interação significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50

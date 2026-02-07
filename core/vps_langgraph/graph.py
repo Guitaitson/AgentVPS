@@ -1,6 +1,6 @@
 """
 Grafo principal do agente LangGraph.
-Define o fluxo de decisão: input → classificar → contexto → planejar → executar → responder.
+Define o fluxo de decisão completo com Self-Improvement.
 """
 from langgraph.graph import StateGraph, END
 from vps_langgraph.state import AgentState
@@ -38,32 +38,33 @@ def build_agent_graph():
     # Ponto de entrada
     workflow.set_entry_point("classify")
     
-    # Classificação de intenção
+    # Classificação de intenção → Contexto
     workflow.add_edge("classify", "load_context")
     
-    # Carregar contexto
+    # Contexto → Planejamento
     workflow.add_edge("load_context", "plan")
     
-    # Planejamento
+    # Planejamento → Execução/Resposta (baseado no intent)
     workflow.add_conditional_edges(
         "plan",
-        lambda state: state.get("intent_type", "unknown"),
+        lambda state: state.get("intent", "unknown"),
         {
-            "command": "execute",
-            "task": "execute",
-            "question": "respond",
-            "chat": "respond",
+            "command": "execute",     # Comandos diretos → executar
+            "task": "execute",      # Tarefas → executar
+            "question": "respond",   # Perguntas → responder
+            "chat": "respond",      # Chat → responder
+            "self_improve": "check_capabilities",  # Auto-evolução → verificar capacidades
             "unknown": "respond",
         }
     )
     
-    # Execução
+    # Execução → Salvar memória
     workflow.add_edge("execute", "save_memory")
     
-    # Salvar memória
+    # Salvar memória → Responder
     workflow.add_edge("save_memory", "respond")
     
-    # Verificar capacidades após execução
+    # Após responder, verificar se precisa de capabilities
     workflow.add_conditional_edges(
         "respond",
         lambda state: state.get("needs_capability_check", False),
@@ -73,7 +74,7 @@ def build_agent_graph():
         }
     )
     
-    # Verificar se precisa de self-improvement
+    # Verificar capacidades
     workflow.add_conditional_edges(
         "check_capabilities",
         lambda state: state.get("capability_status", "ok"),
@@ -84,10 +85,10 @@ def build_agent_graph():
         }
     )
     
-    # Self-improvement
+    # Self-improvement → Implementar capacidade
     workflow.add_edge("self_improve", "implement_capability")
     
-    # Implementar capacidade
+    # Implementar capacidade → END
     workflow.add_edge("implement_capability", END)
     
     return workflow.compile()
