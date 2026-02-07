@@ -38,4 +38,4 @@ vps-agent = "telegram_bot.bot:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["vps_agent*", "vps_langgraph*", "core*", "telegram_bot*"]
+include = ["core.*"]

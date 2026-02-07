@@ -1,1 +1,1 @@
-# VPS Agent - LangGraph + Memory
+# vps_agent - VPS Agent main module
