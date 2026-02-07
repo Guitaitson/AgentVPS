@@ -49,16 +49,20 @@ ALLOWED_USERS = [
 def get_db_conn():
     """Retorna conexão com PostgreSQL."""
     return psycopg2.connect(
-        host="127.0.0.1",
-        port=5432,
-        dbname="vps_agent",
+        host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
+        port=int(os.getenv("POSTGRES_PORT", 5432)),
+        dbname=os.getenv("POSTGRES_DB", "vps_agent"),
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
     )
 
 def get_redis():
     """Retorna conexão com Redis."""
-    return redis.Redis(host="127.0.0.1", port=6379, decode_responses=True)
+    return redis.Redis(
+        host=os.getenv("REDIS_HOST", "127.0.0.1"),
+        port=int(os.getenv("REDIS_PORT", 6379)),
+        decode_responses=True
+    )
 
 
 # Middleware de segurança
