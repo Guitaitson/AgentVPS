@@ -13,6 +13,9 @@ from .nodes import (
     node_call_cli,
     node_generate_response,
     node_save_memory,
+    node_check_capabilities,
+    node_self_improve,
+    node_implement_capability,
 )
 
 memory = AgentMemory()
@@ -32,6 +35,11 @@ def build_agent_graph():
     graph.add_node("respond", node_generate_response)
     graph.add_node("save_memory", node_save_memory)
     
+    # Nós de self-improvement
+    graph.add_node("check_capabilities", node_check_capabilities)
+    graph.add_node("self_improve", node_self_improve)
+    graph.add_node("implement_capability", node_implement_capability)
+    
     # Definir fluxo
     graph.set_entry_point("classify")
     
@@ -39,15 +47,24 @@ def build_agent_graph():
     graph.add_edge("classify", "load_context")
     graph.add_edge("load_context", "plan")
     
-    # plan → execute (comandos diretos) OU plan → call_cli (tarefas)
+    # plan → check_capabilities (verificar se precisa melhorar)
+    graph.add_edge("plan", "check_capabilities")
+    
+    # check_capabilities → self_improve (se precisa) OU check_capabilities → execute (se não precisa)
     graph.add_conditional_edges(
-        "plan",
-        lambda state: "execute" if state.get("plan") and state.get("plan", [{}])[0].get("action") in ["run_command", "start_tool", "stop_tool"] else "call_cli",
+        "check_capabilities",
+        lambda state: "self_improve" if state.get("needs_improvement") else "execute",
         {
+            "self_improve": "self_improve",
             "execute": "execute",
-            "call_cli": "call_cli",
         }
     )
+    
+    # self_improve → implement_capability
+    graph.add_edge("self_improve", "implement_capability")
+    
+    # implement_capability → respond
+    graph.add_edge("implement_capability", "respond")
     
     # execute → respond
     graph.add_edge("execute", "respond")

@@ -86,3 +86,41 @@ CREATE TRIGGER trg_state_updated
 CREATE TRIGGER trg_skills_updated
     BEFORE UPDATE ON agent_skills
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Capacidades do agente (Self-Improvement)
+CREATE TABLE IF NOT EXISTS agent_capabilities (
+    id SERIAL PRIMARY KEY,
+    capability_name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    implemented BOOLEAN DEFAULT FALSE,
+    implementation_path VARCHAR(500),
+    dependencies JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    implemented_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Histórico de implementações de capacidades
+CREATE TABLE IF NOT EXISTS capability_implementations (
+    id SERIAL PRIMARY KEY,
+    capability_name VARCHAR(255) NOT NULL,
+    implementation_plan TEXT NOT NULL,
+    generated_code TEXT,
+    status VARCHAR(20) DEFAULT 'pending',  -- 'pending', 'in_progress', 'completed', 'failed'
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Índices para capacidades
+CREATE INDEX idx_capabilities_name ON agent_capabilities(capability_name);
+CREATE INDEX idx_capabilities_category ON agent_capabilities(category);
+CREATE INDEX idx_capabilities_implemented ON agent_capabilities(implemented);
+CREATE INDEX idx_implementations_status ON capability_implementations(status);
+CREATE INDEX idx_implementations_capability ON capability_implementations(capability_name);
+
+-- Trigger para update de capabilities
+CREATE TRIGGER trg_capabilities_updated
+    BEFORE UPDATE ON agent_capabilities
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();

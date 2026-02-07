@@ -261,3 +261,126 @@ def node_save_memory(state: AgentState) -> AgentState:
         memory.save_fact(user_id, key, value)
     
     return state
+
+
+# ============ Self-Improvement Nodes ============
+
+def node_check_capabilities(state: AgentState) -> AgentState:
+    """Verifica se o agente tem as capacidades necessárias."""
+    from capabilities import capabilities_registry
+    
+    task = state.get("user_message", "")
+    missing = capabilities_registry.detect_missing(task)
+    
+    if missing:
+        missing_list = [cap.to_dict() for cap in missing]
+        return {
+            **state,
+            "missing_capabilities": missing_list,
+            "needs_improvement": True,
+            "improvement_summary": f"Detectei {len(missing)} capacidades faltantes: {', '.join(cap.name for cap in missing)}"
+        }
+    
+    return {
+        **state,
+        "missing_capabilities": [],
+        "needs_improvement": False,
+        "improvement_summary": "Todas as capacidades necessárias estão disponíveis."
+    }
+
+
+def node_self_improve(state: AgentState) -> AgentState:
+    """Planeja e executa auto-improvement."""
+    from capabilities import capabilities_registry
+    
+    missing = state.get("missing_capabilities", [])
+    
+    if not missing:
+        return {
+            **state,
+            "should_improve": False,
+            "improvement_plan": None
+        }
+    
+    # Criar plano de implementação
+    plan = []
+    for cap_dict in missing:
+        cap_name = cap_dict["name"]
+        cap = capabilities_registry.get_capability(cap_name)
+        if cap:
+            plan.append({
+                "capability": cap.to_dict(),
+                "steps": capabilities_registry.get_implementation_plan(cap)
+            })
+    
+    return {
+        **state,
+        "improvement_plan": plan,
+        "should_improve": True,
+        "improvement_status": "planning"
+    }
+
+
+def node_implement_capability(state: AgentState) -> AgentState:
+    """Implementa uma nova capacidade usando o CLI."""
+    from capabilities import capabilities_registry
+    
+    plan = state.get("improvement_plan", [])
+    
+    if not plan:
+        return {
+            **state,
+            "implementation_result": "Nada para implementar",
+            "new_capability": None
+        }
+    
+    # Chamar CLI para implementar a primeira capacidade
+    target_cap = plan[0]["capability"]
+    cap_name = target_cap["name"]
+    cap_description = target_cap["description"]
+    
+    # Criar prompt para o CLI
+    cli_prompt = f"""# Auto-Implementação de Capacidade
+
+## Capacidade a Implementar
+**Nome:** {cap_name}
+**Descrição:** {cap_description}
+
+## Contexto
+O agente detectou que esta capacidade está faltante e precisa ser implementada automaticamente.
+
+## Requisitos
+1. Criar módulo Python funcional
+2. Integrar com sistemas existentes (LangGraph, MCP Server, etc.)
+3. Adicionar testes
+4. Documentar uso
+
+## Plano de Implementação
+{plan[0]["steps"]}
+
+## Restrições
+- Deve funcionar na VPS (Ubuntu 24.04)
+- Deve respeitar limites de RAM (2.4 GB total)
+- Deve ser testado antes de marcar como implementado
+
+Por favor, implemente esta capacidade seguindo o plano acima.
+"""
+    
+    # Simular chamada ao CLI (na implementação real, isso seria uma chamada real)
+    # Por enquanto, vamos gerar um código placeholder
+    implementation_code = f"""# Placeholder para {cap_name}
+# Esta capacidade será implementada pelo CLI/Kilocode
+
+def {cap_name.replace('-', '_')}():
+    \"\"\"{cap_description}\"\"\"
+    # TODO: Implementar funcionalidade
+    pass
+"""
+    
+    return {
+        **state,
+        "implementation_result": f"Código gerado para {cap_name}. Agora preciso integrar e testar.",
+        "generated_code": implementation_code,
+        "new_capability": cap_name,
+        "implementation_status": "code_generated"
+    }
