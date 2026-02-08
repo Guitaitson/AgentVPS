@@ -1,13 +1,13 @@
-# Enhanced Intent Classifier - Classificador melhorado de intenções
+# Enhanced Intent Classifier - Classificador melhorado de intencoes
 
 """
-Módulo de classificação de intenções melhorado.
+Modulo de classificacao de intencoes melhorado.
 
-Este módulo implementa recomendações para melhorar a classificação de intents:
-- Padrões mais abrangentes
-- Suporte a mensagens em português e inglês
-- Detecção de intents compostos
-- Fallback para classificação por LLM
+Este modulo implementa recomendacoes para melhorar a classificacao de intents:
+- Padroes mais abrangentes
+- Suporte a mensagens em portugues e ingles
+- Deteccao de intents compostos
+- Fallback para classificacao por LLM
 """
 
 from typing import Dict, List, Tuple, Optional, Any
@@ -15,7 +15,7 @@ from enum import Enum
 
 
 class Intent(Enum):
-    """Enumeração dos tipos de intenção suportados."""
+    """Enumeracao dos tipos de intencao suportados."""
     COMMAND = "command"
     TASK = "task"
     QUESTION = "question"
@@ -24,7 +24,7 @@ class Intent(Enum):
     UNKNOWN = "unknown"
 
 
-# ============ Padrões de Classificação ============
+# ============ Padroes de Classificacao ============
 
 # Comandos diretos do Telegram/sistema
 TELEGRAM_COMMANDS = [
@@ -38,43 +38,43 @@ TELEGRAM_COMMANDS = [
 
 # Palavras-chave que indicam tarefas de auto-melhoria
 SELF_IMPROVE_KEYWORDS = [
-    # Criação
-    "criar", "crie", "criando", "criação",
+    # Criacao
+    "criar", "crie", "criando", "criacao",
     "novo", "nova", "novos", "novas",
-    # Implementação
-    "implementar", "implementa", "implementando", "implementação",
+    # Implementacao
+    "implementar", "implementa", "implementando", "implementacao",
     "desenvolver", "desenvolve", "desenvolvendo",
     "codar", "codando", "programar", "programando",
     # Agentes
     "agente", "subagente", "sub-agente", "assistant", "bot",
-    # Ferramentas e integrações
+    # Ferramentas e integracoes
     "mcp", "ferramenta", "tool", "skill",
-    "integração", "integrar", "conectar", "conexão",
-    "plugin", "extension", "extensão",
+    "integracao", "integrar", "conectar", "conexao",
+    "plugin", "extension", "extensao",
     # Busca e pesquisa
     "buscar", "busca", "procurar", "pesquisar", "search",
     "monitorar", "monitoramento", "watch",
-    # GitHub específico
-    "github", "repositório", "repo", "repos", "pr", "pull request",
+    # GitHub especifico
+    "github", "repositorio", "repo", "repos", "pr", "pull request",
     "commit", "branch", "merge", "issue",
 ]
 
 # Perguntas sobre o sistema
 SYSTEM_KEYWORDS = [
     # Hardware/Recursos
-    "ram", "memória", "memory", "cpu", "disco", "disk", "espaço", "space",
+    "ram", "memoria", "memory", "cpu", "disco", "disk", "espaco", "space",
     # Containers
     "docker", "container", "containers", "imagem", "image",
-    # Serviços
-    "serviço", "service", "serviços", "services",
+    # Servicos
+    "servico", "service", "servicos", "services",
     "postgresql", "postgres", "redis", "banco", "database",
     # Status
-    "status", "saúde", "health", "como está", "está rodando",
+    "status", "saude", "health", "como esta", "esta rodando",
     # Rede
     "rede", "network", "porta", "port", "ip",
 ]
 
-# Preguntas gerais (indicadores de interrogacao)
+# Perguntas gerais (indicadores de interrogacao)
 QUESTION_INDICATORS = [
     "qual e", "quais sao", "o que e", "quem e", "onde esta",
     "quanto e", "por que", "porque", "como", "quando", "para que",
@@ -84,7 +84,7 @@ QUESTION_INDICATORS = [
 
 # Acoes a executar
 ACTION_KEYWORDS = [
-    # Verbos de ação
+    # Verbos de acao
     "rode", "roda", "rode", "executar", "executa", "executando",
     "rode", "run", "start", "iniciar", "inicia", "iniciando",
     "parar", "para", "parando", "stop", "stop",
@@ -100,16 +100,16 @@ ACTION_KEYWORDS = [
 
 # Palavras de conversa natural
 CHAT_KEYWORDS = [
-    "oi", "olá", "ola", "hello", "hi", "e aí", "eaí", "eai",
+    "oi", "ola", "hello", "hi", "e ai", "eai",
     "tudo bem", "como vai", "bom dia", "boa tarde", "boa noite",
     "obrigado", "obrigada", "thanks", "thank",
     "por favor", "please",
-    "posso", "pode", "você consegue", "você pode",
+    "posso", "pode", "voce consegue", "voce pode",
 ]
 
 # Keywords que indicam skills faltantes (para resposta smarter)
 SKILL_INDICATORS = {
-    "github": ["github", "repositório", "repo", "pr", "pull request", "commit", "branch"],
+    "github": ["github", "repositorio", "repo", "pr", "pull request", "commit", "branch"],
     "web_search": ["buscar", "pesquisar", "search", "google", "internet", "web"],
     "file_manager": ["arquivo", "file", "criar arquivo", "editar arquivo", "ler arquivo"],
     "email": ["email", "e-mail", "enviar email", "gmail", "smtp"],
@@ -117,24 +117,24 @@ SKILL_INDICATORS = {
     "database": ["banco de dados", "sql", "query", "postgres", "mysql"],
     "docker": ["docker", "container", "imagem", "kubernetes", "k8s"],
     "api": ["api", "endpoint", "rest", "http", "request"],
-    "monitoring": ["monitorar", "monitoramento", "alerta", "notificação"],
+    "monitoring": ["monitorar", "monitoramento", "alerta", "notificacao"],
 }
 
 
-# ============ Funções de Classificação ============
+# ============ Funcoes de Classificacao ============
 
 def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
     """
-    Classifica a intenção do usuário com base na mensagem.
+    Classifica a intencao do usuario com base na mensagem.
     
     Args:
-        message: Mensagem do usuário
+        message: Mensagem do usuario
         
     Returns:
         Tupla de (intent, confidence, details)
-        - intent: Enum da intenção classificada
-        - confidence: Confiança da classificação (0.0 a 1.0)
-        - details: Dicionário com detalhes da classificação
+        - intent: Enum da intencao classificada
+        - confidence: Confianca da classificacao (0.0 a 1.0)
+        - details: Dicionario com detalhes da classificacao
     """
     message_lower = message.lower().strip()
     
@@ -156,7 +156,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             {"keywords": _get_matched_keywords(message_lower, SELF_IMPROVE_KEYWORDS)}
         )
     
-    # 3. Verificar perguntas sobre o sistema\n    system_score = _check_keywords(message_lower, SYSTEM_KEYWORDS)\n    if system_score >= 0.6:\n        return (\n            Intent.QUESTION,\n            system_score,\n            {"keywords": _get_matched_keywords(message_lower, SYSTEM_KEYWORDS)}\n        )\n    \n    # 3.5. Verificar indicadores de perguntas gerais\n    question_score = _check_keywords(message_lower, QUESTION_INDICATORS)\n    if question_score >= 0.5:\n        return (\n            Intent.QUESTION,\n            question_score,\n            {"keywords": _get_matched_keywords(message_lower, QUESTION_INDICATORS)}\n        )\n    \n    # 4. Verificar acoes
+    # 3. Verificar perguntas sobre o sistema
     system_score = _check_keywords(message_lower, SYSTEM_KEYWORDS)
     if system_score >= 0.6:
         return (
@@ -165,7 +165,16 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             {"keywords": _get_matched_keywords(message_lower, SYSTEM_KEYWORDS)}
         )
     
-    # 4. Verificar ações a executar
+    # 3.5. Verificar indicadores de perguntas gerais
+    question_score = _check_keywords(message_lower, QUESTION_INDICATORS)
+    if question_score >= 0.5:
+        return (
+            Intent.QUESTION,
+            question_score,
+            {"keywords": _get_matched_keywords(message_lower, QUESTION_INDICATORS)}
+        )
+    
+    # 4. Verificar acoes a executar
     action_score = _check_keywords(message_lower, ACTION_KEYWORDS)
     if action_score >= 0.6:
         return (
@@ -192,7 +201,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             {"skill_indicators": skill_indicators}
         )
     
-    # 7. Default: conversa (assumir que é conversa até prova em contrário)
+    # 7. Default: conversa (assumir que e conversa ate prova em contrario)
     return (
         Intent.CHAT,
         0.60,
@@ -246,7 +255,7 @@ def _detect_skill_indicators(message: str) -> Dict[str, bool]:
         message: Mensagem processada
         
     Returns:
-        Dicionário com skills detectadas
+        Dicionario com skills detectadas
     """
     detected = {}
     for skill, indicators in SKILL_INDICATORS.items():
@@ -260,31 +269,31 @@ def classify_with_context(
     conversation_history: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Classifica intenção considerando contexto da conversa.
+    Classifica intencao considerando contexto da conversa.
     
     Args:
         message: Mensagem atual
-        conversation_history: Histórico de mensagens anteriores
+        conversation_history: Historico de mensagens anteriores
         
     Returns:
-        Dicionário completo com classificação
+        Dicionario completo com classificacao
     """
-    # Classificação básica
+    # Classificacao basica
     intent, confidence, details = classify_intent(message)
     
     # Ajustar baseado em contexto
     if conversation_history:
-        # Verificar se há uma tendência
+        # Verificar se ha uma tendencia
         intents_in_history = [
             msg.get("intent") for msg in conversation_history[-5:]
             if msg.get("intent")
         ]
         
         if intents_in_history:
-            # Se últimas mensagens foram self_improve, manter tendência
+            # Se ultimas mensagens foram self_improve, manter tendencia
             if intents_in_history[-1] == Intent.SELF_IMPROVE.value:
-                if any(kw in message.lower() for kw in ["e", "também", "also", "mais"]):
-                    # Parece continuação de self_improve
+                if any(kw in message.lower() for kw in ["e", "tambem", "also", "mais"]):
+                    # Parece continuacao de self_improve
                     details["context_adjusted"] = True
                     details["original_intent"] = intent.value
                     intent = Intent.SELF_IMPROVE
@@ -300,13 +309,13 @@ def classify_with_context(
 
 def get_intent_description(intent: Intent) -> str:
     """
-    Retorna descrição legível do intent.
+    Retorna descricao legivel do intent.
     
     Args:
         intent: Enum do intent
         
     Returns:
-        Descrição formatada
+        Descricao formatada
     """
     descriptions = {
         Intent.COMMAND: "Comando direto do Telegram",
@@ -314,64 +323,64 @@ def get_intent_description(intent: Intent) -> str:
         Intent.QUESTION: "Pergunta sobre o sistema",
         Intent.CHAT: "Conversa geral",
         Intent.SELF_IMPROVE: "Pedido de nova capacidade",
-        Intent.UNKNOWN: "Intenção não reconhecida",
+        Intent.UNKNOWN: "Intencao nao reconhecida",
     }
     return descriptions.get(intent, "Desconhecido")
 
 
 def suggest_alternatives(message: str) -> List[str]:
     """
-    Sugere alternativas quando a classificação é incerta.
+    Sugere alternativas quando a classificacao e incerta.
     
     Args:
         message: Mensagem original
         
     Returns:
-        Lista de sugestões
+        Lista de sugestoes
     """
     suggestions = []
     message_lower = message.lower()
     
-    # Sugerir comandos disponíveis
-    if any(kw in message_lower for kw in ["ram", "memória", "memory"]):
-        suggestions.append("Tente: /ram para ver status de memória")
+    # Sugerir comandos disponiveis
+    if any(kw in message_lower for kw in ["ram", "memoria", "memory"]):
+        suggestions.append("Tente: /ram para ver status de memoria")
     
     if any(kw in message_lower for kw in ["container", "docker"]):
         suggestions.append("Tente: /containers para listar containers")
     
-    if any(kw in message_lower for kw in ["status", "como está"]):
+    if any(kw in message_lower for kw in ["status", "como esta"]):
         suggestions.append("Tente: /status para ver status geral")
     
     if any(kw in message_lower for kw in ["criar", "novo", "agente"]):
-        suggestions.append("Posso criar novos agentes! Me diga o que você precisa.")
+        suggestions.append("Posso criar novos agentes! Me diga o que voce precisa.")
     
     return suggestions
 
 
-# ============ Prompt para Classificação por LLM ============
+# ============ Prompt para Classificacao por LLM ============
 
 INTENT_CLASSIFICATION_PROMPT = """
-Você é um classificador de intenções para um agente VPS.
+Voce e um classificador de intencoes para um agente VPS.
 
-## Intenções Suportadas:
+## Intencoes Suportadas:
 1. **command** - Comandos diretos do sistema (/status, /ram, /help)
 2. **task** - Tarefas a executar (iniciar algo, parar algo, configurar)
-3. **question** - Perguntas sobre o sistema (quanta RAM? como está?)
+3. **question** - Perguntas sobre o sistema (quanta RAM? como esta?)
 4. **chat** - Conversa natural (oi, tudo bem, obrigado)
 5. **self_improve** - Pedidos para criar/implementar algo novo (criar agente, integrar GitHub)
 
 ## Exemplos:
-- "oi" → chat
-- "/status" → command
-- "quanta RAM está livre?" → question
-- "liste meus containers" → task
-- "crie um novo agente" → self_improve
-- "liste meus projetos no github" → self_improve (requer nova skill)
+- "oi" -> chat
+- "/status" -> command
+- "quanta RAM?" -> question
+- "liste containers" -> task
+- "crie um agente" -> self_improve
+- "liste meus projetos no github" -> self_improve (requer nova skill)
 
 ## Contexto:
-Histórico recente: {history}
+Historico recente: {history}
 
-## Mensagem do usuário:
+## Mensagem do usuario:
 {message}
 
 ## Responda em JSON:
@@ -385,25 +394,25 @@ Histórico recente: {history}
 
 def build_classification_prompt(message: str, history: str = "") -> str:
     """
-    Constrói prompt para classificação por LLM.
+    Constroi prompt para classificacao por LLM.
     
     Args:
         message: Mensagem a classificar
-        history: Histórico formatado
+        history: Historico formatado
         
     Returns:
         Prompt completo
     """
     return INTENT_CLASSIFICATION_PROMPT.format(
         message=message,
-        history=history or "Nenhum histórico"
+        history=history or "Nenhum historico"
     )
 
 
 # ============ Testes ============
 
 if __name__ == "__main__":
-    # Testes básicos
+    # Testes basicos
     test_cases = [
         ("oi", Intent.CHAT),
         ("/status", Intent.COMMAND),
@@ -413,9 +422,8 @@ if __name__ == "__main__":
         ("liste meus projetos no github", Intent.SELF_IMPROVE),
     ]
     
-    print("=== Testes de Classificação ===")
+    print("=== Testes de Classificacao ===")
     for message, expected in test_cases:
         intent, confidence, details = classify_intent(message)
-        status = "✅" if intent == expected else "❌"
-        print(f"{status} '{message}' → {intent.value} ({confidence:.2f})")
-
+        status = "OK" if intent == expected else "FALHA"
+        print(f"{status} '{message}' -> {intent.value} ({confidence:.2f})")
