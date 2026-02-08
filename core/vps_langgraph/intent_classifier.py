@@ -74,7 +74,15 @@ SYSTEM_KEYWORDS = [
     "rede", "network", "porta", "port", "ip",
 ]
 
-# Ações a executar
+# Preguntas gerais (indicadores de interrogacao)
+QUESTION_INDICATORS = [
+    "qual e", "quais sao", "o que e", "quem e", "onde esta",
+    "quanto e", "por que", "porque", "como", "quando", "para que",
+    "me explica", "me diz", "me conta", "voce sabe", "sabe dizer",
+    "nao entendo", "nao compreendo",
+]
+
+# Acoes a executar
 ACTION_KEYWORDS = [
     # Verbos de ação
     "rode", "roda", "rode", "executar", "executa", "executando",
@@ -148,7 +156,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             {"keywords": _get_matched_keywords(message_lower, SELF_IMPROVE_KEYWORDS)}
         )
     
-    # 3. Verificar perguntas sobre o sistema
+    # 3. Verificar perguntas sobre o sistema\n    system_score = _check_keywords(message_lower, SYSTEM_KEYWORDS)\n    if system_score >= 0.6:\n        return (\n            Intent.QUESTION,\n            system_score,\n            {"keywords": _get_matched_keywords(message_lower, SYSTEM_KEYWORDS)}\n        )\n    \n    # 3.5. Verificar indicadores de perguntas gerais\n    question_score = _check_keywords(message_lower, QUESTION_INDICATORS)\n    if question_score >= 0.5:\n        return (\n            Intent.QUESTION,\n            question_score,\n            {"keywords": _get_matched_keywords(message_lower, QUESTION_INDICATORS)}\n        )\n    \n    # 4. Verificar acoes
     system_score = _check_keywords(message_lower, SYSTEM_KEYWORDS)
     if system_score >= 0.6:
         return (
@@ -410,3 +418,4 @@ if __name__ == "__main__":
         intent, confidence, details = classify_intent(message)
         status = "✅" if intent == expected else "❌"
         print(f"{status} '{message}' → {intent.value} ({confidence:.2f})")
+
