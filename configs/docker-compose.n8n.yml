@@ -1,24 +1,47 @@
-version: "3.8"
+# /opt/vps-agent/configs/docker-compose.n8n.yml
+# n8n - Ferramenta de automação sob demanda
+#
+# Docker Compose v2 Format
+# https://docs.docker.com/compose/compose-file/
+
 services:
   n8n:
     image: n8nio/n8n:1.73.1
     container_name: vps-n8n
     restart: unless-stopped
     volumes:
-      - /opt/vps-agent/tools/n8n/data:/home/node/.n8n
+      - n8n_data:/home/node/.n8n
     ports:
-      - "127.0.0.1:5678:5678"
-    deploy:
-      resources:
-        limits:
-          memory: 300M
+      - host: 127.0.0.1:5678:5678
+        protocol: tcp
+    mem_limit: 300m
+    memswap_limit: 300m
+    cpu_period: 100000
+    cpu_quota: 100000
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-TROCAR}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=${N8N_PORT:-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=${N8N_TIMEZONE:-America/Sao_Paulo}
+      - TZ=${N8N_TIMEZONE:-America/Sao_Paulo}
     networks:
-      - vps-core-network
+      - core-network
+    labels:
+      - "com.docker.compose.project=vps-agent"
+      - "com.docker.compose.service=n8n"
+      - "environment=production"
+      - "traefik.enable=false"
 
 networks:
-  vps-core-network:
+  core-network:
+    name: vps-core-network
     external: true
+
+volumes:
+  n8n_data:
+    name: vps-n8n-data
+    driver: local
