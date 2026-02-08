@@ -5,7 +5,6 @@ PostgreSQL para fatos, Redis para cache.
 """
 import os
 import json
-from typing import Optional
 
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor

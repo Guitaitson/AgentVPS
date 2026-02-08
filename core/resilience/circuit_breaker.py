@@ -4,10 +4,10 @@ Error Handling + Circuit Breaker - F1-09
 Sistema de tratamento de erros e circuit breaker.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Optional
 from enum import Enum
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import asyncio
 import time
 
@@ -147,7 +147,7 @@ class CircuitBreaker:
             result = func(*args, **kwargs)
             self._record_success()
             return result
-        except Exception as e:
+        except Exception:
             self._record_failure()
             raise
     
@@ -176,7 +176,7 @@ class CircuitBreaker:
             result = await func(*args, **kwargs)
             self._record_success()
             return result
-        except Exception as e:
+        except Exception:
             self._record_failure()
             raise
     
@@ -246,13 +246,11 @@ async def retry_with_backoff(
         RetryError: Se todas as tentativas falharem
     """
     policy = policy or RetryPolicy()
-    last_error = None
     
     for attempt in range(1, policy.max_attempts + 1):
         try:
             return await func(*args, **kwargs)
         except Exception as e:
-            last_error = e
             if attempt == policy.max_attempts:
                 raise RetryError(
                     f"Max retry attempts ({policy.max_attempts}) reached",
@@ -287,13 +285,11 @@ def retry_with_backoff_sync(
         RetryError: Se todas as tentativas falharem
     """
     policy = policy or RetryPolicy()
-    last_error = None
     
     for attempt in range(1, policy.max_attempts + 1):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            last_error = e
             if attempt == policy.max_attempts:
                 raise RetryError(
                     f"Max retry attempts ({policy.max_attempts}) reached",

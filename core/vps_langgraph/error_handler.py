@@ -10,7 +10,6 @@ Este módulo implementa recomendações para melhorar error handling:
 - Recuperação graceful
 """
 
-import sys
 import traceback
 import structlog
 from typing import Optional, Dict, Any, Callable

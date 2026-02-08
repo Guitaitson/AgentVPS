@@ -8,8 +8,7 @@ suas capacidades.
 import sys
 sys.path.insert(0, "/opt/vps-agent/core")
 
-from typing import Dict, List, Any
-from datetime import datetime, timezone
+from typing import Dict, List
 
 
 def get_agent_identity() -> str:

@@ -3,8 +3,6 @@ Nodes do agente LangGraph.
 Cada função é um nó no grafo de decisões.
 """
 import subprocess
-import json
-from typing import Optional
 from datetime import datetime
 
 from .memory import AgentMemory
@@ -417,8 +415,6 @@ def node_implement_capability(state: AgentState) -> AgentState:
     sys.path.insert(0, "/opt/vps-agent/core")
     
     try:
-        from capabilities import capabilities_registry
-        
         plan = state.get("improvement_plan", [])
         
         if not plan:
@@ -434,7 +430,7 @@ def node_implement_capability(state: AgentState) -> AgentState:
         cap_description = target_cap["description"]
         
         # Criar prompt para o CLI
-        cli_prompt = f"""# Auto-Implementação de Capacidade
+        f"""# Auto-Implementação de Capacidade
 
 ## Capacidade a Implementar
 **Nome:** {cap_name}

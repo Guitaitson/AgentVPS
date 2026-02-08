@@ -6,8 +6,8 @@ Implements token bucket rate limiting for API requests.
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+from dataclasses import dataclass
+from typing import Dict
 
 
 @dataclass

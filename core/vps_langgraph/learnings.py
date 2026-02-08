@@ -17,7 +17,6 @@ import os
 import json
 import structlog
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
 from contextlib import contextmanager
 
 logger = structlog.get_logger()
@@ -288,8 +287,8 @@ class LearningsManager:
         
         # Filtrar apenas lições relevantes (sucesso = True)
         relevant_lessons = [
-            l['lesson'] for l in learnings 
-            if l['success'] and l['category'] != 'execution_error'
+            lesson_item['lesson'] for lesson_item in learnings
+            if lesson_item['success'] and lesson_item['category'] != 'execution_error'
         ]
         
         return relevant_lessons

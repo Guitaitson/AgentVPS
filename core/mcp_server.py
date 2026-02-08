@@ -9,9 +9,7 @@ The server will be available at http://localhost:8000/mcp
 """
 import subprocess
 import sys
-import os
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from fastapi import FastAPI
 from fastapi_mcp import FastApiMCP
@@ -21,7 +19,6 @@ sys.path.insert(0, '/opt/vps-agent/core')
 
 from resource_manager.manager import (
     get_available_ram,
-    get_running_tools,
     get_tools_status,
     start_tool,
     stop_tool,
@@ -76,7 +73,7 @@ def get_system_info() -> dict:
     
     # CPU
     cpu_result = subprocess.run(["top", "-bn1"], capture_output=True, text=True)
-    cpu_line = [l for l in cpu_result.stdout.split("\n") if "Cpu(s)" in l][0]
+    cpu_line = [line for line in cpu_result.stdout.split("\n") if "Cpu(s)" in line][0]
     cpu_parts = cpu_line.split()
     cpu_idle = float(cpu_parts[3].replace(",", "."))
     cpu_usage = 100.0 - cpu_idle

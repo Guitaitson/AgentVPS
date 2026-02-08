@@ -3,10 +3,7 @@ Resource Manager — Gerencia RAM subindo/descendo containers sob demanda.
 Regra: nunca ultrapassar 2.4 GB total. Serviços core (~750 MB) sempre ligados.
 """
 import subprocess
-import json
 import os
-from typing import Optional
-from datetime import datetime, timezone
 
 import structlog
 

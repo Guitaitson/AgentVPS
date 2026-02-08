@@ -3,8 +3,6 @@ Memória Semântica com Qdrant.
 Armazena conversas e contexto como vetores para busca semântica.
 """
 import sys
-import os
-import json
 import uuid
 sys.path.insert(0, "/opt/vps-agent/core")
 
@@ -18,7 +16,6 @@ try:
         PointStruct,
         VectorParams,
         Distance,
-        SearchParams,
     )
     QDRANT_AVAILABLE = True
 except ImportError:
@@ -238,7 +235,7 @@ class SemanticMemory:
             return False
         
         try:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue, Delete
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
             
             self.client.delete(
                 collection_name=self.COLLECTION_NAME,

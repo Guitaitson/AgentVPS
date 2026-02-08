@@ -9,9 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
-import asyncio
 import os
-import socket
 
 
 class HealthStatus(Enum):
@@ -95,7 +93,6 @@ class HealthCheck:
             redis_url: URL de conexão para Redis
             docker_socket: Socket do Docker
         """
-        import os
         self.postgres_dsn = postgres_dsn or os.getenv("POSTGRES_DSN", "postgresql://postgres:postgres@localhost:5432/agentvps")
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.docker_socket = docker_socket or os.getenv("DOCKER_SOCKET", "/var/run/docker.sock")

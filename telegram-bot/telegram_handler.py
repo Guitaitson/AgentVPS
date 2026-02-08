@@ -3,7 +3,6 @@ Telegram Log Handler — Notifica erros CRITICAL via Telegram
 F0-06 — FASE 0 Estabilização
 """
 import os
-import sys
 import logging
 import structlog
 from datetime import datetime, timezone

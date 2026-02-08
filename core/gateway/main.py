@@ -25,7 +25,7 @@ sys.path.insert(0, "/opt/vps-agent/core")
 
 from vps_agent.agent import process_message_async
 from gateway.rate_limiter import RateLimiter
-from gateway.adapters import TelegramAdapter, WebhookAdapter
+from gateway.adapters import TelegramAdapter
 
 # Configure logging
 logging.basicConfig(
@@ -151,7 +151,6 @@ async def health_check():
     # Check core agent
     try:
         # Basic import check
-        from vps_agent.agent import process_message_async
         components["agent"] = "healthy"
     except Exception as e:
         components["agent"] = f"unhealthy: {str(e)}"
@@ -159,7 +158,7 @@ async def health_check():
     # Check memory
     try:
         from vps_langgraph.memory import AgentMemory
-        memory = AgentMemory()
+        AgentMemory()
         components["memory"] = "healthy"
     except Exception as e:
         components["memory"] = f"unhealthy: {str(e)}"

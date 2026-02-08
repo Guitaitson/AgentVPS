@@ -4,13 +4,11 @@ Testes para o Error Handling + Circuit Breaker.
 
 import pytest
 import sys
-import asyncio
 sys.path.insert(0, 'core')
 
 from resilience.circuit_breaker import (
     CircuitState,
     CircuitBreakerConfig,
-    CircuitBreakerStats,
     CircuitBreakerError,
     CircuitBreaker,
     RetryPolicy,

@@ -4,7 +4,6 @@ Versão: 2.0 — Com LangGraph e timeout otimizado
 """
 import os
 import sys
-import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -25,7 +24,7 @@ import psycopg2
 import redis
 
 # Telegram Log Handler (F0-06)
-from telegram_handler import TelegramLogHandler, get_telegram_notifier, setup_telegram_logging
+from telegram_handler import get_telegram_notifier
 
 # VPS-Agent Core (nosso módulo)
 from vps_agent.agent import process_message_async
@@ -85,7 +84,6 @@ def authorized_only(func):
 @authorized_only
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /start."""
-    user_id = update.effective_user.id
     user_name = update.effective_user.first_name
     
     await update.message.reply_text(
@@ -190,8 +188,8 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn = get_db_conn()
         conn.close()
         checks.append(("PostgreSQL", "✅"))
-    except Exception as e:
-        checks.append(("PostgreSQL", f"❌"))
+    except Exception:
+        checks.append(("PostgreSQL", "❌"))
     
     # Redis
     try:

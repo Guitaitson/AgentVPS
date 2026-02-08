@@ -8,7 +8,6 @@ Este módulo implementa a recomendação do Opus 4.6:
 "Em vez de 'não tenho ferramenta direta', responder com plano de ação"
 """
 
-from typing import Optional, Dict, Any
 from datetime import datetime
 
 

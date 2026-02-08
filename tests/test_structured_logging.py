@@ -11,7 +11,6 @@ sys.path.insert(0, 'core')
 from structured_logging import (
     LogLevel,
     LogCategory,
-    LogContext,
     LogEntry,
     StructuredLogger,
     LoggerManager,

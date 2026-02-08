@@ -2,7 +2,7 @@
 Grafo principal do agente LangGraph.
 Define o fluxo de decisão completo com Self-Improvement.
 """
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph
 from vps_langgraph.state import AgentState
 from vps_langgraph.memory import AgentMemory
 from vps_langgraph.nodes import (

@@ -4,7 +4,7 @@ Tests for Health Check & Doctor - F1-10
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 from core.health_check.doctor import (
     HealthCheck,
@@ -140,7 +140,6 @@ class TestHealthCheck:
     @patch('psycopg2.connect')
     def test_check_postgresql_unhealthy(self, mock_connect):
         """Test PostgreSQL check when unhealthy."""
-        import psycopg2
         from psycopg2 import OperationalError
         
         mock_connect.side_effect = OperationalError("Connection refused")

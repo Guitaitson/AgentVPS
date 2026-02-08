@@ -18,8 +18,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     ports:
-      - host: 127.0.0.1:5432:5432
-        protocol: tcp
+      - "127.0.0.1:5432:5432"
     mem_limit: 200m
     memswap_limit: 200m
     cpu_period: 100000
@@ -53,8 +52,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - host: 127.0.0.1:6379:6379
-        protocol: tcp
+      - "127.0.0.1:6379:6379"
     mem_limit: 60m
     memswap_limit: 60m
     cpu_period: 100000

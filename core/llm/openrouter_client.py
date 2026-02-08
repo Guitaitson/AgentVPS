@@ -7,10 +7,9 @@ Modelos suportados:
 - anthropic/claude-sonnet-4-20250514
 """
 import os
-import json
 import asyncio
 import httpx
-from typing import Optional, List, Dict
+from typing import List, Dict
 from dotenv import load_dotenv
 
 load_dotenv("/opt/vps-agent/core/.env")

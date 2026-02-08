@@ -10,7 +10,7 @@ Este modulo implementa recomendacoes para melhorar a classificacao de intents:
 - Fallback para classificacao por LLM
 """
 
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Any
 from enum import Enum
 
 

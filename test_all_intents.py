@@ -33,7 +33,7 @@ async def main():
     
     results = []
     for name, message in tests:
-        success = await test_intent(name, message)
+        success = await run_intent_test(name, message)
         results.append((name, success))
     
     print("\n" + "="*50)

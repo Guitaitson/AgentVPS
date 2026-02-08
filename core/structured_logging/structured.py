@@ -5,7 +5,6 @@ Sistema de logging estruturado com formato JSON.
 """
 
 import json
-import logging
 import sys
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional

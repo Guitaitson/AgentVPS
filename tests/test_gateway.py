@@ -7,7 +7,7 @@ Tests for FastAPI endpoints, rate limiting, adapters, and session management.
 import pytest
 import sys
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 # Add core to path
 sys.path.insert(0, "/opt/vps-agent/core")

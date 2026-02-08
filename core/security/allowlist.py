@@ -5,7 +5,7 @@ Sistema de allowlist para comandos e operações permitidas.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from enum import Enum
 import re
 import json

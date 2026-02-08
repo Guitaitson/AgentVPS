@@ -10,7 +10,6 @@ from security.allowlist import (
     PermissionLevel,
     ResourceType,
     AllowlistRule,
-    AllowlistResult,
     SecurityAllowlist,
     create_default_allowlist,
 )
