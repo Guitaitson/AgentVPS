@@ -6,7 +6,7 @@
 |------|--------|----------------|-----------|
 | **FASE 1-13 (v1)** | ✅ Completo | 13/13 | 100% |
 | **FASE 0 (Estabilização)** | ✅ **COMPLETA** | 7/7 | 100% |
-| **FASE 1 v2 (Fundação)** | ⏳ Pendente | 0/12 | 0% |
+| **FASE 1 v2 (Fundação)** | ✅ **COMPLETA** | 12/12 | 100% |
 | **FASE 2 v2 (Skills)** | ⏳ Pendente | 0/10 | 0% |
 | **FASE 3 v2 (Inteligência)** | ⏳ Pendente | 0/11 | 0% |
 | **FASE 4 v2 (Autonomia)** | ⏳ Pendente | 0/11 | 0% |
@@ -62,8 +62,23 @@
 | F1-08 | Structured Logging | 6h | P1 |
 | F1-09 | Error Handling + Circuit Breaker | 8h | P1 |
 | F1-10 | Health Check & Doctor | 6h | P1 |
-| F1-11 | Docker Compose v2 | 4h | P1 |
-| F1-12 | Testes Unitários Fundação | 10h | P1 |
+| F1-11 | Docker Compose v2 | 4h | P1 | 08/02/2026 | Atualizado configs para v2 format |
+| F1-12 | Testes Unitários Fundação | 10h | P1 | 08/02/2026 | 136 testes passando |
+
+### ✅ Critérios de Saída FASE 1 v2
+
+- [x] Gateway FastAPI com rate limiting e adapters
+- [x] Session Manager com persistência Redis
+- [x] Context Window Guard implementado
+- [x] JSONL Transcripts para logs
+- [x] Prompt Composer Dinâmico
+- [x] LLM Provider Abstraction (OpenAI/Anthropic)
+- [x] Allowlist de Segurança
+- [x] Structured Logging
+- [x] Error Handling + Circuit Breaker
+- [x] Health Check & Doctor
+- [x] Docker Compose v2
+- [x] 136 testes unitários passando
 
 ---
 
