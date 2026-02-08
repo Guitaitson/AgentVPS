@@ -1,0 +1,462 @@
+{
+  "project": "AgentVPS v2",
+  "version": "2.0.0",
+  "total_jobs": 51,
+  "total_hours": 534,
+  "total_weeks": "14-19",
+  "stack": "Python 3.11+ / LangGraph / FastAPI / PostgreSQL / Redis / Qdrant / Docker Compose",
+  "sources": [
+    "AgentVPS v1",
+    "OpenClaw (117k★)",
+    "AgentStack (114 jobs planned)"
+  ],
+  "phases": {
+    "F0": {
+      "name": "Estabilização v1",
+      "objective": "Agente funcional end-to-end via Telegram. Fix bugs, cleanup código, zero features novas.",
+      "estimated_weeks": "1-2",
+      "estimated_hours": 26,
+      "job_count": 7,
+      "principle": "fix_not_build — corrigir mínimo, não construir features que serão reescritas na v2",
+      "jobs": [
+        {
+          "id": "F0-01",
+          "name": "Cleanup de Código",
+          "hours": 4,
+          "priority": "P0",
+          "prereqs": [],
+          "origin": "v1 Bug #3",
+          "v2_overlap": "F1-* reorganiza completamente"
+        },
+        {
+          "id": "F0-02",
+          "name": "Fix Graph Flow self_improve",
+          "hours": 6,
+          "priority": "P0",
+          "prereqs": [
+            "F0-01"
+          ],
+          "origin": "v1 Bug #2",
+          "v2_overlap": "F2-01 Skill Registry substitui capabilities"
+        },
+        {
+          "id": "F0-03",
+          "name": "Fix timezone + Validação",
+          "hours": 1,
+          "priority": "P0",
+          "prereqs": [
+            "F0-01"
+          ],
+          "origin": "v1 Bug #1",
+          "v2_overlap": "F2-01 reescreve registry"
+        },
+        {
+          "id": "F0-04",
+          "name": "Fix CI/CD",
+          "hours": 4,
+          "priority": "P0",
+          "prereqs": [
+            "F0-01"
+          ],
+          "origin": "v1 Bug #5",
+          "v2_overlap": "F1-12 + F4-10"
+        },
+        {
+          "id": "F0-05",
+          "name": "Testes Básicos end-to-end",
+          "hours": 6,
+          "priority": "P1",
+          "prereqs": [
+            "F0-02",
+            "F0-03"
+          ],
+          "origin": "v1 Q22-Q24",
+          "v2_overlap": "F1-12 expande para 60%"
+        },
+        {
+          "id": "F0-06",
+          "name": "Telegram Log Handler",
+          "hours": 3,
+          "priority": "P1",
+          "prereqs": [
+            "F0-01"
+          ],
+          "origin": "v1 Bug #7",
+          "v2_overlap": "F1-08 Structured Logging substitui"
+        },
+        {
+          "id": "F0-07",
+          "name": "Documentação Mínima",
+          "hours": 2,
+          "priority": "P2",
+          "prereqs": [
+            "F0-01"
+          ],
+          "origin": "v1 Manutenibilidade",
+          "v2_overlap": "F4-11 Documentação Completa"
+        }
+      ],
+      "exit_criteria": [
+        "Todos os 5 intents retornam response via Telegram",
+        "Zero NameError: timezone nos logs",
+        "Apenas 1 cópia de cada arquivo (sem duplicatas)",
+        "pytest verde no GitHub Actions com 5+ testes",
+        "__pycache__/ no .gitignore",
+        "Erros CRITICAL/ERROR notificados via Telegram"
+      ],
+      "not_doing_in_this_phase": [
+        "Qdrant integration (→ F3-04/F3-05)",
+        "LLM routing/failover (→ F3-01/F3-02)",
+        "Multi-agent (→ F4-01/F4-02)",
+        "Self-improvement sandbox (→ F2-03/F4-04)",
+        "WhatsApp/Evolution API (→ F2-07)",
+        "Semantic caching (→ F3-06)",
+        "Restructure to v2 directory layout (→ F1-*)"
+      ]
+    },
+    "F1": {
+      "name": "Refatoração da Fundação",
+      "duration_weeks": "3-4",
+      "total_hours": 102,
+      "jobs_count": 12,
+      "delivery": "Gateway funcional + sessões + proteções fundamentais",
+      "jobs": [
+        {
+          "id": "F1-01",
+          "feature": "Gateway Module (FastAPI + Adapters)",
+          "priority": "P0",
+          "hours": 16,
+          "origin": "OpenClaw #1"
+        },
+        {
+          "id": "F1-02",
+          "feature": "Session Manager (isolamento por conversa)",
+          "priority": "P0",
+          "hours": 12,
+          "origin": "OpenClaw #7 + AgentStack T0-018"
+        },
+        {
+          "id": "F1-03",
+          "feature": "Context Window Guard",
+          "priority": "P0",
+          "hours": 10,
+          "origin": "OpenClaw #4 + AgentStack T0-019"
+        },
+        {
+          "id": "F1-04",
+          "feature": "JSONL Transcripts",
+          "priority": "P0",
+          "hours": 6,
+          "origin": "OpenClaw #3"
+        },
+        {
+          "id": "F1-05",
+          "feature": "Prompt Composer Dinâmico",
+          "priority": "P0",
+          "hours": 8,
+          "origin": "OpenClaw #8 + AgentStack T0-014"
+        },
+        {
+          "id": "F1-06",
+          "feature": "LLM Provider Abstraction (multi-provider)",
+          "priority": "P0",
+          "hours": 12,
+          "origin": "AgentStack T0-013"
+        },
+        {
+          "id": "F1-07",
+          "feature": "Allowlist de Segurança + Pairing",
+          "priority": "P0",
+          "hours": 4,
+          "origin": "OpenClaw #5"
+        },
+        {
+          "id": "F1-08",
+          "feature": "Structured Logging (structlog)",
+          "priority": "P1",
+          "hours": 6,
+          "origin": "AgentStack T0-008"
+        },
+        {
+          "id": "F1-09",
+          "feature": "Error Handling + Circuit Breaker",
+          "priority": "P1",
+          "hours": 8,
+          "origin": "AgentStack T0-009, T0-024"
+        },
+        {
+          "id": "F1-10",
+          "feature": "Health Check & agent-cli doctor",
+          "priority": "P1",
+          "hours": 6,
+          "origin": "OpenClaw #9 + AgentStack T0-011"
+        },
+        {
+          "id": "F1-11",
+          "feature": "Docker Compose v2 (profiles dev/prod)",
+          "priority": "P1",
+          "hours": 4,
+          "origin": "AgentStack T0-010"
+        },
+        {
+          "id": "F1-12",
+          "feature": "Testes Unitários Fundação (60%)",
+          "priority": "P1",
+          "hours": 10,
+          "origin": "AgentStack T0-028"
+        }
+      ]
+    },
+    "F2": {
+      "name": "Skills & Segurança",
+      "duration_weeks": "3-4",
+      "total_hours": 120,
+      "jobs_count": 10,
+      "delivery": "Skills modulares + WhatsApp + segurança em camadas",
+      "jobs": [
+        {
+          "id": "F2-01",
+          "feature": "Skill Registry (discovery + loading)",
+          "priority": "P0",
+          "hours": 20,
+          "origin": "OpenClaw #2 + AgentStack T0-016, T0-027"
+        },
+        {
+          "id": "F2-02",
+          "feature": "Skills Core (5 iniciais)",
+          "priority": "P0",
+          "hours": 16,
+          "origin": "AgentVPS Fase 7"
+        },
+        {
+          "id": "F2-03",
+          "feature": "Action Classification & Approval Workflow",
+          "priority": "P0",
+          "hours": 14,
+          "origin": "OpenClaw #5 + AgentStack T1-GAP-021"
+        },
+        {
+          "id": "F2-04",
+          "feature": "PII Redaction Layer",
+          "priority": "P0",
+          "hours": 8,
+          "origin": "AgentStack T1-003"
+        },
+        {
+          "id": "F2-05",
+          "feature": "Prompt Injection Defense",
+          "priority": "P0",
+          "hours": 10,
+          "origin": "AgentStack T1-005"
+        },
+        {
+          "id": "F2-06",
+          "feature": "Tool Contract Testing (Pydantic schemas)",
+          "priority": "P1",
+          "hours": 12,
+          "origin": "AgentStack T1-GAP-018"
+        },
+        {
+          "id": "F2-07",
+          "feature": "Evolution API Adapter (WhatsApp)",
+          "priority": "P1",
+          "hours": 12,
+          "origin": "OpenClaw #1 + AgentVPS roadmap"
+        },
+        {
+          "id": "F2-08",
+          "feature": "Audit Logging (append-only)",
+          "priority": "P1",
+          "hours": 8,
+          "origin": "AgentStack T1-015"
+        },
+        {
+          "id": "F2-09",
+          "feature": "Tool Usage Policies (allow/deny por contexto)",
+          "priority": "P1",
+          "hours": 8,
+          "origin": "OpenClaw #5 + AgentStack T1-016"
+        },
+        {
+          "id": "F2-10",
+          "feature": "Testes Integração Skills (70%)",
+          "priority": "P1",
+          "hours": 12,
+          "origin": "AgentStack T0-029"
+        }
+      ]
+    },
+    "F3": {
+      "name": "Inteligência & Confiabilidade",
+      "duration_weeks": "4-5",
+      "total_hours": 146,
+      "jobs_count": 11,
+      "delivery": "Failover + RAG + Cache + Automações",
+      "jobs": [
+        {
+          "id": "F3-01",
+          "feature": "Multi-Provider LLM Failover",
+          "priority": "P0",
+          "hours": 12,
+          "origin": "AgentStack T2-GAP-015"
+        },
+        {
+          "id": "F3-02",
+          "feature": "Model Cascade Routing",
+          "priority": "P0",
+          "hours": 16,
+          "origin": "AgentStack T2-GAP-006, T2-GAP-016"
+        },
+        {
+          "id": "F3-03",
+          "feature": "Step-Level Reasoning Validation",
+          "priority": "P0",
+          "hours": 14,
+          "origin": "AgentStack T1-GAP-017"
+        },
+        {
+          "id": "F3-04",
+          "feature": "Hierarchical Memory (3 camadas)",
+          "priority": "P0",
+          "hours": 20,
+          "origin": "AgentStack T2-004 + OpenClaw #3"
+        },
+        {
+          "id": "F3-05",
+          "feature": "RAG Ingestion Pipeline",
+          "priority": "P1",
+          "hours": 20,
+          "origin": "AgentStack T1-GAP-025, T1-GAP-026"
+        },
+        {
+          "id": "F3-06",
+          "feature": "Semantic Caching (Redis)",
+          "priority": "P1",
+          "hours": 12,
+          "origin": "AgentStack T2-010, T2-GAP-009"
+        },
+        {
+          "id": "F3-07",
+          "feature": "Reflection & Self-Critique",
+          "priority": "P1",
+          "hours": 14,
+          "origin": "AgentStack T2-002"
+        },
+        {
+          "id": "F3-08",
+          "feature": "LLM-Native Observability (LangSmith)",
+          "priority": "P1",
+          "hours": 10,
+          "origin": "AgentStack T1-GAP-020"
+        },
+        {
+          "id": "F3-09",
+          "feature": "Usage & Cost Tracking + Alertas",
+          "priority": "P1",
+          "hours": 10,
+          "origin": "AgentStack T2-GAP-014"
+        },
+        {
+          "id": "F3-10",
+          "feature": "n8n Integration (triggers → agente)",
+          "priority": "P1",
+          "hours": 10,
+          "origin": "OpenClaw #10"
+        },
+        {
+          "id": "F3-11",
+          "feature": "Cron & Scheduled Tasks",
+          "priority": "P2",
+          "hours": 8,
+          "origin": "OpenClaw #10"
+        }
+      ]
+    },
+    "F4": {
+      "name": "Autonomia & Evolução",
+      "duration_weeks": "3-4",
+      "total_hours": 140,
+      "jobs_count": 11,
+      "delivery": "Multi-agent + Self-improvement + Guardrails",
+      "jobs": [
+        {
+          "id": "F4-01",
+          "feature": "Multi-Agent Routing",
+          "priority": "P1",
+          "hours": 18,
+          "origin": "OpenClaw #6"
+        },
+        {
+          "id": "F4-02",
+          "feature": "Agent-to-Agent Communication",
+          "priority": "P1",
+          "hours": 14,
+          "origin": "OpenClaw #6 + AgentStack T2-001"
+        },
+        {
+          "id": "F4-03",
+          "feature": "Goal Drift Monitor",
+          "priority": "P1",
+          "hours": 12,
+          "origin": "AgentStack T3-014"
+        },
+        {
+          "id": "F4-04",
+          "feature": "Self-Improvement Pipeline (com approval)",
+          "priority": "P1",
+          "hours": 20,
+          "origin": "AgentVPS Fase 7 + AgentStack T2-GAP-019"
+        },
+        {
+          "id": "F4-05",
+          "feature": "Indirect Prompt Injection Scanner",
+          "priority": "P1",
+          "hours": 14,
+          "origin": "AgentStack T2-GAP-007"
+        },
+        {
+          "id": "F4-06",
+          "feature": "Behavioral Contract Testing",
+          "priority": "P2",
+          "hours": 10,
+          "origin": "AgentStack T2-GAP-017"
+        },
+        {
+          "id": "F4-07",
+          "feature": "Shadow Testing para Prompts",
+          "priority": "P2",
+          "hours": 12,
+          "origin": "AgentStack T2-GAP-020"
+        },
+        {
+          "id": "F4-08",
+          "feature": "Memory Compaction Scheduler",
+          "priority": "P2",
+          "hours": 8,
+          "origin": "AgentStack T2-017"
+        },
+        {
+          "id": "F4-09",
+          "feature": "CLI Expandido",
+          "priority": "P2",
+          "hours": 10,
+          "origin": "OpenClaw #9 + AgentStack T0-033"
+        },
+        {
+          "id": "F4-10",
+          "feature": "Environment Segregation (dev/prod)",
+          "priority": "P2",
+          "hours": 10,
+          "origin": "AgentStack T1-GAP-019"
+        },
+        {
+          "id": "F4-11",
+          "feature": "Documentação Completa",
+          "priority": "P2",
+          "hours": 12,
+          "origin": "AgentStack T0-030, T0-031"
+        }
+      ]
+    }
+  }
+}

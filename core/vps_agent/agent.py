@@ -40,7 +40,9 @@ async def process_message_async(user_id: str, message: str) -> str:
     try:
         # Construir e executar o grafo
         graph = build_agent_graph()
+        logger.info("grafico_criado", nodes=list(graph.nodes.keys()))
         result = await graph.ainvoke(initial_state)
+        logger.info("resultado_grafo", result_keys=list(result.keys()))
         
         # Extrair resposta
         response = result.get("response", "Desculpe, ocorreu um erro ao processar sua mensagem.")
@@ -50,7 +52,9 @@ async def process_message_async(user_id: str, message: str) -> str:
         return response
         
     except Exception as e:
+        import traceback
         logger.error("erro_processamento", error=str(e), user_id=user_id)
+        logger.error("traceback", traceback=traceback.format_exc())
         return f"❌ Erro ao processar mensagem: {str(e)}"
 
 
