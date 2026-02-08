@@ -15,60 +15,21 @@ memory = AgentMemory()
 
 def node_classify_intent(state: AgentState) -> AgentState:
     """Classifica a intenção do usuário."""
-    message = state["user_message"].lower()
+    from intent_classifier import classify_intent
     
-    # Comandos diretos do Telegram
-    telegram_commands = [
-        "/start", "/status", "/ram", "/containers", "/health", "/help",
-        "status", "ram", "containers", "health", "help"
-    ]
+    message = state["user_message"]
     
-    if any(message.startswith(cmd) for cmd in telegram_commands):
-        return {
-            **state,
-            "intent": "command",
-            "intent_confidence": 0.95,
-        }
+    # Usar o classificador melhorado
+    result = classify_intent(message)
+    intent = result[0].value
+    confidence = result[1]
+    details = result[2]
     
-    # Tarefas que requerem Self-Improvement (criar algo novo)
-    self_improve_keywords = [
-        "criar", "crie", "criando", "novo", "novos", "nova",
-        "implementar", "implementa", "implementando",
-        "agente", "subagente", "mcp", "ferramenta",
-        "buscar", "procurar", "monitorar", "pesquisar",
-        "integração", "integrar", "conectar",
-    ]
-    
-    if any(kw in message for kw in self_improve_keywords):
-        return {
-            **state,
-            "intent": "self_improve",
-            "intent_confidence": 0.90,
-        }
-    
-    # Perguntas sobre o sistema
-    system_keywords = ["ram", "memória", "cpu", "docker", "container", "status", "saúde"]
-    if any(kw in message for kw in system_keywords):
-        return {
-            **state,
-            "intent": "question",
-            "intent_confidence": 0.85,
-        }
-    
-    # Tarefas a executar
-    action_keywords = ["rode", "execute", "rode", "inicia", "para", "reinicia"]
-    if any(kw in message for kw in action_keywords):
-        return {
-            **state,
-            "intent": "task",
-            "intent_confidence": 0.80,
-        }
-    
-    # Default: conversa
     return {
         **state,
-        "intent": "chat",
-        "intent_confidence": 0.70,
+        "intent": intent,
+        "intent_confidence": confidence,
+        "intent_details": details,
     }
 
 
@@ -129,6 +90,8 @@ def node_plan(state: AgentState) -> AgentState:
 
 def node_execute(state: AgentState) -> AgentState:
     """Executa o plano definido."""
+    from error_handler import wrap_error, format_error_for_user
+    
     intent = state.get("intent")
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
@@ -142,7 +105,6 @@ def node_execute(state: AgentState) -> AgentState:
     
     try:
         if action_type == "command" and action == "ram":
-            # Executar comando de RAM
             result = subprocess.run(
                 ["free", "-m"],
                 capture_output=True,
@@ -151,7 +113,6 @@ def node_execute(state: AgentState) -> AgentState:
             )
             output = result.stdout
             
-            # Parsear memória
             lines = output.strip().split("\n")
             mem_line = lines[1].split()
             total = mem_line[1]
@@ -164,7 +125,6 @@ def node_execute(state: AgentState) -> AgentState:
             }
         
         elif action_type == "command" and action == "containers":
-            # Listar containers
             result = subprocess.run(
                 ["docker", "ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
                 capture_output=True,
@@ -177,7 +137,6 @@ def node_execute(state: AgentState) -> AgentState:
             }
         
         elif action_type == "command" and action == "status":
-            # Status completo
             result = subprocess.run(
                 ["free", "-m"],
                 capture_output=True,
@@ -192,8 +151,11 @@ def node_execute(state: AgentState) -> AgentState:
             }
         
         elif action_type == "command" and action == "health":
-            # Health check
+            from error_handler import check_system_health
             checks = []
+            
+            health = check_system_health()
+            overall = health.get("overall", {})
             
             # PostgreSQL
             try:
@@ -216,8 +178,8 @@ def node_execute(state: AgentState) -> AgentState:
             try:
                 import redis
                 r = redis.Redis(
-                    host=os.getenv("REDIS_HOST", "127.0.0.1"), 
-                    port=int(os.getenv("REDIS_PORT", 6379)), 
+                    host=os.getenv("REDIS_HOST", "127.0.0.1"),
+                    port=int(os.getenv("REDIS_PORT", 6379)),
                     socket_timeout=5
                 )
                 r.ping()
@@ -225,22 +187,34 @@ def node_execute(state: AgentState) -> AgentState:
             except Exception as e:
                 checks.append(f"❌ Redis: {e}")
             
+            status_msg = "\n".join(checks)
+            status_msg += f"\n\n📊 Status Geral: {overall.get('status', 'unknown')}"
+            
             return {
                 **state,
-                "execution_result": "\n".join(checks),
+                "execution_result": status_msg,
             }
         
         else:
+            # Comando não implementado - usar resposta smarter
+            from smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
+            detected = detect_missing_skill_keywords(f"{action_type} {action}")
+            response = generate_smart_unavailable_response(
+                f"{action_type} {action}",
+                detected_skills=detected,
+                intent=intent
+            )
             return {
                 **state,
-                "execution_result": f"Comando '{action}' não implementado",
+                "execution_result": response,
             }
     
     except Exception as e:
+        wrapped_error = wrap_error(e, metadata={"action": action})
         return {
             **state,
-            "error": str(e),
-            "execution_result": f"Erro ao executar: {e}",
+            "error": wrapped_error.to_dict(),
+            "execution_result": format_error_for_user(e),
         }
 
 
@@ -249,15 +223,40 @@ def node_generate_response(state: AgentState) -> AgentState:
     import sys
     sys.path.insert(0, "/opt/vps-agent/core")
     
+    from smart_responses import (
+        generate_smart_unavailable_response,
+        get_capabilities_summary,
+        detect_missing_skill_keywords
+    )
+    
     intent = state.get("intent")
     execution_result = state.get("execution_result")
     user_context = state.get("user_context", {})
     user_message = state.get("user_message")
     conversation_history = state.get("conversation_history", [])
+    missing_capabilities = state.get("missing_capabilities", [])
     
     # Se há resultado de execução, usar diretamente
     if execution_result:
-        response = execution_result
+        # Verificar se é uma mensagem de "não implementado"
+        if "não implementado" in execution_result.lower() or "not implemented" in execution_result.lower():
+            # Gerar resposta smarter com plano de ação
+            detected = detect_missing_skill_keywords(user_message.lower())
+            response = generate_smart_unavailable_response(
+                user_message,
+                detected_skills=detected,
+                intent=intent
+            )
+        else:
+            response = execution_result
+    
+    # Para self_improve com capacidades faltantes
+    elif intent == "self_improve" and missing_capabilities:
+        response = generate_smart_unavailable_response(
+            user_message,
+            detected_skills=detect_missing_skill_keywords(user_message.lower()),
+            intent=intent
+        )
     
     # Para conversas e perguntas, usar LLM com identidade VPS-Agent
     elif intent in ["chat", "question"]:
@@ -274,13 +273,34 @@ def node_generate_response(state: AgentState) -> AgentState:
             # Fallback se LLM falhou
             if not response:
                 if intent == "chat":
-                    response = f"Oi! Sou o VPS-Agent, seu assistente autonomous. 😊\n\nPosso ajudar a gerenciar sua VPS, criar agentes, integrar ferramentas e muito mais!\n\nO que precisa hoje?"
+                    response = (
+                        "Oi! Sou o VPS-Agent! 😊\n\n"
+                        "Seu assistente autônomo rodando na VPS.\n\n"
+                        "Posso ajudar com:\n"
+                        "• Gerenciamento da VPS (RAM, containers, serviços)\n"
+                        "• Criação de novos agentes\n"
+                        "• Integração de ferramentas\n"
+                        "• E muito mais!\n\n"
+                        "O que você precisa hoje?"
+                    )
                 else:
-                    response = f"Sobre '{user_message}': Posso ajudar com isso! Como VPS-Agent, tenho acesso a várias ferramentas.\n\nPode me dar mais detalhes?"
+                    response = (
+                        f"Sobre '{user_message}':\n\n"
+                        "Posso ajudar! Como VPS-Agent, tenho acesso a várias ferramentas.\n\n"
+                        f"{get_capabilities_summary()}"
+                    )
                     
         except Exception as e:
             print(f"LLM error: {e}")
-            response = f"Sou o VPS-Agent! 😊\n\nEntendi sua mensagem. Posso ajudar com:\n• Gerenciamento da VPS (RAM, containers, serviços)\n• Criação de novos agentes\n• Integração de ferramentas\n• E muito mais!\n\nO que precisa?"
+            response = (
+                "Sou o VPS-Agent! 😊\n\n"
+                "Entendi sua mensagem.\n\n"
+                "O que eu posso fazer:\n"
+                "• Gerenciar sua VPS (RAM, containers)\n"
+                "• Criar novos agentes\n"
+                "• Integrar ferramentas\n\n"
+                f"{get_capabilities_summary()}"
+            )
     
     else:
         response = "Comando executado com sucesso! ✅"
