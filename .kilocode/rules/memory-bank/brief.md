@@ -1,10 +1,12 @@
 # Estado Atual — VPS-Agente v2
 
-## Fase Atual: FASE 13 Completa
-## Última ação: FASE 13 completa — Self-Improvement Agent implementado
-## Próxima ação: Testar fluxo completo com mensagem via Telegram
+## Fase Atual: FASE 0 (Estabilização v1)
+## Última ação: Criado plano de implantação e deployment tracker
+## Próxima ação: Iniciar F0-01 — Cleanup de Código
 
 ## Checklist de Fases
+
+### v1 (Completo)
 - [x] Fase 1: Fundação (Docker, PostgreSQL, Redis, estrutura)
 - [x] Fase 2: CLI + Telegram Bot
 - [x] Fase 3: LangGraph + Memória
@@ -19,55 +21,38 @@
 - [x] Fase 12: FastAPI-MCP Integration
 - [x] Fase 13: Self-Improvement Agent
 
-## Problemas Conhecidos
-- Nenhum
+### v2 (Pendente)
+- [ ] FASE 0: Estabilização v1 (em andamento)
+- [ ] FASE 1: Fundação (Gateway + Sessões)
+- [ ] FASE 2: Skills & Segurança
+- [ ] FASE 3: Inteligência & Confiabilidade
+- [ ] FASE 4: Autonomia & Evolução
+
+## Problemas Conhecidos (FASE 0)
+1. **self_improve não gera resposta** — Graph flow incorreto
+2. **timezone is not defined** — Import faltando
+3. **Código duplicado em 3 locais** — Imports confusos
 
 ## Decisões Tomadas
 - Arquitetura v2: VPS é o agente, CLI é o cérebro
 - Resource Manager controla RAM
 - PostgreSQL + Redis sempre ligados (~750 MB)
 - Ferramentas sob demanda (máx 2 simultâneas)
-- Moltbot NÃO faz parte deste projeto
 - MiniMax M2.1 via OpenRouter (gratuito) como modelo default
-- LangGraph classifica intents: command, task, question, chat
+- LangGraph classifica intents: command, task, question, chat, self_improve
 - Qdrant para memória semântica (embeddings de conversas)
+- FASE 0 obrigatória antes de v2 (recomendação Opus 4.6)
 
-## Resultados FASE 1
-- Ubuntu 24.04 configurado
-- Docker 29.2.1 instalado
-- UFW ativo com regras para SSH, 443, 8443
-- Fail2ban bloqueando IPs maliciosos
-- PostgreSQL 16 rodando (~24 MB)
-- Redis 7 rodando (~3 MB)
-- RAM disponível: ~2000 MB
+## Resultados FASE 0 (Planejado)
+- Cleanup de código (deletar duplicatas)
+- Graph flow self_improve corrigido
+- Timezone import validado
+- CI/CD funcionando
+- 5 testes end-to-end passando
+- Telegram Log Handler implementado
+- README atualizado
 
-## Resultados FASE 2
-- Python 3.12 + venv configurado
-- Telegram Bot @Molttaitbot rodando via systemd
-- Comandos implementados: /start, /status, /ram, /containers, /health, /help
-
-## Resultados FASE 8-11
-- Interpretador de Intenções LangGraph implementado
-- node_classify_intent: command, task, question, chat
-- node_call_cli: Chama MiniMax M2.1 via OpenRouter
-- node_load_context: Carrega contexto + memória semântica Qdrant
-- node_save_memory: Salva em PostgreSQL + Qdrant
-- Fluxo: classify → load_context → plan → execute|call_cli → respond → save_memory
-
-## Resultados FASE 12
-- Servidor FastAPI-MCP criado em core/mcp_server.py
-- MCP Server rodando em http://localhost:8000 (systemd)
-- Ferramentas expostas: /ram, /containers, /tools, /services, /system
-- Endpoints REST: health, ram, containers, tools, services, system
-- Documentação: docs/MCP_SERVER.md
-- Integração com Claude Desktop via SSH tunnel
-
-## Resultados FASE 13
-- Self-Improvement Agent implementado
-- Capabilities Registry criado em core/capabilities/registry.py
-- Interface vps_agent/agent.py (Telegram → LangGraph)
-- Novos nós LangGraph: check_capabilities, self_improve, implement_capability
-- Tabelas PostgreSQL: agent_capabilities, capability_requests
-- Arquitetura: core/vps_langgraph/ (renomeado para evitar conflito com langgraph package)
-- Telegram Bot @Molttaitbot rodando via systemd
-- Fluxo: classify → load_context → plan → execute → respond → check_capabilities → self_improve → implement
+## Recursos
+- Plano completo: `plans/fase-0-estabilizacao.md`
+- Roadmap v2: `agentvps-v2-roadmap.md`
+- Tracker: `.kilocode/rules/memory-bank/deployment-tracker.md`
