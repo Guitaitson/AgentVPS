@@ -15,7 +15,7 @@ memory = AgentMemory()
 
 def node_classify_intent(state: AgentState) -> AgentState:
     """Classifica a intenção do usuário."""
-    from intent_classifier import classify_intent
+    from .intent_classifier import classify_intent
     
     message = state["user_message"]
     
@@ -90,7 +90,7 @@ def node_plan(state: AgentState) -> AgentState:
 
 def node_execute(state: AgentState) -> AgentState:
     """Executa o plano definido."""
-    from error_handler import wrap_error, format_error_for_user
+    from .error_handler import wrap_error, format_error_for_user
     
     intent = state.get("intent")
     plan = state.get("plan", [])
@@ -151,7 +151,7 @@ def node_execute(state: AgentState) -> AgentState:
             }
         
         elif action_type == "command" and action == "health":
-            from error_handler import check_system_health
+            from .error_handler import check_system_health
             checks = []
             
             health = check_system_health()
@@ -197,7 +197,7 @@ def node_execute(state: AgentState) -> AgentState:
         
         else:
             # Comando não implementado - usar resposta smarter
-            from smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
+            from .smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
             detected = detect_missing_skill_keywords(f"{action_type} {action}")
             response = generate_smart_unavailable_response(
                 f"{action_type} {action}",
@@ -223,7 +223,7 @@ def node_generate_response(state: AgentState) -> AgentState:
     import sys
     sys.path.insert(0, "/opt/vps-agent/core")
     
-    from smart_responses import (
+    from .smart_responses import (
         generate_smart_unavailable_response,
         get_capabilities_summary,
         detect_missing_skill_keywords
@@ -261,7 +261,7 @@ def node_generate_response(state: AgentState) -> AgentState:
     # Para conversas e perguntas, usar LLM com identidade VPS-Agent
     elif intent in ["chat", "question"]:
         try:
-            from llm.openrouter_client import generate_response_sync
+            from ..llm.openrouter_client import generate_response_sync
             
             # Chamar LLM com contexto completo de identidade
             response = generate_response_sync(
