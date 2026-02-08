@@ -1,7 +1,7 @@
 # Capabilities Registry - Sistema de gerenciamento de capacidades do agente
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone, timezone
 import structlog
 
 logger = structlog.get_logger()
