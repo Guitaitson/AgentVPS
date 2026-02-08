@@ -24,6 +24,9 @@ from dotenv import load_dotenv
 import psycopg2
 import redis
 
+# Telegram Log Handler (F0-06)
+from telegram_handler import TelegramLogHandler, get_telegram_notifier, setup_telegram_logging
+
 # VPS-Agent Core (nosso módulo)
 from vps_agent.agent import process_message_async
 
@@ -245,8 +248,18 @@ Este bot controla o VPS-Agent, um agente autônomo que roda na VPS.
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para erros."""
-    logger.error("erro_telegram", error=context.error)
+    """Handler para erros — envia para Telegram e log local."""
+    error_msg = str(context.error)
+    
+    # Log local
+    logger.error("erro_telegram", error=error_msg)
+    
+    # Enviar para Telegram (F0-06)
+    try:
+        notifier = get_telegram_notifier()
+        notifier.send_error(f"Erro no Bot:\n```\n{error_msg[:500]}\n```")
+    except Exception:
+        pass  # Silencioso se Telegram falhar
 
 
 def main():

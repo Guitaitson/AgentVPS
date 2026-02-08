@@ -1,236 +1,189 @@
-# 🧠 VPS-Agente v2
+# VPS-Agent v2
 
-Um agente autônomo auto-melhorável rodando em VPS com 2.4GB de RAM.
+🤖 **Agente Autônomo para VPS de 2.4 GB RAM**
 
-## 📋 Índice
+[![CI/CD](https://github.com/Guitaitson/AgentVPS/actions/workflows/ci.yml/badge.svg)](https://github.com/Guitaitson/AgentVPS/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-- [Visão Geral](#visão-geral)
-- [Arquitetura](#arquitetura)
-- [Stack](#stack)
-- [Fases do Projeto](#fases-do-projeto)
-- [Quick Start](#quick-start)
-- [Estrutura de Diretórios](#estrutura-de-diretórios)
-- [Contribuição](#contribuição)
-- [Licença](#licença)
+## Visão Geral
 
----
+VPS-Agent é um agente autônomo que roda em uma VPS de 2.4 GB RAM, utilizando LangGraph para orquestração, PostgreSQL e Redis para memória estruturada, e Qdrant para memória semântica.
 
-## 🎯 Visão Geral
-
-**VPS-Agente v2** é um sistema de agente autônomo capaz de:
-- Desenvolver-se sozinho
-- Aprender e melhorar automaticamente
-- Implementar novas funções
-- Criar novos agentes
-
-A VPS é o agente. O CLI (Kilocode/Claude) é o **CÉREBRO** instalado na própria VPS.
-
----
-
-## 🏗️ Arquitetura
+## Arquitetura
 
 ```
-┌─────────────────────────────────────────┐
-│           VPS 2.4 GB (AGENTE)          │
-│                                         │
-│  ┌───────────────────────────────────┐  │
-│  │  CÉREBRO (~500 MB)                │  │
-│  │  CLI (Kilocode/Claude)            │  │
-│  │  LangGraph + Agent                │  │
-│  └───────────────────────────────────┘  │
-│                                         │
-│  ┌───────────────────────────────────┐  │
-│  │  SEMPRE LIGADOS (~750 MB)         │  │
-│  │  PostgreSQL + Redis + LangGraph   │  │
-│  │  + Resource Manager               │  │
-│  │  + Telegram Bot                   │  │
-│  └───────────────────────────────────┘  │
-│                                         │
-│  ┌───────────────────────────────────┐  │
-│  │  SOB DEMANDA (~1650 MB livre)     │  │
-│  │  Qdrant (memória semântica)       │  │
-│  │  n8n, Flowise                     │  │
-│  └───────────────────────────────────┘  │
-│                                         │
-│  Interface: Telegram (@Molttaitbot)   │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│                 VPS 2.4 GB                  │
+│                                             │
+│  ┌─────────────────────────────────────┐    │
+│  │     SEMPRE LIGADOS (~750 MB)       │    │
+│  │  PostgreSQL + Redis + LangGraph    │    │
+│  │  + Resource Manager + Telegram Bot │    │
+│  └─────────────────────────────────────┘    │
+│                                             │
+│  ┌─────────────────────────────────────┐    │
+│  │     SOB DEMANDA (~1650 MB livre)   │    │
+│  │  Qdrant + n8n + Flowise            │    │
+│  └─────────────────────────────────────┘    │
+│                                             │
+│  Interface: Telegram Bot (@Molttaitbot)     │
+└─────────────────────────────────────────────┘
 ```
 
----
+## Stack Principal
 
-## 🛠️ Stack
+- **Orquestração:** LangGraph (Python 3.11+)
+- **Memória Estruturada:** PostgreSQL 16
+- **Cache/Filas:** Redis 7
+- **Memória Semântica:** Qdrant (sob demanda)
+- **Interface:** Telegram Bot (python-telegram-bot)
+- **Containers:** Docker + Docker Compose
+- **LLM:** MiniMax M2.1 via OpenRouter
 
-| Componente | Propósito |
-|------------|-----------|
-| **LangGraph** | Orquestração do agente |
-| **PostgreSQL 16** | Memória estruturada (fatos, configs, estado) |
-| **Redis 7** | Cache e pub/sub |
-| **Qdrant** | Memória semântica (vector DB) |
-| **Docker** | Containers |
-| **Claude CLI** | Cérebro (assinatura Anthropic) |
-| **Kilocode CLI** | Cérebro (OpenRouter + créditos) |
-| **Telegram Bot** | Interface de comunicação |
+## Intents Suportados
 
----
+| Intent | Descrição | Exemplo |
+|--------|-----------|---------|
+| `command` | Comandos do sistema | "mostre o status" |
+| `task` | Tarefas complexas | "crie um backup" |
+| `question` | Perguntas | "quanta RAM está livre?" |
+| `chat` | Conversa geral | "olá, tudo bem?" |
+| `self_improve` | Auto-evolução | "analise suas capacidades" |
 
-## 📊 Fases do Projeto
+## Quick Start
 
-- ✅ **FASE 1:** Fundação (Docker, PostgreSQL, Redis, estrutura)
-- ✅ **FASE 2:** Telegram Bot
-- ✅ **FASE 3:** LangGraph + Memória (PostgreSQL)
-- ✅ **FASE 4:** Qdrant (Memória Vetorial)
-- ✅ **FASE 5:** CLI na VPS (Claude + Kilocode)
-- 🔄 **FASE 6:** Arquitetura GitHub (docs, contributing)
-- ⏳ **FASE 7:** Agente Autônomo (self-improving)
-
----
-
-## 🚀 Quick Start
-
-### Pré-requisitos
-
-- VPS Ubuntu 24.04
-- 2.4 GB RAM mínimo
-- Docker + Docker Compose
-- Git
-
-### Instalação
+### 1. Clonar e Configurar
 
 ```bash
-# Clonar o repositório
-git clone https://github.com/seu-usuario/vps-agente-v2.git
-cd vps-agente-v2
+git clone https://github.com/Guitaitson/AgentVPS.git
+cd AgentVPS
+```
 
-# Configurar variáveis de ambiente
+### 2. Configurar Variáveis de Ambiente
+
+```bash
 cp configs/.env.example configs/.env
-nano configs/.env
+# Editar configs/.env com suas credenciais
+```
 
-# Iniciar serviços core
+### 3. Deploy na VPS
+
+```bash
+# SSH para a VPS
+ssh root@107.175.1.42
+
+# Clone e setup
+cd /opt/vps-agent
+git pull origin main
+
+# Iniciar serviços
 docker compose -f configs/docker-compose.core.yml up -d
 
-# Configurar CLI (Claude ou Kilocode)
-agent-cli configure claude
-# ou
-agent-cli configure kilocode
-
-# Ativar CLI
-agent-cli use claude
-# ou
-agent-cli use kilocode
+# Verificar status
+./scripts/deploy.sh status
 ```
 
-### Uso do CLI Switcher
+### 4. Usar o Bot
+
+Iniciar conversa com [@Molttaitbot](https://t.me/Molttaitbot) no Telegram:
+
+```
+/start - Iniciar
+/status - Estado da VPS
+/ram - Uso de memória
+/health - Health check
+```
+
+## Comandos de Deployment
 
 ```bash
+# Deploy completo
+./scripts/deploy.sh deploy
+
 # Ver status
-agent-cli status
+./scripts/deploy.sh status
 
-# Executar tarefa
-agent-cli run 'Analise o projeto e sugira melhorias'
+# Ver logs
+./scripts/deploy.sh logs [servico]
+
+# Backup
+./scripts/deploy.sh backup
 ```
 
----
-
-## 📁 Estrutura de Diretórios
+## Estrutura de Diretórios
 
 ```
-vps-agente-v2/
-├── brain/              # CLI e cérebro do agente
-│   └── agent-cli.sh    # Script de alternância Claude/Kilocode
-├── configs/            # Configurações Docker e serviços
-│   ├── docker-compose.core.yml
-│   ├── docker-compose.qdrant.yml
-│   ├── docker-compose.n8n.yml
-│   ├── .env.example
-│   ├── init-db.sql
-│   └── telegram-bot.service
-├── core/               # Serviços sempre ligados
-│   ├── vps_agent/      # Módulo LangGraph
-│   │   ├── state.py    # AgentState TypedDict
-│   │   ├── memory.py   # PostgreSQL + Redis
-│   │   ├── nodes.py    # LangGraph nodes
-│   │   ├── graph.py    # Workflow
-│   │   └── agent.py    # Entry point
-│   └── resource-manager/
-│       └── manager.py  # Gerenciador de RAM
-├── data/               # Dados persistentes
-├── docs/               # Documentação
-├── logs/               # Logs
-├── scripts/            # Scripts de automação
-├── tools/              # Ferramentas sob demanda
-│   ├── qdrant/         # Vector DB
-│   └── n8n/            # Automation
-├── telegram-bot/       # Bot Telegram
-├── .kilocode/         # Memory Bank
-│   └── rules/
-│       ├── memory-bank/
-│       │   ├── brief.md
-│       │   ├── context.md
-│       │   └── history.md
-│       └── vps-agent-rules.md
-├── README.md
-└── LICENSE
+AgentVPS/
+├── core/                   # Serviços sempre ligados
+│   ├── langgraph/         # Agente LangGraph
+│   ├── telegram-bot/       # Interface Telegram
+│   └── vps_agent/         # Agente principal
+├── tools/                  # Ferramentas sob demanda
+│   ├── n8n/
+│   ├── flowise/
+│   └── qdrant/
+├── configs/                # Configurações Docker
+├── scripts/               # Scripts de automação
+├── data/                  # Dados persistentes
+├── logs/                  # Logs da aplicação
+└── requirements.txt       # Dependências Python
 ```
 
----
-
-## 🔧 Configuração
-
-### Variáveis de Ambiente
+## Variáveis de Ambiente Necessárias
 
 ```env
+# Telegram
+TELEGRAM_BOT_TOKEN=seu_token
+TELEGRAM_ALLOWED_USERS=id1,id2
+TELEGRAM_ADMIN_CHAT_ID=chat_id
+
 # PostgreSQL
-POSTGRES_DB=vps_agent
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=sua_senha
+POSTGRES_PASSWORD=senha
+POSTGRES_DB=vps_agent
 
 # Redis
-REDIS_PASSWORD=sua_senha
+REDIS_PASSWORD=senha
 
-# Telegram Bot
-TELEGRAM_BOT_TOKEN=seu_token
-
-# APIs (opcional)
-ANTHROPIC_API_KEY=sua_chave
+# LLM (OpenRouter)
 OPENROUTER_API_KEY=sua_chave
+
+# Qdrant
+QDRANT_API_KEY=sua_chave
 ```
 
----
+## FASE 0 — Estabilização v1 (Concluída)
 
-## 📖 Documentação
+- ✅ Cleanup de código (deletadas duplicatas)
+- ✅ Fix Graph Flow self_improve
+- ✅ Fix timezone import
+- ✅ CI/CD adaptado para requirements.txt
+- ✅ Telegram Log Handler implementado
+- ✅ Testes end-to-end (5/5 passaram)
 
-- [Plano de Implantação](plans/plano-implementacao-vps-agente.md)
-- [Memory Bank](.kilocode/rules/memory-bank/)
-- [Regras do Agente](.kilocode/rules/vps-agent-rules.md)
+## Roadmap v2
 
----
+| Fase | Jobs | Descrição |
+|------|------|-----------|
+| F1 | 12 | Gateway + Sessions + Protections |
+| F2 | 10 | Skills + Security + WhatsApp |
+| F3 | 11 | Intelligence + Reliability |
+| F4 | 11 | Autonomy + Evolution |
 
-## 🤝 Contribuição
+## Regras de RAM
 
-Consulte [CONTRIBUTING.md](docs/CONTRIBUTING.md) para diretrizes de contribuição.
+⚠️ **NUNCA ultrapassar 2.4 GB de RAM**
 
----
+- Serviços sempre ligados: ~750 MB máximo
+- Ferramentas sob demanda: máximo 2 simultâneas
+- Resource Manager controla tudo automaticamente
 
-## ⚠️ Restrições Críticas
+## Documentação Completa
 
-- **RAM total: 2.4 GB** — NUNCA ultrapassar
-- Serviços "sempre ligados" devem caber em **750 MB**
-- Máximo **2 ferramentas sob demanda** simultâneas
-- CLI deve estar NA VPS para autonomia total
-- Qdrant para memória semântica (conceitos, não só fatos)
+- [Plano de Implantação](plans/plano-implantacao-vps-agente-v2.md)
+- [Roadmap v2](agentvps-v2-roadmap.md)
+- [Tracker de Deployment](.kilocode/rules/memory-bank/deployment-tracker.md)
 
----
+## Licença
 
-## 📝 Licença
-
-MIT License - veja [LICENSE](LICENSE) para detalhes.
-
----
-
-## 🧠 Autor
-
-Desenvolvido como projeto de agente autônomo auto-melhorável.
-
----
-
-**Status:** Em Desenvolvimento | **Versão:** 2.0.0
+MIT License - see [LICENSE](LICENSE) for details.
