@@ -5,7 +5,7 @@
 | Fase | Status | Jobs Completos | Progresso |
 |------|--------|----------------|-----------|
 | **FASE 1-13 (v1)** | ✅ Completo | 13/13 | 100% |
-| **FASE 0 (Estabilização)** | ⏳ Em Andamento | 0/7 | 0% |
+| **FASE 0 (Estabilização)** | ✅ **COMPLETA** | 7/7 | 100% |
 | **FASE 1 v2 (Fundação)** | ⏳ Pendente | 0/12 | 0% |
 | **FASE 2 v2 (Skills)** | ⏳ Pendente | 0/10 | 0% |
 | **FASE 3 v2 (Inteligência)** | ⏳ Pendente | 0/11 | 0% |
@@ -13,40 +13,41 @@
 
 ---
 
-## 🎯 FASE 0 — Estabilização v1
+## 🎯 FASE 0 — Estabilização v1 (CONCLUÍDA)
 
 **Objetivo:** Corrigir bugs críticos, cleanup código, zero features novas  
-**Início:** [DATA]  
-**Prazo:** 1-2 semanas  
+**Início:** 06/02/2026  
+**Conclusão:** 08/02/2026  
+**Duração:** 3 dias  
 **Responsável:** Kilocode + suporte Opus 4.6
 
 ### Jobs
 
-| # | Job | Status | Data Início | Data Fim | Notas |
-|---|-----|--------|-------------|----------|-------|
-| F0-01 | Cleanup de Código | ⏳ | - | - | Deletar duplicatas |
-| F0-02 | Fix Graph Flow self_improve | ⏳ | - | - | Roteamento corrigido |
-| F0-03 | Fix timezone + Validação | ⏳ | - | - | Import testado |
-| F0-04 | Fix CI/CD | ⏳ | - | - | Pipeline verde |
-| F0-05 | Testes Básicos end-to-end | ⏳ | - | - | 5 intents testados |
-| F0-06 | Telegram Log Handler | ⏳ | - | - | Errors notificados |
-| F0-07 | Documentação Mínima | ⏳ | - | - | README atualizado |
+| # | Job | Status | Data | Notas |
+|---|-----|--------|------|-------|
+| F0-01 | Cleanup de Código | ✅ | 06/02 | Deletadas duplicatas (graph.py, nodes.py) |
+| F0-02 | Fix Graph Flow self_improve | ✅ | 06/02 | Roteamento: plan → check_capabilities → respond |
+| F0-03 | Fix timezone + Validação | ✅ | 06/02 | Adicionado `timezone` ao import datetime |
+| F0-04 | Fix CI/CD | ✅ | 08/02 | Pipeline usa requirements.txt |
+| F0-05 | Testes Básicos end-to-end | ✅ | 06/02 | 5/5 intents passando |
+| F0-06 | Telegram Log Handler | ✅ | 08/02 | telegram_handler.py criado |
+| F0-07 | Documentação Mínima | ✅ | 08/02 | README.md atualizado |
 
 ### ✅ Critérios de Saída FASE 0
 
-- [ ] Todos os 5 intents retornam response via Telegram
-- [ ] Zero NameError: timezone nos logs
-- [ ] Apenas 1 cópia de cada arquivo (sem duplicatas)
-- [ ] pytest verde com 5+ testes
-- [ ] `__pycache__/` no .gitignore
-- [ ] Erros CRITICAL notificados via Telegram
+- [x] Todos os 5 intents retornam response via Telegram
+- [x] Zero NameError: timezone nos logs
+- [x] Apenas 1 cópia de cada arquivo (sem duplicatas)
+- [x] pytest verde com 5+ testes
+- [x] `__pycache__/` no .gitignore
+- [x] Erros CRITICAL notificados via Telegram
 
 ---
 
 ## 🚀 FASE 1 v2 — Refatoração da Fundação
 
 **Objetivo:** Gateway + Sessões + Proteções fundamentais  
-**Início:** Após FASE 0 completa  
+**Início:** Após aprovação  
 **Duração:** 3-4 semanas (~102h)
 
 | # | Job | Horas | Prioridade |
@@ -136,7 +137,7 @@
 | Fase | Jobs | Horas | Semanas |
 |------|------|-------|---------|
 | v1 (completo) | 13 | - | - |
-| FASE 0 | 7 | ~26h | 1-2 |
+| FASE 0 | 7 | ~26h | 3 dias |
 | FASE 1 v2 | 12 | ~102h | 3-4 |
 | FASE 2 v2 | 10 | ~120h | 3-4 |
 | FASE 3 v2 | 11 | ~146h | 4-5 |
@@ -147,7 +148,15 @@
 
 ## 📝 Últimas Atualizações
 
-### [DATA] — Início FASE 0
+### 2026-02-08 — FASE 0 COMPLETA
+- 所有 7 jobs da FASE 0 concluídos
+- Graph flow self_improve corrigido e testado
+- Telegram Log Handler implementado
+- README.md atualizado com documentação
+- CI/CD adaptado para requirements.txt
+- Deploy script criado (scripts/deploy.sh)
+
+### 2026-02-06 — Início FASE 0
 - Plano de estabilização criado baseado em consultoria Opus 4.6
 - Jobs definidos com prioridades e critérios de saída
 
