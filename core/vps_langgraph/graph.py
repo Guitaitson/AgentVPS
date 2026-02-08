@@ -38,10 +38,8 @@ def build_agent_graph():
     # Ponto de entrada
     workflow.set_entry_point("classify")
     
-    # Classificação de intenção → Contexto
+    # Fluxo principal: classify → load_context → plan
     workflow.add_edge("classify", "load_context")
-    
-    # Contexto → Planejamento
     workflow.add_edge("load_context", "plan")
     
     # Planejamento → Execução/Resposta (baseado no intent)
@@ -49,10 +47,10 @@ def build_agent_graph():
         "plan",
         lambda state: state.get("intent", "unknown"),
         {
-            "command": "execute",     # Comandos diretos → executar
-            "task": "execute",      # Tarefas → executar
-            "question": "respond",   # Perguntas → responder
-            "chat": "respond",      # Chat → responder
+            "command": "execute",       # Comandos diretos → executar
+            "task": "execute",         # Tarefas → executar
+            "question": "respond",      # Perguntas → responder
+            "chat": "respond",         # Chat → responder
             "self_improve": "check_capabilities",  # Auto-evolução → verificar capacidades
             "unknown": "respond",
         }
@@ -61,35 +59,20 @@ def build_agent_graph():
     # Execução → Salvar memória
     workflow.add_edge("execute", "save_memory")
     
-    # Salvar memória → Responder
-    workflow.add_edge("save_memory", "respond")
-    
-    # Após responder, verificar se precisa de capabilities
-    workflow.add_conditional_edges(
-        "respond",
-        lambda state: state.get("needs_capability_check", False),
-        {
-            True: "check_capabilities",
-            False: END,
-        }
-    )
-    
-    # Verificar capacidades
+    # Self-improve: check_capabilities → self_improve → respond
     workflow.add_conditional_edges(
         "check_capabilities",
-        lambda state: state.get("capability_status", "ok"),
+        lambda state: state.get("needs_new_capability", False),
         {
-            "needs_improvement": "self_improve",
-            "ok": END,
-            "implementing": "implement_capability",
+            True: "self_improve",
+            False: "respond",
         }
     )
+    workflow.add_edge("self_improve", "respond")
     
-    # Self-improvement → Implementar capacidade
-    workflow.add_edge("self_improve", "implement_capability")
-    
-    # Implementar capacidade → END
-    workflow.add_edge("implement_capability", END)
+    # Responder → Salvar memória → END
+    workflow.add_edge("respond", "save_memory")
+    workflow.set_finish_point("save_memory")
     
     return workflow.compile()
 
