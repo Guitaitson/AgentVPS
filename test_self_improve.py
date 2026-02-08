@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Teste do fluxo self_improve."""
 import sys
-sys.path.insert(0, '/opt/vps-agent/core')
+from pathlib import Path
+
+# Add core/ to path dynamically
+core_path = Path(__file__).parent / 'core'
+sys.path.insert(0, str(core_path))
 
 from vps_agent.agent import process_message_async
 import asyncio

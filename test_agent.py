@@ -5,10 +5,10 @@ from pathlib import Path
 
 # Add the project root to the path
 project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / 'core'))
 
 # Import from the package
-from core.vps_agent.agent import process_message_async
+from vps_agent.agent import process_message_async
 import asyncio
 
 
