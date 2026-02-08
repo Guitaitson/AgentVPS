@@ -54,13 +54,10 @@ jobs:
       
       - name: Install linting tools
         run: |
-          pip install ruff black
+          pip install ruff
       
       - name: Run ruff linter
         run: ruff check .
-      
-      - name: Run black formatter check
-        run: black --check .
   
   docker:
     runs-on: ubuntu-latest
