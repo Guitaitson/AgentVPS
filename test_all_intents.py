@@ -10,7 +10,8 @@ sys.path.insert(0, str(core_path))
 from vps_agent.agent import process_message_async
 import asyncio
 
-async def test_intent(name: str, message: str):
+async def run_intent_test(name: str, message: str):
+    """Helper function to test a single intent."""
     print(f"\n=== TESTANDO: {name} ===")
     print(f"Mensagem: {message}")
     try:
