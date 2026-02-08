@@ -163,13 +163,23 @@
 
 ## 📝 Últimas Atualizações
 
-### 2026-02-08 — FASE 0 COMPLETA
+### 2026-02-08 — DEPLOY CONCLUÍDO
 - 所有 7 jobs da FASE 0 concluídos
 - Graph flow self_improve corrigido e testado
 - Telegram Log Handler implementado
 - README.md atualizado com documentação
 - CI/CD adaptado para requirements.txt
 - Deploy script criado (scripts/deploy.sh)
+
+### 2026-02-08 — FASE 1 v2 COMPLETA
+- VPS deployado com sucesso (107.175.1.42)
+- PostgreSQL + Redis + Qdrant rodando
+- Documentação robusta criada:
+  - docs/ARCHITECTURE.md
+  - docs/CONTRIBUTING.md
+  - docs/DEPLOYMENT.md
+  - docs/adr/* (3 ADRs criados)
+- Memory Bank atualizado e organizado
 
 ### 2026-02-06 — Início FASE 0
 - Plano de estabilização criado baseado em consultoria Opus 4.6
