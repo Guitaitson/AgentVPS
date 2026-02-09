@@ -2,6 +2,7 @@
 Telegram Log Handler — Notifica erros CRITICAL via Telegram
 F0-06 — FASE 0 Estabilização
 """
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -120,7 +121,7 @@ class TelegramNotifier:
                 chat_id=self.chat_id,
                 text=message,
                 parse_mode="Markdown",
-                disable_notification=disable_notification
+                disable_notification=disable_notification,
             )
             return True
         except TelegramError:
@@ -154,9 +155,7 @@ class TelegramNotifier:
             lines.append(f"{'✅' if ok else '❌'} {service}")
 
         text = (
-            f"{emoji} **Health Check**\n\n"
-            f"{chr(10).join(lines)}\n\n"
-            f"RAM: {status.get('ram', 'N/A')}"
+            f"{emoji} **Health Check**\n\n{chr(10).join(lines)}\n\nRAM: {status.get('ram', 'N/A')}"
         )
         return self.send(text, level="warning" if not status.get("healthy") else "success")
 

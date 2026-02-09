@@ -2,6 +2,7 @@
 Grafo principal do agente LangGraph.
 Define o fluxo de decisão completo com Self-Improvement.
 """
+
 from langgraph.graph import StateGraph
 
 from .memory import AgentMemory
@@ -48,13 +49,13 @@ def build_agent_graph():
         "plan",
         lambda state: state.get("intent", "unknown"),
         {
-            "command": "execute",       # Comandos diretos → executar
-            "task": "execute",         # Tarefas → executar
-            "question": "respond",      # Perguntas → responder
-            "chat": "respond",         # Chat → responder
+            "command": "execute",  # Comandos diretos → executar
+            "task": "execute",  # Tarefas → executar
+            "question": "respond",  # Perguntas → responder
+            "chat": "respond",  # Chat → responder
             "self_improve": "check_capabilities",  # Auto-evolução → verificar capacidades
             "unknown": "respond",
-        }
+        },
     )
 
     # Execução → Salvar memória
@@ -67,7 +68,7 @@ def build_agent_graph():
         {
             True: "self_improve",
             False: "respond",
-        }
+        },
     )
     workflow.add_edge("self_improve", "respond")
 

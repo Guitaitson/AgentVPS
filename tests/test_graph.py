@@ -1,6 +1,7 @@
 """
 Testes basicos para o VPS-Agent v2.
 """
+
 import pytest
 
 
@@ -10,16 +11,15 @@ class TestAgentState:
     def test_agent_state_import(self):
         """Testa se AgentState pode ser importado."""
         from core.vps_langgraph.state import AgentState
+
         assert AgentState is not None
 
     def test_agent_state_structure(self):
         """Testa a estrutura do AgentState."""
         from core.vps_langgraph.state import AgentState
+
         state = AgentState(
-            user_id="test_user",
-            user_message="Hello",
-            intent="chat",
-            intent_confidence=0.9
+            user_id="test_user", user_message="Hello", intent="chat", intent_confidence=0.9
         )
         assert state["user_id"] == "test_user"
         assert state["user_message"] == "Hello"
@@ -33,10 +33,7 @@ class TestNodes:
         """Testa classificacao de comandos."""
         from core.vps_langgraph.nodes import node_classify_intent
 
-        state = {
-            "user_id": "123",
-            "user_message": "/ram"
-        }
+        state = {"user_id": "123", "user_message": "/ram"}
         result = node_classify_intent(state)
 
         assert result["intent"] == "command"
@@ -47,10 +44,7 @@ class TestNodes:
         from core.vps_langgraph.nodes import node_classify_intent
 
         # Pergunta factual clara - sem "e" isolado para evitar match com self_improve
-        state = {
-            "user_id": "123",
-            "user_message": "oq e a capital do brasil?"
-        }
+        state = {"user_id": "123", "user_message": "oq e a capital do brasil?"}
         result = node_classify_intent(state)
 
         # Aceita question OU chat OU self_improve (modelo gratuito tem limitacoes)
@@ -60,10 +54,7 @@ class TestNodes:
         """Testa classificacao de chat."""
         from core.vps_langgraph.nodes import node_classify_intent
 
-        state = {
-            "user_id": "123",
-            "user_message": "Ola, tudo bem?"
-        }
+        state = {"user_id": "123", "user_message": "Ola, tudo bem?"}
         result = node_classify_intent(state)
 
         assert result["intent"] == "chat"
@@ -86,6 +77,7 @@ class TestMemory:
     def test_memory_import(self):
         """Testa se AgentMemory pode ser importado."""
         from core.vps_langgraph.memory import AgentMemory
+
         assert AgentMemory is not None
 
 

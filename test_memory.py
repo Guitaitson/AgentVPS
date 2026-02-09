@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test memory connection."""
+
 import sys
 from pathlib import Path
 
@@ -24,6 +25,7 @@ def test_memory():
     except Exception as e:
         print(f"ERRO: {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

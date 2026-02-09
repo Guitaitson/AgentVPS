@@ -128,10 +128,7 @@ class TestLLMProviderFactory:
                 yield "test"
 
         # Registrar provedor
-        LLMProviderFactory.register_provider(
-            LLMProviderType.MINIMAX,
-            CustomProvider
-        )
+        LLMProviderFactory.register_provider(LLMProviderType.MINIMAX, CustomProvider)
 
         # Criar provedor
         config = LLMConfig(

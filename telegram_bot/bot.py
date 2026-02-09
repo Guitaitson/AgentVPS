@@ -2,6 +2,7 @@
 VPS-Agent Telegram Bot — Interface principal
 Versão: 2.0 — Com LangGraph e timeout otimizado
 """
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -37,10 +38,9 @@ load_dotenv("/opt/vps-agent/core/.env")
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ALLOWED_USERS = [
-    int(uid.strip())
-    for uid in os.getenv("TELEGRAM_ALLOWED_USERS", "").split(",")
-    if uid.strip()
+    int(uid.strip()) for uid in os.getenv("TELEGRAM_ALLOWED_USERS", "").split(",") if uid.strip()
 ]
+
 
 # Conexões
 def get_db_conn():
@@ -53,18 +53,20 @@ def get_db_conn():
         password=os.getenv("POSTGRES_PASSWORD"),
     )
 
+
 def get_redis():
     """Retorna conexão com Redis."""
     return redis.Redis(
         host=os.getenv("REDIS_HOST", "127.0.0.1"),
         port=int(os.getenv("REDIS_PORT", 6379)),
-        decode_responses=True
+        decode_responses=True,
     )
 
 
 # Middleware de segurança
 def authorized_only(func):
     """Decorator: só permite usuários autorizados."""
+
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if user_id not in ALLOWED_USERS:
@@ -72,6 +74,7 @@ def authorized_only(func):
             await update.message.reply_text("⛔ Acesso não autorizado.")
             return
         return await func(update, context)
+
     return wrapper
 
 
@@ -129,6 +132,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     import subprocess
+
     result = subprocess.run(["free", "-m"], capture_output=True, text=True)
     lines = result.stdout.strip().split("\n")
     mem_parts = lines[1].split()
@@ -150,10 +154,11 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /ram — detalhe de memória por container."""
     import subprocess
+
     result = subprocess.run(
-        ["docker", "stats", "--no-stream", "--format",
-         "{{.Name}}: {{.MemUsage}} ({{.MemPerc}})"],
-        capture_output=True, text=True
+        ["docker", "stats", "--no-stream", "--format", "{{.Name}}: {{.MemUsage}} ({{.MemPerc}})"],
+        capture_output=True,
+        text=True,
     )
 
     text = f"🧠 **RAM por Container:**\n\n```\n{result.stdout if result.stdout.strip() else 'Nenhum container'}```"
@@ -164,9 +169,11 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /containers — lista containers."""
     import subprocess
+
     result = subprocess.run(
         ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
 
     text = f"🐳 **Containers Ativos:**\n\n```\n{result.stdout if result.stdout.strip() else 'Nenhum container'}```"
@@ -197,9 +204,8 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Docker
     try:
         import subprocess
-        result = subprocess.run(
-            ["docker", "ps", "-q"], capture_output=True, text=True
-        )
+
+        result = subprocess.run(["docker", "ps", "-q"], capture_output=True, text=True)
         containers = len(result.stdout.strip().split("\n"))
         checks.append(("Docker", f"✅ ({containers} containers)"))
     except Exception:
@@ -208,6 +214,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # RAM
     try:
         import subprocess
+
         result = subprocess.run(["free", "-m"], capture_output=True, text=True)
         lines = result.stdout.strip().split("\n")
         mem_parts = lines[1].split()
@@ -250,6 +257,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     # Enviar para Telegram (F0-06)
     try:
         from telegram_bot.telegram_handler import get_telegram_notifier
+
         notifier = get_telegram_notifier()
         notifier.send_error(f"Erro no Bot:\n```\n{error_msg[:500]}\n```")
     except Exception:
@@ -263,11 +271,11 @@ def main():
     app = (
         Application.builder()
         .token(TOKEN)
-        .connect_timeout(30.0)      # Timeout de conexão
-        .read_timeout(30.0)        # Timeout de leitura
-        .write_timeout(30.0)       # Timeout de escrita
-        .pool_timeout(30.0)       # Timeout do pool de conexões
-        .concurrent_updates(10)    # Atualizações simultâneas
+        .connect_timeout(30.0)  # Timeout de conexão
+        .read_timeout(30.0)  # Timeout de leitura
+        .write_timeout(30.0)  # Timeout de escrita
+        .pool_timeout(30.0)  # Timeout do pool de conexões
+        .concurrent_updates(10)  # Atualizações simultâneas
         .connection_pool_size(20)  # Tamanho do pool de conexões
         .build()
     )

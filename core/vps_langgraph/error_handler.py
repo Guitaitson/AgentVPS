@@ -23,15 +23,16 @@ logger = structlog.get_logger()
 
 class ErrorCategory(Enum):
     """Categorias de erro para classificação."""
-    VALIDATION = "validation"          # Erros de validação de entrada
-    EXECUTION = "execution"            # Erros durante execução
-    NETWORK = "network"                # Erros de rede/conexão
-    DATABASE = "database"              # Erros de banco de dados
-    AUTHENTICATION = "authentication" # Erros de autenticação/autorização
-    PERMISSION = "permission"          # Erros de permissão
-    RESOURCE = "resource"             # Erros de recursos (RAM, disk)
-    TIMEOUT = "timeout"               # Erros de timeout
-    UNKNOWN = "unknown"              # Erros não categorizados
+
+    VALIDATION = "validation"  # Erros de validação de entrada
+    EXECUTION = "execution"  # Erros durante execução
+    NETWORK = "network"  # Erros de rede/conexão
+    DATABASE = "database"  # Erros de banco de dados
+    AUTHENTICATION = "authentication"  # Erros de autenticação/autorização
+    PERMISSION = "permission"  # Erros de permissão
+    RESOURCE = "resource"  # Erros de recursos (RAM, disk)
+    TIMEOUT = "timeout"  # Erros de timeout
+    UNKNOWN = "unknown"  # Erros não categorizados
 
 
 class VPSAgentError(Exception):
@@ -44,7 +45,7 @@ class VPSAgentError(Exception):
         original_error: Optional[Exception] = None,
         recoverable: bool = True,
         user_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message)
         self.message = message
@@ -126,6 +127,7 @@ class NetworkError(VPSAgentError):
 
 # ============ Funções de Utility ============
 
+
 def categorize_error(error: Exception) -> ErrorCategory:
     """
     Categoriza um erro baseado no tipo.
@@ -155,7 +157,10 @@ def categorize_error(error: Exception) -> ErrorCategory:
     if any(kw in error_message for kw in ["auth", "token", "credential", "password", "api_key"]):
         return ErrorCategory.AUTHENTICATION
 
-    if any(kw in error_message for kw in ["permission", "denied", "access", "forbidden", "unauthorized"]):
+    if any(
+        kw in error_message
+        for kw in ["permission", "denied", "access", "forbidden", "unauthorized"]
+    ):
         return ErrorCategory.PERMISSION
 
     if any(kw in error_message for kw in ["memory", "ram", "disk", "space", "quota", "limit"]):
@@ -165,9 +170,7 @@ def categorize_error(error: Exception) -> ErrorCategory:
 
 
 def wrap_error(
-    error: Exception,
-    user_message: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    error: Exception, user_message: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None
 ) -> VPSAgentError:
     """
     Envolve uma exceção em VPSAgentError.
@@ -230,11 +233,7 @@ def format_error_for_user(error: Exception) -> str:
     return f"{prefix} {base_message}"
 
 
-def log_error(
-    error: Exception,
-    context: Optional[Dict[str, Any]] = None,
-    level: str = "error"
-):
+def log_error(error: Exception, context: Optional[Dict[str, Any]] = None, level: str = "error"):
     """
     Faz logging estruturado de erro.
 
@@ -253,10 +252,12 @@ def log_error(
         error_info["context"] = context
 
     if isinstance(error, VPSAgentError):
-        error_info.update({
-            "recoverable": error.recoverable,
-            "metadata": error.metadata,
-        })
+        error_info.update(
+            {
+                "recoverable": error.recoverable,
+                "metadata": error.metadata,
+            }
+        )
         logger.log(level, error.message, **error_info)
     else:
         logger.log(level, f"{type(error).__name__}: {error}", **error_info)
@@ -264,11 +265,12 @@ def log_error(
 
 # ============ Decoradores ============
 
+
 def error_handler(
     user_message: Optional[str] = None,
     fallback: Optional[Callable] = None,
     default_return: Any = None,
-    log_context: Optional[Dict[str, Any]] = None
+    log_context: Optional[Dict[str, Any]] = None,
 ):
     """
     Decorador para tratamento de erros em funções.
@@ -282,6 +284,7 @@ def error_handler(
     Returns:
         Decorator
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -301,11 +304,14 @@ def error_handler(
                 log_error(wrapped, log_context)
                 print(f"Error in {func.__name__}: {traceback.format_exc()}")
                 return default_return
+
         return wrapper
+
     return decorator
 
 
 # ============ Recovery Suggestions ============
+
 
 def suggest_recovery(error: Exception) -> str:
     """
@@ -336,6 +342,7 @@ def suggest_recovery(error: Exception) -> str:
 
 # ============ Health Check ============
 
+
 def check_system_health() -> Dict[str, Any]:
     """
     Verifica a saúde do sistema.
@@ -352,13 +359,14 @@ def check_system_health() -> Dict[str, Any]:
         import os
 
         import psycopg2
+
         conn = psycopg2.connect(
             host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
             port=int(os.getenv("POSTGRES_PORT", 5432)),
             dbname=os.getenv("POSTGRES_DB", "vps_agent"),
             user=os.getenv("POSTGRES_USER"),
             password=os.getenv("POSTGRES_PASSWORD"),
-            connect_timeout=3
+            connect_timeout=3,
         )
         conn.close()
         checks["postgresql"] = {"status": "healthy", "latency_ms": "<10"}
@@ -368,10 +376,11 @@ def check_system_health() -> Dict[str, Any]:
     # Verificar Redis
     try:
         import redis
+
         r = redis.Redis(
             host=os.getenv("REDIS_HOST", "127.0.0.1"),
             port=int(os.getenv("REDIS_PORT", 6379)),
-            socket_timeout=3
+            socket_timeout=3,
         )
         r.ping()
         checks["redis"] = {"status": "healthy", "latency_ms": "<10"}

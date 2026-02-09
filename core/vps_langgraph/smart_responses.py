@@ -19,7 +19,7 @@ SKILL_GUIDE = {
             "1. Instalar/clonar SDK do GitHub",
             "2. Configurar token PAT (Personal Access Token)",
             "3. Implementar endpoints para listar/criar repos",
-        ]
+        ],
     },
     "repositório": {
         "name": "GitHub API",
@@ -28,7 +28,7 @@ SKILL_GUIDE = {
             "1. Instalar/clonar SDK do GitHub",
             "2. Configurar autenticação",
             "3. Implementar operações de repositório",
-        ]
+        ],
     },
     "web": {
         "name": "Busca Web",
@@ -37,7 +37,7 @@ SKILL_GUIDE = {
             "1. Integrar API de busca (Brave Search)",
             "2. Implementar parser de resultados",
             "3. Adicionar cache de buscas",
-        ]
+        ],
     },
     "site": {
         "name": "Web Scraping",
@@ -46,7 +46,7 @@ SKILL_GUIDE = {
             "1. Implementar parser HTML",
             "2. Adicionar rate limiting",
             "3. Tratar erros de rede",
-        ]
+        ],
     },
     "arquivo": {
         "name": "Gerenciador de Arquivos",
@@ -55,7 +55,7 @@ SKILL_GUIDE = {
             "1. Implementar operações de arquivo seguro",
             "2. Adicionar validação de caminhos",
             "3. Criar backup automático",
-        ]
+        ],
     },
     "banco": {
         "name": "Banco de Dados",
@@ -64,7 +64,7 @@ SKILL_GUIDE = {
             "1. Conectar ao PostgreSQL",
             "2. Implementar query builder seguro",
             "3. Adicionar validação de inputs",
-        ]
+        ],
     },
     "email": {
         "name": "Email",
@@ -73,7 +73,7 @@ SKILL_GUIDE = {
             "1. Configurar servidor SMTP",
             "2. Implementar envio de emails",
             "3. Adicionar templates",
-        ]
+        ],
     },
     "slack": {
         "name": "Slack Integration",
@@ -82,7 +82,7 @@ SKILL_GUIDE = {
             "1. Configurar webhook do Slack",
             "2. Implementar envio de mensagens",
             "3. Adicionar formatação rica",
-        ]
+        ],
     },
     "criar": {
         "name": "Criação de Agentes",
@@ -91,7 +91,7 @@ SKILL_GUIDE = {
             "1. Usar CLI Kilocode para criar agente",
             "2. Configurar ambiente isolado",
             "3. Integrar com LangGraph",
-        ]
+        ],
     },
     "agente": {
         "name": "Gerenciamento de Agentes",
@@ -100,7 +100,7 @@ SKILL_GUIDE = {
             "1. Definir capacidades do agente",
             "2. Criar estrutura do projeto",
             "3. Configurar CI/CD",
-        ]
+        ],
     },
 }
 
@@ -123,9 +123,7 @@ def detect_missing_skill_keywords(message: str) -> list:
 
 
 def generate_smart_unavailable_response(
-    user_message: str,
-    detected_skills: list = None,
-    intent: str = "unknown"
+    user_message: str, detected_skills: list = None, intent: str = "unknown"
 ) -> str:
     """
     Gera uma resposta inteligente quando uma habilidade não está disponível.
@@ -162,7 +160,7 @@ def generate_smart_unavailable_response(
             responses.append(f"📦 **{skill_info['name']}**")
             responses.append(f"   O que faz: {skill_info['description']}")
             responses.append("   Para implementar:")
-            for step in skill_info['plan']:
+            for step in skill_info["plan"]:
                 responses.append(f"   {step}")
             responses.append("")
 
@@ -198,7 +196,9 @@ def _generate_generic_unavailable_response(intent: str) -> str:
         responses.append("• Integrar uma API externa")
         responses.append("• Desenvolver um novo agente")
         responses.append("")
-        responses.append("Me explique melhor o que você precisa e eu criarei um plano de implementação.")
+        responses.append(
+            "Me explique melhor o que você precisa e eu criarei um plano de implementação."
+        )
 
     elif intent == "task":
         responses.append("Para executar essa tarefa, preciso:")
@@ -222,8 +222,7 @@ def _generate_generic_unavailable_response(intent: str) -> str:
 
 
 def generate_capability_detected_response(
-    capability_name: str,
-    is_implemented: bool = False
+    capability_name: str, is_implemented: bool = False
 ) -> str:
     """
     Gera resposta quando uma capacidade é detectada.
@@ -239,19 +238,14 @@ def generate_capability_detected_response(
         return f"✅ **Capacidade disponível:** {capability_name}\n\nPosso ajudar com isso! O que você precisa?"
 
     return generate_smart_unavailable_response(
-        f"preciso de {capability_name}",
-        detect_missing_skill_keywords(capability_name.lower())
+        f"preciso de {capability_name}", detect_missing_skill_keywords(capability_name.lower())
     )
 
 
 # ============ Learning Tracking ============
 
-def create_learning_message(
-    category: str,
-    trigger: str,
-    lesson: str,
-    success: bool = True
-) -> str:
+
+def create_learning_message(category: str, trigger: str, lesson: str, success: bool = True) -> str:
     """
     Cria uma mensagem formatada para registrar um aprendizado.
 
@@ -276,6 +270,7 @@ def create_learning_message(
 
 
 # ============ Help and Capabilities Summary ============
+
 
 def get_capabilities_summary() -> str:
     """

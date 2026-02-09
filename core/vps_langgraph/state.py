@@ -2,6 +2,7 @@
 Estado compartilhado do agente LangGraph.
 Tudo que o agente "sabe" em um dado momento.
 """
+
 from typing import Optional, TypedDict
 
 

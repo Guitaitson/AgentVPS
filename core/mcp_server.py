@@ -7,6 +7,7 @@ Usage:
 
 The server will be available at http://localhost:8000/mcp
 """
+
 import subprocess
 from contextlib import asynccontextmanager
 
@@ -23,7 +24,7 @@ from core.resource_manager.manager import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """ lifespan context manager for startup/shutdown """
+    """lifespan context manager for startup/shutdown"""
     # Startup
     print("[MCP] Starting VPS-Agent MCP Server...")
     yield
@@ -36,7 +37,7 @@ app = FastAPI(
     title="VPS-Agent MCP Server",
     description="Exposes VPS management tools via MCP protocol",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
@@ -44,17 +45,20 @@ def get_docker_containers() -> list:
     """Get all Docker containers with their status."""
     result = subprocess.run(
         ["docker", "ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.Image}}"],
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
     containers = []
     for line in result.stdout.strip().split("\n"):
         if line:
             parts = line.split("|")
-            containers.append({
-                "name": parts[0] if len(parts) > 0 else "",
-                "status": parts[1] if len(parts) > 1 else "",
-                "image": parts[2] if len(parts) > 2 else "",
-            })
+            containers.append(
+                {
+                    "name": parts[0] if len(parts) > 0 else "",
+                    "status": parts[1] if len(parts) > 1 else "",
+                    "image": parts[2] if len(parts) > 2 else "",
+                }
+            )
     return containers
 
 
@@ -92,15 +96,13 @@ async def health_check() -> dict:
 
 # MCP Tools
 
+
 @app.get("/ram", tags=["mcp"])
 async def get_ram_status() -> dict:
     """Get current RAM status of the VPS."""
     try:
         ram_info = get_available_ram()
-        return {
-            "status": "success",
-            "available_ram_mb": ram_info
-        }
+        return {"status": "success", "available_ram_mb": ram_info}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -110,10 +112,7 @@ async def list_containers() -> dict:
     """List all Docker containers and their status."""
     try:
         containers = get_docker_containers()
-        return {
-            "status": "success",
-            "containers": containers
-        }
+        return {"status": "success", "containers": containers}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -123,10 +122,7 @@ async def list_tools() -> dict:
     """List all on-demand tools and their status."""
     try:
         tools_status = get_tools_status()
-        return {
-            "status": "success",
-            "tools": tools_status
-        }
+        return {"status": "success", "tools": tools_status}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -136,10 +132,7 @@ async def start_tool_endpoint(tool_name: str) -> dict:
     """Start an on-demand tool."""
     try:
         success, message = start_tool(tool_name)
-        return {
-            "status": "success" if success else "error",
-            "message": message
-        }
+        return {"status": "success" if success else "error", "message": message}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -149,10 +142,7 @@ async def stop_tool_endpoint(tool_name: str) -> dict:
     """Stop an on-demand tool."""
     try:
         success, message = stop_tool(tool_name)
-        return {
-            "status": "success" if success else "error",
-            "message": message
-        }
+        return {"status": "success" if success else "error", "message": message}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -164,12 +154,11 @@ async def list_services() -> dict:
         containers = get_docker_containers()
         # Filter for core services
         core_names = ["postgres", "redis", "telegram-bot", "langgraph", "vps-agent"]
-        core_services = [c for c in containers if any(name in c["name"].lower() for name in core_names)]
+        core_services = [
+            c for c in containers if any(name in c["name"].lower() for name in core_names)
+        ]
 
-        return {
-            "status": "success",
-            "services": core_services
-        }
+        return {"status": "success", "services": core_services}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -179,10 +168,7 @@ async def get_system_info_endpoint() -> dict:
     """Get system information (CPU, RAM, Disk)."""
     try:
         info = get_system_info()
-        return {
-            "status": "success",
-            "system": info
-        }
+        return {"status": "success", "system": info}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -192,7 +178,7 @@ mcp = FastApiMCP(
     app,
     name="VPS-Agent MCP Server",
     description="Model Context Protocol server for VPS management",
-    include_tags=["mcp"]  # Tag our endpoints with 'mcp' to include them
+    include_tags=["mcp"],  # Tag our endpoints with 'mcp' to include them
 )
 
 
@@ -212,12 +198,7 @@ def main():
     print("Docs: http://localhost:8000/docs")
     print("=" * 50)
 
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Teste do fluxo self_improve."""
+
 import sys
 from pathlib import Path
 
@@ -15,10 +16,11 @@ from core.vps_agent.agent import process_message_async
 
 async def main():
     print("Testando fluxo self_improve...")
-    result = await process_message_async('test', 'voce consegue melhorar voce mesmo?')
-    print('=== RESULTADO ===')
+    result = await process_message_async("test", "voce consegue melhorar voce mesmo?")
+    print("=== RESULTADO ===")
     print(result)
     return result
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())

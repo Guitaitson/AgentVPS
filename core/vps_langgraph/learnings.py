@@ -27,13 +27,14 @@ logger = structlog.get_logger()
 def get_db_connection():
     """Retorna conexão com PostgreSQL."""
     import psycopg2
+
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
         port=int(os.getenv("POSTGRES_PORT", 5432)),
         dbname=os.getenv("POSTGRES_DB", "vps_agent"),
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
-        connect_timeout=5
+        connect_timeout=5,
     )
 
 
@@ -114,7 +115,7 @@ class LearningsManager:
         trigger: str,
         lesson: str,
         success: bool = True,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> int:
         """
         Adiciona um novo aprendizado.
@@ -140,17 +141,13 @@ class LearningsManager:
         try:
             with db_cursor() as cursor:
                 cursor.execute(
-                    insert_sql,
-                    (category, trigger, lesson, success, json.dumps(metadata or {}))
+                    insert_sql, (category, trigger, lesson, success, json.dumps(metadata or {}))
                 )
                 result = cursor.fetchone()
                 learning_id = result[0] if result else None
 
             logger.info(
-                "learning_added",
-                category=category,
-                learning_id=learning_id,
-                success=success
+                "learning_added", category=category, learning_id=learning_id, success=success
             )
             return learning_id
 
@@ -159,10 +156,7 @@ class LearningsManager:
             return -1
 
     def get_learnings(
-        self,
-        category: Optional[str] = None,
-        limit: int = 50,
-        offset: int = 0
+        self, category: Optional[str] = None, limit: int = 50, offset: int = 0
     ) -> List[Dict[str, Any]]:
         """
         Recupera aprendizados.
@@ -189,8 +183,15 @@ class LearningsManager:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
 
-                columns = ['id', 'category', 'trigger', 'lesson', 'success',
-                          'metadata', 'created_at']
+                columns = [
+                    "id",
+                    "category",
+                    "trigger",
+                    "lesson",
+                    "success",
+                    "metadata",
+                    "created_at",
+                ]
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
@@ -222,8 +223,15 @@ class LearningsManager:
                 cursor.execute(search_sql, (f"%{query}%", f"%{query}%", limit))
                 rows = cursor.fetchall()
 
-                columns = ['id', 'category', 'trigger', 'lesson', 'success',
-                          'metadata', 'created_at']
+                columns = [
+                    "id",
+                    "category",
+                    "trigger",
+                    "lesson",
+                    "success",
+                    "metadata",
+                    "created_at",
+                ]
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
@@ -256,19 +264,22 @@ class LearningsManager:
                 cursor.execute(query, (days, limit))
                 rows = cursor.fetchall()
 
-                columns = ['id', 'category', 'trigger', 'lesson', 'success',
-                          'metadata', 'created_at']
+                columns = [
+                    "id",
+                    "category",
+                    "trigger",
+                    "lesson",
+                    "success",
+                    "metadata",
+                    "created_at",
+                ]
                 return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
             logger.error("failures_fetch_failed", error=str(e))
             return []
 
-    def get_lessons_for_action(
-        self,
-        action_type: str,
-        context: str = ""
-    ) -> List[str]:
+    def get_lessons_for_action(self, action_type: str, context: str = "") -> List[str]:
         """
         Recupera lições relevantes antes de executar uma ação.
 
@@ -288,18 +299,14 @@ class LearningsManager:
 
         # Filtrar apenas lições relevantes (sucesso = True)
         relevant_lessons = [
-            lesson_item['lesson'] for lesson_item in learnings
-            if lesson_item['success'] and lesson_item['category'] != 'execution_error'
+            lesson_item["lesson"]
+            for lesson_item in learnings
+            if lesson_item["success"] and lesson_item["category"] != "execution_error"
         ]
 
         return relevant_lessons
 
-    def record_api_failure(
-        self,
-        api_name: str,
-        error: str,
-        suggestion: str = ""
-    ) -> int:
+    def record_api_failure(self, api_name: str, error: str, suggestion: str = "") -> int:
         """
         Registra falha de API específica.
 
@@ -316,15 +323,10 @@ class LearningsManager:
             trigger=f"API: {api_name} | Erro: {error[:200]}",
             lesson=suggestion or f"API {api_name} falhou com erro: {error[:200]}",
             success=False,
-            metadata={"api_name": api_name, "error": error[:500]}
+            metadata={"api_name": api_name, "error": error[:500]},
         )
 
-    def record_tool_choice(
-        self,
-        tool: str,
-        reason: str,
-        outcome: str
-    ) -> int:
+    def record_tool_choice(self, tool: str, reason: str, outcome: str) -> int:
         """
         Registra escolha de ferramenta e seu resultado.
 
@@ -341,7 +343,7 @@ class LearningsManager:
             trigger=f"Ferramenta: {tool} | Razão: {reason[:200]}",
             lesson=f"Resultado: {outcome[:500]}",
             success="sucesso" in outcome.lower() or "funcionou" in outcome.lower(),
-            metadata={"tool": tool, "reason": reason[:500]}
+            metadata={"tool": tool, "reason": reason[:500]},
         )
 
     def get_summary(self) -> Dict[str, Any]:
@@ -378,13 +380,13 @@ class LearningsManager:
                         "successes": row[2],
                         "failures": row[3],
                         "oldest": row[4].isoformat() if row[4] else None,
-                        "newest": row[5].isoformat() if row[5] else None
+                        "newest": row[5].isoformat() if row[5] else None,
                     }
 
                 return {
                     "total_learnings": sum(c["total"] for c in categories.values()),
                     "categories": categories,
-                    "initialized": self._initialized
+                    "initialized": self._initialized,
                 }
 
         except Exception as e:
@@ -397,6 +399,7 @@ learnings_manager = LearningsManager()
 
 
 # ============ Convenience Functions ============
+
 
 def record_failure_and_continue(api_name: str, error: str, suggestion: str = ""):
     """
@@ -437,7 +440,7 @@ def check_before_action(action_type: str, context: str = "") -> Dict[str, Any]:
         "recommendation": (
             f"Encontrei {len(lessons)} lição(ões) anterior(es) para '{action_type}'. "
             "Recomendo revisar antes de continuar."
-            if lessons else
-            "Sem lições anteriores. Primeira execução desta ação."
-        )
+            if lessons
+            else "Sem lições anteriores. Primeira execução desta ação."
+        ),
     }

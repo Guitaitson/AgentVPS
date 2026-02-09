@@ -50,6 +50,7 @@ async def process_message_async(user_id: str, message: str) -> str:
 
     except Exception as e:
         import traceback
+
         logger.error("erro_processamento", error=str(e), user_id=user_id)
         logger.error("traceback", traceback=traceback.format_exc())
         return f"❌ Erro ao processar mensagem: {str(e)}"
@@ -69,7 +70,7 @@ def get_agent_status() -> Dict[str, Any]:
     return {
         "status": "online",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "capabilities": summary
+        "capabilities": summary,
     }
 
 

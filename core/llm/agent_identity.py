@@ -5,6 +5,7 @@ Este módulo fornece ao LLM todas as informações necessárias
 para que o agente se identifique corretamente e conheça
 suas capacidades.
 """
+
 from typing import Dict, List
 
 
@@ -119,7 +120,9 @@ def get_full_system_prompt(user_name: str = "Guilherme") -> str:
     return chr(10).join(parts)
 
 
-def get_conversation_prompt(user_message: str, history: List[Dict] = None, context: Dict = None) -> str:
+def get_conversation_prompt(
+    user_message: str, history: List[Dict] = None, context: Dict = None
+) -> str:
     """
     Retorna o prompt para geração de resposta em conversa.
     """

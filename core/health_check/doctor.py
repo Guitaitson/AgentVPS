@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 class HealthStatus(Enum):
     """Status de saúde do componente."""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -23,6 +24,7 @@ class HealthStatus(Enum):
 @dataclass
 class HealthCheckResult:
     """Resultado de uma verificação de saúde."""
+
     name: str
     status: HealthStatus
     message: str
@@ -38,6 +40,7 @@ class HealthCheckResult:
 @dataclass
 class ServiceHealth:
     """Status de um serviço."""
+
     name: str
     status: HealthStatus
     port: Optional[int] = None
@@ -49,6 +52,7 @@ class ServiceHealth:
 @dataclass
 class SystemHealth:
     """Status de recursos do sistema."""
+
     cpu_percent: float = 0.0
     memory_percent: float = 0.0
     disk_percent: float = 0.0
@@ -93,7 +97,9 @@ class HealthCheck:
             redis_url: URL de conexão para Redis
             docker_socket: Socket do Docker
         """
-        self.postgres_dsn = postgres_dsn or os.getenv("POSTGRES_DSN", "postgresql://postgres:postgres@localhost:5432/agentvps")
+        self.postgres_dsn = postgres_dsn or os.getenv(
+            "POSTGRES_DSN", "postgresql://postgres:postgres@localhost:5432/agentvps"
+        )
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.docker_socket = docker_socket or os.getenv("DOCKER_SOCKET", "/var/run/docker.sock")
 
@@ -136,21 +142,21 @@ class HealthCheck:
                     "version": version,
                     "uptime_seconds": uptime_seconds,
                     "dsn": self.postgres_dsn.split("@")[0] + "@...",  # Mask credentials
-                }
+                },
             )
         except OperationalError as e:
             return HealthCheckResult(
                 name="postgresql",
                 status=HealthStatus.UNHEALTHY,
                 message=f"PostgreSQL inacessível: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
         except Exception as e:
             return HealthCheckResult(
                 name="postgresql",
                 status=HealthStatus.DEGRADED,
                 message=f"PostgreSQL com problema: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_redis(self) -> HealthCheckResult:
@@ -172,21 +178,21 @@ class HealthCheck:
                 details={
                     "url": self.redis_url.split("@")[0] + "@...",
                     "used_memory": used_memory,
-                }
+                },
             )
         except RedisConnectionError as e:
             return HealthCheckResult(
                 name="redis",
                 status=HealthStatus.UNHEALTHY,
                 message=f"Redis inacessível: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
         except Exception as e:
             return HealthCheckResult(
                 name="redis",
                 status=HealthStatus.DEGRADED,
                 message=f"Redis com problema: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_docker(self) -> HealthCheckResult:
@@ -195,9 +201,7 @@ class HealthCheck:
         from docker.errors import DockerException
 
         try:
-            client = docker.DockerSocketTimeoutError(
-                base_url=self.docker_socket, timeout=5
-            )
+            client = docker.DockerSocketTimeoutError(base_url=self.docker_socket, timeout=5)
             client.ping()
 
             info = client.info()
@@ -215,21 +219,21 @@ class HealthCheck:
                     "containers_running": running,
                     "containers_stopped": stopped,
                     "total_containers": len(containers),
-                }
+                },
             )
         except DockerException as e:
             return HealthCheckResult(
                 name="docker",
                 status=HealthStatus.UNHEALTHY,
                 message=f"Docker inacessível: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
         except Exception as e:
             return HealthCheckResult(
                 name="docker",
                 status=HealthStatus.DEGRADED,
                 message=f"Docker com problema: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_memory(self) -> HealthCheckResult:
@@ -259,21 +263,21 @@ class HealthCheck:
                     "used_gb": memory.used / (1024**3),
                     "available_gb": memory.available / (1024**3),
                     "total_gb": memory.total / (1024**3),
-                }
+                },
             )
         except ImportError:
             return HealthCheckResult(
                 name="memory",
                 status=HealthStatus.UNKNOWN,
                 message="psutil não disponível",
-                details={}
+                details={},
             )
         except Exception as e:
             return HealthCheckResult(
                 name="memory",
                 status=HealthStatus.DEGRADED,
                 message=f"Erro ao verificar memória: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_cpu(self) -> HealthCheckResult:
@@ -301,21 +305,18 @@ class HealthCheck:
                     "percent": percent,
                     "cores": psutil.cpu_count(),
                     "frequency_mhz": psutil.cpu_freq().current if psutil.cpu_freq() else None,
-                }
+                },
             )
         except ImportError:
             return HealthCheckResult(
-                name="cpu",
-                status=HealthStatus.UNKNOWN,
-                message="psutil não disponível",
-                details={}
+                name="cpu", status=HealthStatus.UNKNOWN, message="psutil não disponível", details={}
             )
         except Exception as e:
             return HealthCheckResult(
                 name="cpu",
                 status=HealthStatus.DEGRADED,
                 message=f"Erro ao verificar CPU: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_disk(self) -> HealthCheckResult:
@@ -345,21 +346,21 @@ class HealthCheck:
                     "used_gb": disk.used / (1024**3),
                     "free_gb": disk.free / (1024**3),
                     "total_gb": disk.total / (1024**3),
-                }
+                },
             )
         except ImportError:
             return HealthCheckResult(
                 name="disk",
                 status=HealthStatus.UNKNOWN,
                 message="psutil não disponível",
-                details={}
+                details={},
             )
         except Exception as e:
             return HealthCheckResult(
                 name="disk",
                 status=HealthStatus.DEGRADED,
                 message=f"Erro ao verificar disco: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_network(self) -> HealthCheckResult:
@@ -405,7 +406,7 @@ class HealthCheck:
                 name="network",
                 status=HealthStatus.DEGRADED,
                 message=f"Erro ao verificar rede: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def check_agent(self) -> HealthCheckResult:
@@ -439,14 +440,14 @@ class HealthCheck:
                     **checks,
                     "python_version": __import__("sys").version.split()[0],
                     "check_time": datetime.now(timezone.utc).isoformat(),
-                }
+                },
             )
         except Exception as e:
             return HealthCheckResult(
                 name="agent",
                 status=HealthStatus.DEGRADED,
                 message=f"Erro ao verificar agente: {str(e)}",
-                details={"error": str(e)}
+                details={"error": str(e)},
             )
 
     def run_check(self, check_name: str) -> HealthCheckResult:
@@ -456,7 +457,7 @@ class HealthCheck:
                 name=check_name,
                 status=HealthStatus.UNKNOWN,
                 message=f"Verificação '{check_name}' não encontrada",
-                details={"available": list(self._check_functions.keys())}
+                details={"available": list(self._check_functions.keys())},
             )
 
         return self._check_functions[check_name]()
@@ -536,15 +537,25 @@ class Doctor:
         for result in results:
             if result.status == HealthStatus.UNHEALTHY:
                 if result.name == "memory":
-                    recommendations.append("🧠 MEMORY CRITICAL: Considere liberar memória ou reiniciar serviços não essenciais")
+                    recommendations.append(
+                        "🧠 MEMORY CRITICAL: Considere liberar memória ou reiniciar serviços não essenciais"
+                    )
                 elif result.name == "cpu":
-                    recommendations.append("💻 CPU CRITICAL: Verifique processos em execução e considere escalar")
+                    recommendations.append(
+                        "💻 CPU CRITICAL: Verifique processos em execução e considere escalar"
+                    )
                 elif result.name == "disk":
-                    recommendations.append("💾 DISK CRITICAL: Limpe arquivos temporários e logs antigos")
+                    recommendations.append(
+                        "💾 DISK CRITICAL: Limpe arquivos temporários e logs antigos"
+                    )
                 elif result.name == "postgresql":
-                    recommendations.append("🐘 PostgreSQL inacessível: Verifique se o container está rodando")
+                    recommendations.append(
+                        "🐘 PostgreSQL inacessível: Verifique se o container está rodando"
+                    )
                 elif result.name == "redis":
-                    recommendations.append("🔴 Redis inacessível: Verifique se o container está rodando")
+                    recommendations.append(
+                        "🔴 Redis inacessível: Verifique se o container está rodando"
+                    )
                 elif result.name == "docker":
                     recommendations.append("🐳 Docker inacessível: Verifique o serviço Docker")
             elif result.status == HealthStatus.DEGRADED:
@@ -580,7 +591,7 @@ class Doctor:
                 "results": {r.name: r.status.value for r in results},
                 "healthy_count": healthy_count,
                 "total_count": total_count,
-            }
+            },
         )
 
     def get_service_health(self) -> List[ServiceHealth]:
@@ -613,7 +624,7 @@ class Doctor:
                 "memory": memory_result.details,
                 "cpu": cpu_result.details,
                 "disk": disk_result.details,
-            }
+            },
         )
 
 

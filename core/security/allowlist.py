@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 class PermissionLevel(Enum):
     """Níveis de permissão."""
+
     DENY = "deny"
     ALLOW = "allow"
     REQUIRE_APPROVAL = "require_approval"
@@ -20,6 +21,7 @@ class PermissionLevel(Enum):
 
 class ResourceType(Enum):
     """Tipos de recursos."""
+
     COMMAND = "command"
     API_ENDPOINT = "api_endpoint"
     FILE_OPERATION = "file_operation"
@@ -30,6 +32,7 @@ class ResourceType(Enum):
 @dataclass
 class AllowlistRule:
     """Regra de allowlist."""
+
     name: str
     resource_type: ResourceType
     pattern: str  # Regex pattern
@@ -48,6 +51,7 @@ class AllowlistRule:
 @dataclass
 class AllowlistResult:
     """Resultado da verificação de allowlist."""
+
     allowed: bool
     permission: PermissionLevel
     rule: Optional[AllowlistRule] = None
@@ -87,10 +91,7 @@ class SecurityAllowlist:
         return False
 
     def check(
-        self,
-        resource_type: ResourceType,
-        value: str,
-        context: Optional[Dict[str, Any]] = None
+        self, resource_type: ResourceType, value: str, context: Optional[Dict[str, Any]] = None
     ) -> AllowlistResult:
         """
         Verifica se uma operação é permitida.
@@ -105,7 +106,8 @@ class SecurityAllowlist:
         """
         # Buscar regras correspondentes
         matching_rules = [
-            rule for rule in self.rules
+            rule
+            for rule in self.rules
             if rule.resource_type == resource_type and rule.matches(value)
         ]
 
@@ -114,7 +116,7 @@ class SecurityAllowlist:
             return AllowlistResult(
                 allowed=False,
                 permission=PermissionLevel.DENY,
-                reason="Nenhuma regra correspondente encontrada"
+                reason="Nenhuma regra correspondente encontrada",
             )
 
         # Priorizar DENY > REQUIRE_APPROVAL > ALLOW
@@ -125,17 +127,19 @@ class SecurityAllowlist:
                 permission=PermissionLevel.DENY,
                 rule=deny_rules[0],
                 reason=f"Negado pela regra: {deny_rules[0].name}",
-                metadata={"rule_name": deny_rules[0].name}
+                metadata={"rule_name": deny_rules[0].name},
             )
 
-        approval_rules = [r for r in matching_rules if r.permission == PermissionLevel.REQUIRE_APPROVAL]
+        approval_rules = [
+            r for r in matching_rules if r.permission == PermissionLevel.REQUIRE_APPROVAL
+        ]
         if approval_rules:
             return AllowlistResult(
                 allowed=False,
                 permission=PermissionLevel.REQUIRE_APPROVAL,
                 rule=approval_rules[0],
                 reason=f"Requer aprovação pela regra: {approval_rules[0].name}",
-                metadata={"rule_name": approval_rules[0].name}
+                metadata={"rule_name": approval_rules[0].name},
             )
 
         allow_rules = [r for r in matching_rules if r.permission == PermissionLevel.ALLOW]
@@ -145,13 +149,13 @@ class SecurityAllowlist:
                 permission=PermissionLevel.ALLOW,
                 rule=allow_rules[0],
                 reason=f"Permitido pela regra: {allow_rules[0].name}",
-                metadata={"rule_name": allow_rules[0].name}
+                metadata={"rule_name": allow_rules[0].name},
             )
 
         return AllowlistResult(
             allowed=False,
             permission=PermissionLevel.DENY,
-            reason="Nenhuma regra de permissão encontrada"
+            reason="Nenhuma regra de permissão encontrada",
         )
 
     def get_rules_by_type(self, resource_type: ResourceType) -> List[AllowlistRule]:
@@ -200,7 +204,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Comandos Docker seguros (leitura apenas)",
         ),
-
         AllowlistRule(
             name="safe_system_commands",
             resource_type=ResourceType.COMMAND,
@@ -208,7 +211,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Comandos de sistema seguros (leitura apenas)",
         ),
-
         # Comandos que requerem aprovação
         AllowlistRule(
             name="docker_management_commands",
@@ -217,7 +219,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.REQUIRE_APPROVAL,
             description="Comandos de gerenciamento Docker (requer aprovação)",
         ),
-
         # Comandos negados
         AllowlistRule(
             name="dangerous_commands",
@@ -226,7 +227,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.DENY,
             description="Comandos perigosos (sempre negados)",
         ),
-
         # API endpoints permitidos
         AllowlistRule(
             name="safe_api_endpoints",
@@ -235,7 +235,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Endpoints API seguros",
         ),
-
         # Operações de arquivo permitidas
         AllowlistRule(
             name="safe_file_operations",
@@ -244,7 +243,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Operações de arquivo seguras (leitura apenas)",
         ),
-
         AllowlistRule(
             name="file_write_operations",
             resource_type=ResourceType.FILE_OPERATION,
@@ -252,7 +250,6 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.REQUIRE_APPROVAL,
             description="Operações de escrita (requer aprovação)",
         ),
-
         # Operações LLM permitidas
         AllowlistRule(
             name="safe_llm_operations",
@@ -268,7 +265,7 @@ def create_default_allowlist() -> SecurityAllowlist:
 
 def load_allowlist_from_file(filepath: str) -> SecurityAllowlist:
     """Carrega allowlist de um arquivo JSON."""
-    with open(filepath, 'r', encoding='utf-8') as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     return SecurityAllowlist(rules_data=data.get("rules", []))
@@ -280,5 +277,5 @@ def save_allowlist_to_file(allowlist: SecurityAllowlist, filepath: str) -> None:
         "rules": allowlist.export_rules(),
     }
 
-    with open(filepath, 'w', encoding='utf-8') as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

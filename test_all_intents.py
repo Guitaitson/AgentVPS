@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Teste dos 5 intents principais."""
+
 import sys
 from pathlib import Path
 
@@ -18,12 +19,13 @@ async def run_intent_test(name: str, message: str):
     print(f"\n=== TESTANDO: {name} ===")
     print(f"Mensagem: {message}")
     try:
-        result = await process_message_async('test', message)
+        result = await process_message_async("test", message)
         print(f"Resposta: {result[:200]}..." if len(result) > 200 else f"Resposta: {result}")
         return result is not None and result != ""
     except Exception as e:
         print(f"ERRO: {e}")
         return False
+
 
 async def main():
     tests = [
@@ -39,9 +41,9 @@ async def main():
         success = await run_intent_test(name, message)
         results.append((name, success))
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("RESUMO DOS TESTES:")
-    print("="*50)
+    print("=" * 50)
     for name, success in results:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{name}: {status}")
@@ -52,6 +54,7 @@ async def main():
 
     return passed == total
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     success = asyncio.run(main())
     sys.exit(0 if success else 1)

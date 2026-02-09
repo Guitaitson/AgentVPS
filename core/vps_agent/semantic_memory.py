@@ -2,6 +2,7 @@
 Memória Semântica com Qdrant.
 Armazena conversas e contexto como vetores para busca semântica.
 """
+
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -14,6 +15,7 @@ try:
         PointStruct,
         VectorParams,
     )
+
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
@@ -73,20 +75,21 @@ class SemanticMemory:
         # TODO: Integrar com MiniMax/OpenAI embedding API
         # Por enquanto, retorna hash simulado como vetor
         import hashlib
+
         hash_obj = hashlib.sha256(text.encode())
         hash_hex = hash_obj.hexdigest()
 
         # Converter hash em vetor de floats
         vector = []
         for i in range(0, len(hash_hex), 8):
-            chunk = hash_hex[i:i+8]
+            chunk = hash_hex[i : i + 8]
             vector.append(int(chunk, 16) / 0xFFFFFFFF)
 
         # Padding para tamanho fixo
         while len(vector) < self.VECTOR_SIZE:
             vector.append(0.0)
 
-        return vector[:self.VECTOR_SIZE]
+        return vector[: self.VECTOR_SIZE]
 
     def save_conversation(
         self,
@@ -133,7 +136,7 @@ class SemanticMemory:
                         vector=vector,
                         payload=payload,
                     )
-                ]
+                ],
             )
 
             return point_id
@@ -169,14 +172,16 @@ class SemanticMemory:
             # Formatar resultados
             similar = []
             for hit in results:
-                similar.append({
-                    "id": hit.id,
-                    "score": hit.score,
-                    "message": hit.payload.get("message", ""),
-                    "response": hit.payload.get("response", ""),
-                    "intent": hit.payload.get("intent", ""),
-                    "created_at": hit.payload.get("created_at", ""),
-                })
+                similar.append(
+                    {
+                        "id": hit.id,
+                        "score": hit.score,
+                        "message": hit.payload.get("message", ""),
+                        "response": hit.payload.get("response", ""),
+                        "intent": hit.payload.get("intent", ""),
+                        "created_at": hit.payload.get("created_at", ""),
+                    }
+                )
 
             return similar
 
@@ -202,21 +207,21 @@ class SemanticMemory:
                 collection_name=self.COLLECTION_NAME,
                 limit=limit,
                 scroll_filter=Filter(
-                    must=[
-                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
-                    ]
+                    must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))]
                 ),
             )
 
             history = []
             for point in results[0]:
-                history.append({
-                    "id": point.id,
-                    "message": point.payload.get("message", ""),
-                    "response": point.payload.get("response", ""),
-                    "intent": point.payload.get("intent", ""),
-                    "created_at": point.payload.get("created_at", ""),
-                })
+                history.append(
+                    {
+                        "id": point.id,
+                        "message": point.payload.get("message", ""),
+                        "response": point.payload.get("response", ""),
+                        "intent": point.payload.get("intent", ""),
+                        "created_at": point.payload.get("created_at", ""),
+                    }
+                )
 
             return history
 
@@ -237,9 +242,7 @@ class SemanticMemory:
             self.client.delete(
                 collection_name=self.COLLECTION_NAME,
                 points_selector=Filter(
-                    must=[
-                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
-                    ]
+                    must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))]
                 ),
             )
             return True

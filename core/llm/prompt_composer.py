@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class PromptTemplate:
     """Template de prompt."""
+
     name: str
     description: str
     template: str
@@ -26,6 +27,7 @@ class PromptTemplate:
 @dataclass
 class PromptContext:
     """Contexto para composição de prompt."""
+
     user_id: str
     session_id: str
     conversation_history: List[Dict[str, Any]]
@@ -38,6 +40,7 @@ class PromptContext:
 @dataclass
 class ComposedPrompt:
     """Prompt composto."""
+
     system_prompt: str
     user_prompt: str
     context: PromptContext
@@ -61,9 +64,8 @@ Capacidades disponíveis:
 {capabilities}
 
 Responda de forma natural, concisa e útil. Mantenha respostas curtas (1-2 frases) para conversas casuais.""",
-        variables=["user_id", "intent", "history_summary", "capabilities"]
+        variables=["user_id", "intent", "history_summary", "capabilities"],
     ),
-
     "command": PromptTemplate(
         name="command",
         description="Execução de comandos do sistema",
@@ -76,9 +78,8 @@ Contexto:
 - Estado do sistema: {system_state}
 
 Execute o comando e retorne o resultado de forma clara e concisa. Se houver erro, explique o que aconteceu.""",
-        variables=["user_id", "intent", "capabilities", "system_state"]
+        variables=["user_id", "intent", "capabilities", "system_state"],
     ),
-
     "task": PromptTemplate(
         name="task",
         description="Execução de tarefas",
@@ -92,9 +93,8 @@ Contexto:
 - Histórico recente: {history_summary}
 
 Execute a tarefa e retorne o resultado de forma clara. Se precisar de mais informações, pergunte ao usuário.""",
-        variables=["user_id", "intent", "capabilities", "system_state", "history_summary"]
+        variables=["user_id", "intent", "capabilities", "system_state", "history_summary"],
     ),
-
     "question": PromptTemplate(
         name="question",
         description="Resposta a perguntas sobre o sistema",
@@ -108,9 +108,8 @@ Contexto:
 - Histórico recente: {history_summary}
 
 Responda à pergunta de forma clara e precisa. Se não souber a resposta, seja honesto e sugira alternativas.""",
-        variables=["user_id", "intent", "capabilities", "system_state", "history_summary"]
+        variables=["user_id", "intent", "capabilities", "system_state", "history_summary"],
     ),
-
     "self_improve": PromptTemplate(
         name="self_improve",
         description="Auto-melhoria do agente",
@@ -136,7 +135,7 @@ Retorne um plano detalhado com:
 - Riscos identificados
 - Próximos passos recomendados
 - Confirmação se deve prosseguir""",
-        variables=["user_id", "intent", "capabilities", "system_state", "history_summary"]
+        variables=["user_id", "intent", "capabilities", "system_state", "history_summary"],
     ),
 }
 
@@ -186,7 +185,7 @@ class PromptComposer:
         self,
         template_name: str,
         context: PromptContext,
-        additional_vars: Optional[Dict[str, Any]] = None
+        additional_vars: Optional[Dict[str, Any]] = None,
     ) -> ComposedPrompt:
         """
         Compõe um prompt baseado em um template e contexto.
@@ -234,7 +233,7 @@ class PromptComposer:
             metadata={
                 "composed_at": datetime.now().isoformat(),
                 "variables_used": list(variables.keys()),
-            }
+            },
         )
 
     def compose_for_intent(
@@ -281,10 +280,7 @@ class PromptComposer:
             Prompt composto com contexto expandido
         """
         # Resumo do histórico expandido
-        history_summary = self._summarize_history(
-            context.conversation_history,
-            max_history_items
-        )
+        history_summary = self._summarize_history(context.conversation_history, max_history_items)
 
         # Adicionar consciência de contexto ao template
         additional_vars = {
@@ -314,10 +310,11 @@ class PromptComposer:
 
         if estimated_tokens > max_tokens:
             # Truncar histórico se necessário
-            max_history_items = max(1, (max_tokens - 1000) // 100)  # Reservar 1000 tokens para system + user
+            max_history_items = max(
+                1, (max_tokens - 1000) // 100
+            )  # Reservar 1000 tokens para system + user
             history_summary = self._summarize_history(
-                prompt.context.conversation_history,
-                max_history_items
+                prompt.context.conversation_history, max_history_items
             )
 
             # Recompor com histórico resumido
@@ -342,6 +339,7 @@ def create_context(
 ) -> PromptContext:
     """Cria um contexto de prompt."""
     from datetime import datetime
+
     return PromptContext(
         user_id=user_id,
         session_id=session_id,

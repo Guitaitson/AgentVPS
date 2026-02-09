@@ -18,7 +18,7 @@ class Capability:
         implemented: bool = False,
         dependencies: Optional[List[str]] = None,
         implementation_path: Optional[str] = None,
-        category: str = "general"
+        category: str = "general",
     ):
         self.name = name
         self.description = description
@@ -39,7 +39,7 @@ class Capability:
             "implementation_path": self.implementation_path,
             "category": self.category,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "implemented_at": self.implemented_at.isoformat() if self.implemented_at else None
+            "implemented_at": self.implemented_at.isoformat() if self.implemented_at else None,
         }
 
     def mark_implemented(self, implementation_path: str):
@@ -65,63 +65,63 @@ class CapabilitiesRegistry:
                 description="Consultar status de RAM da VPS",
                 implemented=True,
                 implementation_path="core/mcp_server.py:/ram",
-                category="vps_management"
+                category="vps_management",
             ),
             Capability(
                 name="vps_containers",
                 description="Listar e gerenciar containers Docker",
                 implemented=True,
                 implementation_path="core/mcp_server.py:/containers",
-                category="vps_management"
+                category="vps_management",
             ),
             Capability(
                 name="vps_services",
                 description="Listar serviços core (PostgreSQL, Redis, etc)",
                 implemented=True,
                 implementation_path="core/mcp_server.py:/services",
-                category="vps_management"
+                category="vps_management",
             ),
             Capability(
                 name="vps_system",
                 description="Obter informações do sistema (CPU, RAM, Disk)",
                 implemented=True,
                 implementation_path="core/mcp_server.py:/system",
-                category="vps_management"
+                category="vps_management",
             ),
             Capability(
                 name="memory_structured",
                 description="Memória estruturada em PostgreSQL",
                 implemented=True,
                 implementation_path="core/langgraph/memory.py",
-                category="memory"
+                category="memory",
             ),
             Capability(
                 name="memory_semantic",
                 description="Memória semântica em Qdrant (busca vetorial)",
                 implemented=True,
                 implementation_path="core/vps_agent/semantic_memory.py",
-                category="memory"
+                category="memory",
             ),
             Capability(
                 name="telegram_bot",
                 description="Interface via Telegram Bot",
                 implemented=True,
                 implementation_path="telegram-bot/bot.py",
-                category="communication"
+                category="communication",
             ),
             Capability(
                 name="langgraph_agent",
                 description="Orquestrador LangGraph para processamento de mensagens",
                 implemented=True,
                 implementation_path="core/langgraph/graph.py",
-                category="orchestration"
+                category="orchestration",
             ),
             Capability(
                 name="mcp_server",
                 description="Servidor MCP para expor ferramentas",
                 implemented=True,
                 implementation_path="core/mcp_server.py",
-                category="infrastructure"
+                category="infrastructure",
             ),
         ]
 
@@ -131,7 +131,9 @@ class CapabilitiesRegistry:
     def register(self, capability: Capability):
         """Registra uma nova capacidade."""
         self.capabilities[capability.name] = capability
-        logger.info("capacidade_registrada", name=capability.name, implemented=capability.implemented)
+        logger.info(
+            "capacidade_registrada", name=capability.name, implemented=capability.implemented
+        )
 
     def check_capability(self, name: str) -> bool:
         """Verifica se uma capacidade existe e está implementada."""
@@ -164,7 +166,14 @@ class CapabilitiesRegistry:
         # Padrões de detecção
         patterns = {
             "github": ["github", "repositório", "repo", "pr", "pull request"],
-            "file": ["arquivo", "file", "criar arquivo", "ler arquivo", "editar arquivo", "deletar arquivo"],
+            "file": [
+                "arquivo",
+                "file",
+                "criar arquivo",
+                "ler arquivo",
+                "editar arquivo",
+                "deletar arquivo",
+            ],
             "web": ["site", "web", "scraping", "http", "url", "api externa"],
             "database": ["banco de dados", "database", "sql", "query"],
         }
@@ -172,15 +181,19 @@ class CapabilitiesRegistry:
         for category, keywords in patterns.items():
             if any(keyword in task_lower for keyword in keywords):
                 # Verificar se já existe capacidade dessa categoria
-                category_caps = [cap for cap in self.capabilities.values() if cap.category == category]
+                category_caps = [
+                    cap for cap in self.capabilities.values() if cap.category == category
+                ]
                 if not category_caps:
                     # Criar capacidade placeholder
-                    missing.append(Capability(
-                        name=f"{category}_api",
-                        description=f"API para {category}",
-                        implemented=False,
-                        category=category
-                    ))
+                    missing.append(
+                        Capability(
+                            name=f"{category}_api",
+                            description=f"API para {category}",
+                            implemented=False,
+                            category=category,
+                        )
+                    )
 
         return missing
 
@@ -252,8 +265,8 @@ O CLI/Kilocode será usado para gerar o código de implementação.
             "total_capabilities": total,
             "implemented": implemented,
             "missing": missing,
-            "implementation_rate": f"{(implemented/total*100):.1f}%" if total > 0 else "0%",
-            "categories": self._get_category_summary()
+            "implementation_rate": f"{(implemented / total * 100):.1f}%" if total > 0 else "0%",
+            "categories": self._get_category_summary(),
         }
 
     def _get_category_summary(self) -> Dict[str, int]:

@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 
 class LogLevel(Enum):
     """Níveis de log."""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -24,6 +25,7 @@ class LogLevel(Enum):
 
 class LogCategory(Enum):
     """Categorias de log."""
+
     SYSTEM = "system"
     API = "api"
     LLM = "llm"
@@ -36,6 +38,7 @@ class LogCategory(Enum):
 @dataclass
 class LogContext:
     """Contexto do log."""
+
     user_id: Optional[str] = None
     session_id: Optional[str] = None
     request_id: Optional[str] = None
@@ -47,6 +50,7 @@ class LogContext:
 @dataclass
 class LogEntry:
     """Entrada de log estruturado."""
+
     timestamp: str
     level: str
     category: str
@@ -67,12 +71,7 @@ class LogEntry:
 class StructuredLogger:
     """Logger estruturado."""
 
-    def __init__(
-        self,
-        name: str,
-        level: LogLevel = LogLevel.INFO,
-        output: Optional[str] = None
-    ):
+    def __init__(self, name: str, level: LogLevel = LogLevel.INFO, output: Optional[str] = None):
         self.name = name
         self.level = level
         self.output = output or sys.stdout
@@ -95,15 +94,17 @@ class StructuredLogger:
 
     def _should_log(self, level: LogLevel) -> bool:
         """Verifica se deve logar no nível."""
-        levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL]
+        levels = [
+            LogLevel.DEBUG,
+            LogLevel.INFO,
+            LogLevel.WARNING,
+            LogLevel.ERROR,
+            LogLevel.CRITICAL,
+        ]
         return levels.index(level) >= levels.index(self.level)
 
     def _create_entry(
-        self,
-        level: LogLevel,
-        category: LogCategory,
-        message: str,
-        **kwargs
+        self, level: LogLevel, category: LogCategory, message: str, **kwargs
     ) -> LogEntry:
         """Cria uma entrada de log."""
         entry = LogEntry(
@@ -180,11 +181,7 @@ class StructuredLogger:
         self._write(entry)
 
     def exception(
-        self,
-        category: LogCategory,
-        message: str,
-        exception: Exception,
-        **kwargs
+        self, category: LogCategory, message: str, exception: Exception, **kwargs
     ) -> None:
         """Log uma exceção."""
         error_info = {
@@ -203,10 +200,7 @@ class LoggerManager:
 
     @classmethod
     def get_logger(
-        cls,
-        name: str,
-        level: LogLevel = LogLevel.INFO,
-        output: Optional[str] = None
+        cls, name: str, level: LogLevel = LogLevel.INFO, output: Optional[str] = None
     ) -> StructuredLogger:
         """
         Obtém ou cria um logger.
@@ -237,12 +231,7 @@ class LoggerManager:
                 logger.output.close()
 
 
-def log_performance(
-    logger: StructuredLogger,
-    operation: str,
-    duration_ms: float,
-    **kwargs
-) -> None:
+def log_performance(logger: StructuredLogger, operation: str, duration_ms: float, **kwargs) -> None:
     """
     Loga uma métrica de performance.
 
@@ -252,24 +241,15 @@ def log_performance(
         duration_ms: Duração em milissegundos
         **kwargs: Informações adicionais
     """
-    performance_data = {
-        "operation": operation,
-        "duration_ms": duration_ms,
-        **kwargs
-    }
+    performance_data = {"operation": operation, "duration_ms": duration_ms, **kwargs}
 
     logger.info(
-        LogCategory.PERFORMANCE,
-        f"Operation completed: {operation}",
-        performance=performance_data
+        LogCategory.PERFORMANCE, f"Operation completed: {operation}", performance=performance_data
     )
 
 
 def log_error(
-    logger: StructuredLogger,
-    error: Exception,
-    context: Optional[Dict[str, Any]] = None,
-    **kwargs
+    logger: StructuredLogger, error: Exception, context: Optional[Dict[str, Any]] = None, **kwargs
 ) -> None:
     """
     Loga um erro.
@@ -290,10 +270,7 @@ def log_error(
         error_info.update(context)
 
     logger.error(
-        LogCategory.ERROR,
-        f"Error occurred: {type(error).__name__}",
-        error=error_info,
-        **kwargs
+        LogCategory.ERROR, f"Error occurred: {type(error).__name__}", error=error_info, **kwargs
     )
 
 

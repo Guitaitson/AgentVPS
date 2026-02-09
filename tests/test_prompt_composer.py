@@ -42,7 +42,7 @@ class TestPromptComposer:
             name="custom",
             description="Template customizado",
             template="Custom template: {var}",
-            variables=["var"]
+            variables=["var"],
         )
         composer.add_template(new_template)
         assert "custom" in composer.templates
@@ -133,7 +133,8 @@ class TestPromptComposer:
             session_id="test_session",
             conversation_history=[
                 {"intent": "chat", "user_message": "oi", "response": "Olá!"},
-            ] * 20,  # Histórico longo
+            ]
+            * 20,  # Histórico longo
             current_intent="chat",
             capabilities=["ram", "containers"],
         )

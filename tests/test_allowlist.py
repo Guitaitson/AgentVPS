@@ -95,12 +95,14 @@ class TestSecurityAllowlist:
     def test_check_allowed(self):
         """Testa verificação de operação permitida."""
         allowlist = SecurityAllowlist()
-        allowlist.add_rule(AllowlistRule(
-            name="allow_test",
-            resource_type=ResourceType.COMMAND,
-            pattern=r"^test$",
-            permission=PermissionLevel.ALLOW,
-        ))
+        allowlist.add_rule(
+            AllowlistRule(
+                name="allow_test",
+                resource_type=ResourceType.COMMAND,
+                pattern=r"^test$",
+                permission=PermissionLevel.ALLOW,
+            )
+        )
 
         result = allowlist.check(ResourceType.COMMAND, "test")
 
@@ -111,12 +113,14 @@ class TestSecurityAllowlist:
     def test_check_denied(self):
         """Testa verificação de operação negada."""
         allowlist = SecurityAllowlist()
-        allowlist.add_rule(AllowlistRule(
-            name="deny_test",
-            resource_type=ResourceType.COMMAND,
-            pattern=r"^dangerous$",
-            permission=PermissionLevel.DENY,
-        ))
+        allowlist.add_rule(
+            AllowlistRule(
+                name="deny_test",
+                resource_type=ResourceType.COMMAND,
+                pattern=r"^dangerous$",
+                permission=PermissionLevel.DENY,
+            )
+        )
 
         result = allowlist.check(ResourceType.COMMAND, "dangerous")
 
@@ -127,12 +131,14 @@ class TestSecurityAllowlist:
     def test_check_require_approval(self):
         """Testa verificação de operação que requer aprovação."""
         allowlist = SecurityAllowlist()
-        allowlist.add_rule(AllowlistRule(
-            name="approval_test",
-            resource_type=ResourceType.COMMAND,
-            pattern=r"^sensitive$",
-            permission=PermissionLevel.REQUIRE_APPROVAL,
-        ))
+        allowlist.add_rule(
+            AllowlistRule(
+                name="approval_test",
+                resource_type=ResourceType.COMMAND,
+                pattern=r"^sensitive$",
+                permission=PermissionLevel.REQUIRE_APPROVAL,
+            )
+        )
 
         result = allowlist.check(ResourceType.COMMAND, "sensitive")
 
@@ -153,18 +159,22 @@ class TestSecurityAllowlist:
     def test_get_rules_by_type(self):
         """Testa obtenção de regras por tipo."""
         allowlist = SecurityAllowlist()
-        allowlist.add_rule(AllowlistRule(
-            name="cmd1",
-            resource_type=ResourceType.COMMAND,
-            pattern=r"^cmd1$",
-            permission=PermissionLevel.ALLOW,
-        ))
-        allowlist.add_rule(AllowlistRule(
-            name="api1",
-            resource_type=ResourceType.API_ENDPOINT,
-            pattern=r"^/api1$",
-            permission=PermissionLevel.ALLOW,
-        ))
+        allowlist.add_rule(
+            AllowlistRule(
+                name="cmd1",
+                resource_type=ResourceType.COMMAND,
+                pattern=r"^cmd1$",
+                permission=PermissionLevel.ALLOW,
+            )
+        )
+        allowlist.add_rule(
+            AllowlistRule(
+                name="api1",
+                resource_type=ResourceType.API_ENDPOINT,
+                pattern=r"^/api1$",
+                permission=PermissionLevel.ALLOW,
+            )
+        )
 
         cmd_rules = allowlist.get_rules_by_type(ResourceType.COMMAND)
         api_rules = allowlist.get_rules_by_type(ResourceType.API_ENDPOINT)
@@ -177,13 +187,15 @@ class TestSecurityAllowlist:
     def test_export_import_rules(self):
         """Testa exportação e importação de regras."""
         allowlist1 = SecurityAllowlist()
-        allowlist1.add_rule(AllowlistRule(
-            name="test_rule",
-            resource_type=ResourceType.COMMAND,
-            pattern=r"^test$",
-            permission=PermissionLevel.ALLOW,
-            description="Teste",
-        ))
+        allowlist1.add_rule(
+            AllowlistRule(
+                name="test_rule",
+                resource_type=ResourceType.COMMAND,
+                pattern=r"^test$",
+                permission=PermissionLevel.ALLOW,
+                description="Teste",
+            )
+        )
 
         # Exportar
         exported = allowlist1.export_rules()

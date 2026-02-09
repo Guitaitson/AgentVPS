@@ -7,6 +7,7 @@ Com o novo sistema de pacotes (pyproject.toml), os imports devem ser:
 
 Para desenvolvimento local sem instalação, adicionamos o diretório raiz ao path.
 """
+
 import os
 import sys
 
@@ -47,6 +48,7 @@ def mock_env_vars(monkeypatch):
 @pytest.fixture
 def mock_telegram_update():
     """Fixture para criar mock de update do Telegram."""
+
     class MockUser:
         def __init__(self):
             self.id = 123456

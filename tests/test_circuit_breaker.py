@@ -93,7 +93,11 @@ class TestCircuitBreaker:
         """Testa que circuito fecha após sucessos."""
         # Usar timeout curto (0.1s) para que o teste funcione rapidamente
         # success_threshold=7 significa que precisamos de 7 sucessos para fechar
-        cb = CircuitBreaker(CircuitBreakerConfig(failure_threshold=2, success_threshold=7, half_open_max_calls=10, timeout=0.1))
+        cb = CircuitBreaker(
+            CircuitBreakerConfig(
+                failure_threshold=2, success_threshold=7, half_open_max_calls=10, timeout=0.1
+            )
+        )
 
         def fail_func():
             raise ValueError("Test error")
@@ -110,6 +114,7 @@ class TestCircuitBreaker:
 
         # Esperar timeout expirar
         import time
+
         time.sleep(0.15)
 
         # 7 sucessos em HALF_OPEN devem fechar o circuito

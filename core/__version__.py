@@ -19,14 +19,14 @@ UPDATE_CHECK_URL = "https://api.github.com/repos/SEU_USUARIO/vps-agent/releases/
 SUPPORTED_MODELS = {
     "anthropic": ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
     "openrouter": ["minimax/minimax-m2.1", "anthropic/claude-3.5-sonnet", "openai/gpt-4o"],
-    "kilocode": ["default"]
+    "kilocode": ["default"],
 }
 
 # Installation types
 INSTALL_TYPES = {
     "docker": "Docker Compose",
     "manual": "Manual Installation",
-    "kubernetes": "Kubernetes"
+    "kubernetes": "Kubernetes",
 }
 
 # Resource limits
@@ -34,5 +34,5 @@ RESOURCE_LIMITS = {
     "max_ram_mb": 2458,
     "max_containers": 10,
     "reserved_core_mb": 750,
-    "max_tools_simultaneous": 2
+    "max_tools_simultaneous": 2,
 }

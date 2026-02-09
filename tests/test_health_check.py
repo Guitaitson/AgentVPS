@@ -42,7 +42,7 @@ class TestHealthCheckResult:
             name="test_service",
             status=HealthStatus.HEALTHY,
             message="Service is healthy",
-            details={"key": "value"}
+            details={"key": "value"},
         )
 
         assert result.name == "test_service"
@@ -54,9 +54,7 @@ class TestHealthCheckResult:
     def test_create_unhealthy_result(self):
         """Test creating an unhealthy result."""
         result = HealthCheckResult(
-            name="test_service",
-            status=HealthStatus.UNHEALTHY,
-            message="Service is down"
+            name="test_service", status=HealthStatus.UNHEALTHY, message="Service is down"
         )
 
         assert result.is_healthy is False
@@ -64,9 +62,7 @@ class TestHealthCheckResult:
     def test_create_degraded_result(self):
         """Test creating a degraded result."""
         result = HealthCheckResult(
-            name="test_service",
-            status=HealthStatus.DEGRADED,
-            message="Service is degraded"
+            name="test_service", status=HealthStatus.DEGRADED, message="Service is degraded"
         )
 
         # DEGRADED ainda é considerado "healthy" para fins de continuidade
@@ -74,11 +70,7 @@ class TestHealthCheckResult:
 
     def test_result_timestamp(self):
         """Test result has timestamp."""
-        result = HealthCheckResult(
-            name="test",
-            status=HealthStatus.HEALTHY,
-            message="OK"
-        )
+        result = HealthCheckResult(name="test", status=HealthStatus.HEALTHY, message="OK")
         assert result.timestamp is not None
 
 
@@ -103,7 +95,7 @@ class TestHealthCheck:
         hc = HealthCheck(
             postgres_dsn="postgresql://user:pass@localhost:5432/custom",
             redis_url="redis://localhost:6379/5",
-            docker_socket="/tmp/docker.sock"
+            docker_socket="/tmp/docker.sock",
         )
 
         assert "user:pass@localhost" in hc.postgres_dsn
@@ -119,7 +111,7 @@ class TestHealthCheck:
         assert "não encontrada" in result.message
         assert "available" in result.details
 
-    @patch('psycopg2.connect')
+    @patch("psycopg2.connect")
     def test_check_postgresql_healthy(self, mock_connect):
         """Test PostgreSQL check when healthy."""
         # Mock cursor and connection
@@ -138,7 +130,7 @@ class TestHealthCheck:
         assert result.status in [HealthStatus.HEALTHY, HealthStatus.DEGRADED]
         assert "postgresql" in result.name.lower()
 
-    @patch('psycopg2.connect')
+    @patch("psycopg2.connect")
     def test_check_postgresql_unhealthy(self, mock_connect):
         """Test PostgreSQL check when unhealthy."""
         from psycopg2 import OperationalError
@@ -151,7 +143,7 @@ class TestHealthCheck:
         assert result.status == HealthStatus.UNHEALTHY
         assert "inacessível" in result.message.lower()
 
-    @patch('redis.from_url')
+    @patch("redis.from_url")
     def test_check_redis_healthy(self, mock_redis):
         """Test Redis check when healthy."""
         mock_client = MagicMock()
@@ -165,7 +157,7 @@ class TestHealthCheck:
         assert result.status == HealthStatus.HEALTHY
         assert "used_memory" in result.details
 
-    @patch('redis.from_url')
+    @patch("redis.from_url")
     def test_check_redis_unhealthy(self, mock_redis):
         """Test Redis check when unhealthy."""
         from redis import ConnectionError as RedisConnectionError
@@ -182,7 +174,7 @@ class TestHealthCheck:
         hc = HealthCheck()
 
         # Simular psutil não disponível
-        with patch.dict('sys.modules', {'psutil': None}):
+        with patch.dict("sys.modules", {"psutil": None}):
             result = hc.check_memory()
             assert result.status == HealthStatus.UNKNOWN
 
@@ -190,7 +182,7 @@ class TestHealthCheck:
         """Test CPU check returns UNKNOWN when psutil is not available."""
         hc = HealthCheck()
 
-        with patch.dict('sys.modules', {'psutil': None}):
+        with patch.dict("sys.modules", {"psutil": None}):
             result = hc.check_cpu()
             assert result.status == HealthStatus.UNKNOWN
 
@@ -198,7 +190,7 @@ class TestHealthCheck:
         """Test disk check returns UNKNOWN when psutil is not available."""
         hc = HealthCheck()
 
-        with patch.dict('sys.modules', {'psutil': None}):
+        with patch.dict("sys.modules", {"psutil": None}):
             result = hc.check_disk()
             assert result.status == HealthStatus.UNKNOWN
 
@@ -206,7 +198,7 @@ class TestHealthCheck:
         """Test network check when healthy."""
         hc = HealthCheck()
 
-        with patch('socket.socket') as mock_socket:
+        with patch("socket.socket") as mock_socket:
             mock_sock = MagicMock()
             mock_sock.connect_ex.return_value = 0
             mock_socket.return_value = mock_sock
@@ -286,7 +278,7 @@ class TestDoctor:
 
         assert doctor.health_check is not None
 
-    @patch.object(HealthCheck, 'run_all_checks')
+    @patch.object(HealthCheck, "run_all_checks")
     def test_diagnose(self, mock_run_all):
         """Test diagnose method."""
         mock_run_all.return_value = [
@@ -305,7 +297,7 @@ class TestDoctor:
         assert diagnosis["degraded_count"] == 0
         assert diagnosis["unhealthy_count"] == 0
 
-    @patch.object(HealthCheck, 'run_all_checks')
+    @patch.object(HealthCheck, "run_all_checks")
     def test_diagnose_with_unhealthy(self, mock_run_all):
         """Test diagnose with unhealthy service."""
         mock_run_all.return_value = [
@@ -319,15 +311,13 @@ class TestDoctor:
         assert len(diagnosis["recommendations"]) > 0
         assert "MEMORY CRITICAL" in diagnosis["recommendations"][0]
 
-    @patch.object(HealthCheck, 'run_check')
+    @patch.object(HealthCheck, "run_check")
     def test_quick_check(self, mock_run):
         """Test quick_check method."""
+
         def side_effect(name):
             return HealthCheckResult(
-                name=name,
-                status=HealthStatus.HEALTHY,
-                message="OK",
-                details={}
+                name=name, status=HealthStatus.HEALTHY, message="OK", details={}
             )
 
         mock_run.side_effect = side_effect
@@ -338,15 +328,13 @@ class TestDoctor:
         assert result.name == "quick_check"
         assert "4/4" in result.message
 
-    @patch.object(HealthCheck, 'run_check')
+    @patch.object(HealthCheck, "run_check")
     def test_get_service_health(self, mock_run):
         """Test get_service_health method."""
+
         def side_effect(name):
             return HealthCheckResult(
-                name=name,
-                status=HealthStatus.HEALTHY,
-                message="OK",
-                details={}
+                name=name, status=HealthStatus.HEALTHY, message="OK", details={}
             )
 
         mock_run.side_effect = side_effect
@@ -368,7 +356,7 @@ class TestRunHealthCheck:
         """Test quick health check."""
         from core.health_check.doctor import run_health_check
 
-        with patch.object(HealthCheck, 'run_all_checks') as mock:
+        with patch.object(HealthCheck, "run_all_checks") as mock:
             mock.return_value = [
                 HealthCheckResult(name="p", status=HealthStatus.HEALTHY, message="OK"),
                 HealthCheckResult(name="r", status=HealthStatus.HEALTHY, message="OK"),
@@ -389,9 +377,7 @@ class TestRunHealthCheck:
         from core.health_check.doctor import run_health_check
 
         # Deve funcionar tanto síncrona quanto assincronamente
-        result = asyncio.get_event_loop().run_until_complete(
-            run_health_check(full=False)
-        )
+        result = asyncio.get_event_loop().run_until_complete(run_health_check(full=False))
 
         assert "status" in result
 
@@ -402,10 +388,7 @@ class TestServiceHealth:
     def test_create_service_health(self):
         """Test creating ServiceHealth."""
         health = ServiceHealth(
-            name="postgresql",
-            status=HealthStatus.HEALTHY,
-            port=5432,
-            version="14.5"
+            name="postgresql", status=HealthStatus.HEALTHY, port=5432, version="14.5"
         )
 
         assert health.name == "postgresql"
@@ -424,7 +407,7 @@ class TestSystemHealth:
             memory_percent=60.0,
             disk_percent=70.0,
             network_connections=100,
-            open_files=500
+            open_files=500,
         )
 
         assert health.cpu_percent == 50.0

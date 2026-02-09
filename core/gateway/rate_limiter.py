@@ -13,6 +13,7 @@ from typing import Dict
 @dataclass
 class RateLimitConfig:
     """Rate limit configuration."""
+
     requests_per_minute: int = 60
     requests_per_hour: int = 1000
     burst_size: int = 10

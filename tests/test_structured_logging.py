@@ -162,7 +162,7 @@ class TestStructuredLogger:
         logger.info(
             LogCategory.PERFORMANCE,
             "Operation completed",
-            performance={"operation": "test", "duration_ms": 100}
+            performance={"operation": "test", "duration_ms": 100},
         )
 
         output.seek(0)

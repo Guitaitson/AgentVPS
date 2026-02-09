@@ -2,6 +2,7 @@
 Resource Manager — Gerencia RAM subindo/descendo containers sob demanda.
 Regra: nunca ultrapassar 2.4 GB total. Serviços core (~750 MB) sempre ligados.
 """
+
 import os
 import subprocess
 
@@ -47,9 +48,7 @@ SAFETY_MARGIN_MB = 200
 
 def get_available_ram() -> int:
     """Retorna RAM disponível em MB."""
-    result = subprocess.run(
-        ["free", "-m"], capture_output=True, text=True
-    )
+    result = subprocess.run(["free", "-m"], capture_output=True, text=True)
     lines = result.stdout.strip().split("\n")
     return int(lines[1].split()[6])
 
@@ -57,8 +56,7 @@ def get_available_ram() -> int:
 def get_running_tools() -> list:
     """Retorna lista de ferramentas sob demanda rodando."""
     result = subprocess.run(
-        ["docker", "ps", "--format", "{{.Names}}"],
-        capture_output=True, text=True
+        ["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True
     )
     containers = result.stdout.strip().split("\n") if result.stdout.strip() else []
 
@@ -112,8 +110,7 @@ def start_tool(tool_name: str) -> tuple[bool, str]:
     logger.info("iniciando_ferramenta", tool=tool_name, ram_estimada=config["ram_mb"])
 
     result = subprocess.run(
-        ["docker", "compose", "-f", compose_file, "up", "-d"],
-        capture_output=True, text=True
+        ["docker", "compose", "-f", compose_file, "up", "-d"], capture_output=True, text=True
     )
 
     if result.returncode != 0:
@@ -136,8 +133,7 @@ def stop_tool(tool_name: str) -> tuple[bool, str]:
     logger.info("parando_ferramenta", tool=tool_name)
 
     result = subprocess.run(
-        ["docker", "compose", "-f", compose_file, "down"],
-        capture_output=True, text=True
+        ["docker", "compose", "-f", compose_file, "down"], capture_output=True, text=True
     )
 
     if result.returncode != 0:

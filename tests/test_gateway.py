@@ -11,6 +11,7 @@ import pytest
 
 # ============ Rate Limiter Tests ============
 
+
 class TestRateLimiter:
     """Tests for the RateLimiter class."""
 
@@ -86,6 +87,7 @@ class TestRateLimiter:
 
 # ============ Adapter Tests ============
 
+
 class TestTelegramAdapter:
     """Tests for the TelegramAdapter class."""
 
@@ -101,8 +103,8 @@ class TestTelegramAdapter:
                 "message_id": 1,
                 "chat": {"id": 100, "type": "private"},
                 "from": {"id": 200, "username": "testuser", "first_name": "Test"},
-                "text": "Hello, agent!"
-            }
+                "text": "Hello, agent!",
+            },
         }
 
         result = adapter.process_update(update)
@@ -124,8 +126,8 @@ class TestTelegramAdapter:
                 "id": "callback123",
                 "from": {"id": 200, "username": "testuser"},
                 "data": "button_clicked",
-                "message": {"message_id": 1, "chat": {"id": 100}}
-            }
+                "message": {"message_id": 1, "chat": {"id": 100}},
+            },
         }
 
         result = adapter.process_update(update)
@@ -145,8 +147,8 @@ class TestTelegramAdapter:
             "inline_query": {
                 "id": "inline123",
                 "from": {"id": 200, "username": "testuser"},
-                "query": "search term"
-            }
+                "query": "search term",
+            },
         }
 
         result = adapter.process_update(update)
@@ -186,11 +188,7 @@ class TestWebhookAdapter:
         payload = b'{"test": "data"}'
 
         # Create valid signature
-        signature = hmac.new(
-            b"mysecret",
-            payload,
-            hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(b"mysecret", payload, hashlib.sha256).hexdigest()
 
         # Mock request
         mock_request = MagicMock()
@@ -200,6 +198,7 @@ class TestWebhookAdapter:
 
 
 # ============ Session Manager Tests ============
+
 
 class TestSessionManager:
     """Tests for the SessionManager class using sync wrapper."""
@@ -298,6 +297,7 @@ class TestSessionManager:
 
 # ============ FastAPI Endpoint Tests ============
 
+
 class TestGatewayEndpoints:
     """Tests for FastAPI endpoints."""
 
@@ -307,6 +307,7 @@ class TestGatewayEndpoints:
         from fastapi.testclient import TestClient
 
         from core.gateway.main import app
+
         return TestClient(app)
 
     def test_root_endpoint(self, client):
@@ -340,8 +341,7 @@ class TestGatewayEndpoints:
         # Make many requests to trigger rate limit
         for i in range(65):
             response = client.post(
-                "/api/v1/messages",
-                json={"user_id": "test_user", "message": f"Test {i}"}
+                "/api/v1/messages", json={"user_id": "test_user", "message": f"Test {i}"}
             )
 
         # Should eventually get 429

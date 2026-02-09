@@ -6,6 +6,7 @@ Modelos suportados:
 - openai/gpt-4o
 - anthropic/claude-sonnet-4-20250514
 """
+
 import asyncio
 import os
 from typing import Dict, List
@@ -57,6 +58,7 @@ def get_capabilities_context() -> str:
     """Retorna contexto das capacidades implementadas."""
     try:
         from capabilities import capabilities_registry
+
         caps = capabilities_registry.get_implemented_capabilities()
 
         lines = ["## Suas Capacidades Atuais"]
@@ -153,7 +155,7 @@ def build_conversation_prompt(
         parts.extend(context_parts)
         parts.append("")
 
-    parts.append(f"Nova mensagem do usuário: \"{user_message}\"")
+    parts.append(f'Nova mensagem do usuário: "{user_message}"')
     parts.append("")
     parts.append("Responda de forma como o VPS-Agent que você é:")
 
@@ -246,12 +248,14 @@ def generate_response_sync(
     """
     Versão síncrona de generate_response.
     """
-    return asyncio.run(generate_response(
-        user_message=user_message,
-        conversation_history=conversation_history,
-        user_context=user_context,
-        system_prompt=system_prompt,
-    ))
+    return asyncio.run(
+        generate_response(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            user_context=user_context,
+            system_prompt=system_prompt,
+        )
+    )
 
 
 if __name__ == "__main__":

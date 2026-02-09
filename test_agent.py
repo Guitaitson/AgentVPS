@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test script for LangGraph agent."""
+
 import sys
 from pathlib import Path
 
@@ -17,8 +18,8 @@ from core.vps_agent.agent import process_message_async
 
 def test_process_message():
     """Test basic message processing."""
-    result = asyncio.run(process_message_async('123456789', 'test message'))
-    print('Result:', result)
+    result = asyncio.run(process_message_async("123456789", "test message"))
+    print("Result:", result)
     assert result is not None
 
 

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TelegramUpdate:
     """Represents a Telegram update."""
+
     update_id: str
     message: Optional[Dict[str, Any]] = None
     callback_query: Optional[Dict[str, Any]] = None
@@ -28,7 +29,7 @@ class TelegramUpdate:
             update_id=str(data.get("update_id", "")),
             message=data.get("message"),
             callback_query=data.get("callback_query"),
-            inline_query=data.get("inline_query")
+            inline_query=data.get("inline_query"),
         )
 
 
@@ -74,7 +75,7 @@ class TelegramAdapter:
             return {
                 "update_id": tg_update.update_id,
                 "type": "unknown",
-                "text": "Unknown update type"
+                "text": "Unknown update type",
             }
 
     def _handle_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
@@ -101,12 +102,8 @@ class TelegramAdapter:
             "chat_id": chat_id,
             "message_id": str(message.get("message_id", "")),
             "text": text,
-            "user": {
-                "id": user_id,
-                "username": username,
-                "first_name": first_name
-            },
-            "chat_type": chat.get("type", "private")
+            "user": {"id": user_id, "username": username, "first_name": first_name},
+            "chat_type": chat.get("type", "private"),
         }
 
     def _handle_callback_query(self, callback_query: Dict[str, Any]) -> Dict[str, Any]:
@@ -127,7 +124,7 @@ class TelegramAdapter:
             "user_id": identifier,
             "data": data,
             "message_id": str(message.get("message_id", "")),
-            "chat_id": str(message.get("chat", {}).get("id", ""))
+            "chat_id": str(message.get("chat", {}).get("id", "")),
         }
 
     def _handle_inline_query(self, inline_query: Dict[str, Any]) -> Dict[str, Any]:
@@ -146,7 +143,7 @@ class TelegramAdapter:
             "update_id": str(inline_query.get("id", "")),
             "type": "inline_query",
             "user_id": identifier,
-            "query": query
+            "query": query,
         }
 
     def send_message(self, chat_id: str, text: str, **kwargs) -> Dict[str, Any]:
@@ -163,37 +160,24 @@ class TelegramAdapter:
         """
         import requests
 
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            **kwargs
-        }
+        payload = {"chat_id": chat_id, "text": text, **kwargs}
 
-        response = requests.post(
-            f"{self.api_url}/sendMessage",
-            json=payload,
-            timeout=10
-        )
+        response = requests.post(f"{self.api_url}/sendMessage", json=payload, timeout=10)
 
         return response.json()
 
-    def answer_callback(self, callback_id: str, text: str = None, show_alert: bool = False) -> Dict[str, Any]:
+    def answer_callback(
+        self, callback_id: str, text: str = None, show_alert: bool = False
+    ) -> Dict[str, Any]:
         """Answer a callback query."""
         import requests
 
-        payload = {
-            "callback_query_id": callback_id,
-            "show_alert": show_alert
-        }
+        payload = {"callback_query_id": callback_id, "show_alert": show_alert}
 
         if text:
             payload["text"] = text
 
-        response = requests.post(
-            f"{self.api_url}/answerCallbackQuery",
-            json=payload,
-            timeout=10
-        )
+        response = requests.post(f"{self.api_url}/answerCallbackQuery", json=payload, timeout=10)
 
         return response.json()
 
@@ -240,15 +224,13 @@ class WebhookAdapter:
         import hashlib
         import hmac
 
-        expected = hmac.new(
-            self.secret_token.encode(),
-            payload,
-            hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(self.secret_token.encode(), payload, hashlib.sha256).hexdigest()
 
         return hmac.compare_digest(received_sig, f"sha256={expected}")
 
-    def process_webhook(self, source: str, data: Dict[str, Any], headers: Dict[str, str] = None) -> Dict[str, Any]:
+    def process_webhook(
+        self, source: str, data: Dict[str, Any], headers: Dict[str, str] = None
+    ) -> Dict[str, Any]:
         """
         Process a generic webhook.
 
@@ -262,12 +244,7 @@ class WebhookAdapter:
         """
         logger.info(f"📥 Webhook from {source}: {str(data)[:200]}...")
 
-        return {
-            "source": source,
-            "type": "webhook",
-            "data": data,
-            "headers": headers or {}
-        }
+        return {"source": source, "type": "webhook", "data": data, "headers": headers or {}}
 
 
 class SlackAdapter:
@@ -298,9 +275,7 @@ class SlackAdapter:
 
         sig_basestring = f"v0:{timestamp}:{payload.decode()}"
         signature = hmac.new(
-            self.signing_secret.encode(),
-            sig_basestring.encode(),
-            hashlib.sha256
+            self.signing_secret.encode(), sig_basestring.encode(), hashlib.sha256
         ).hexdigest()
 
         expected = f"v0={signature}"
@@ -324,7 +299,7 @@ class SlackAdapter:
             "user_id": f"slack_{user_id}",
             "channel": channel,
             "text": text,
-            "event_type": event.get("type")
+            "event_type": event.get("type"),
         }
 
     def process_interaction(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -341,5 +316,5 @@ class SlackAdapter:
             "type": "interaction",
             "user_id": f"slack_{user_id}",
             "action": action.get("type"),
-            "value": value
+            "value": value,
         }

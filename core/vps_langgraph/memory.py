@@ -3,6 +3,7 @@ Sistema de memória do agente.
 Duas dimensões: por usuário e global.
 PostgreSQL para fatos, Redis para cache.
 """
+
 import json
 import os
 
@@ -28,7 +29,7 @@ class AgentMemory:
         self._redis = redis.Redis(
             host=os.getenv("REDIS_HOST", "127.0.0.1"),
             port=int(os.getenv("REDIS_PORT", 6379)),
-            decode_responses=True
+            decode_responses=True,
         )
 
     def _get_conn(self):
@@ -50,7 +51,7 @@ class AgentMemory:
             "SELECT key, value, confidence FROM agent_memory "
             "WHERE user_id = %s AND memory_type = 'fact' "
             "ORDER BY confidence DESC",
-            (user_id,)
+            (user_id,),
         )
         facts = {row["key"]: row["value"] for row in cur.fetchall()}
         conn.close()
@@ -70,7 +71,7 @@ class AgentMemory:
             ON CONFLICT (user_id, memory_type, key)
             DO UPDATE SET value = EXCLUDED.value, confidence = EXCLUDED.confidence
             """,
-            (user_id, key, Json(value), confidence)
+            (user_id, key, Json(value), confidence),
         )
         conn.commit()
         conn.close()
@@ -90,21 +91,16 @@ class AgentMemory:
         cur.execute(
             "SELECT role, content, created_at as timestamp FROM conversation_log "
             "WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
-            (user_id, limit)
+            (user_id, limit),
         )
-        history = [
-            {"role": row["role"], "content": row["content"]}
-            for row in cur.fetchall()
-        ]
+        history = [{"role": row["role"], "content": row["content"]} for row in cur.fetchall()]
         conn.close()
         history.reverse()  # chronological order
 
         self._redis.setex(cache_key, 60, json.dumps(history))
         return history
 
-    def save_conversation(
-        self, user_id: str, role: str, content: str
-    ):
+    def save_conversation(self, user_id: str, role: str, content: str):
         """Salva uma mensagem na conversa."""
         conn = self._get_conn()
         cur = conn.cursor()
@@ -113,7 +109,7 @@ class AgentMemory:
             INSERT INTO conversation_log (user_id, role, content)
             VALUES (%s, %s, %s)
             """,
-            (user_id, role, content)
+            (user_id, role, content),
         )
         conn.commit()
         conn.close()
@@ -148,7 +144,7 @@ class AgentMemory:
             VALUES (%s, %s)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
             """,
-            (key, Json(value))
+            (key, Json(value)),
         )
         conn.commit()
         conn.close()
@@ -159,5 +155,5 @@ class AgentMemory:
 
     def close(self):
         """Fecha conexões."""
-        if hasattr(self, '_redis'):
+        if hasattr(self, "_redis"):
             self._redis.close()

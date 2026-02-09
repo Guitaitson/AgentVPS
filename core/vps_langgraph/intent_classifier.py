@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Tuple
 
 class Intent(Enum):
     """Enumeracao dos tipos de intencao suportados."""
+
     COMMAND = "command"
     TASK = "task"
     QUESTION = "question"
@@ -28,83 +29,237 @@ class Intent(Enum):
 
 # Comandos diretos do Telegram/sistema
 TELEGRAM_COMMANDS = [
-    "/start", "/status", "/ram", "/containers", "/health", "/help",
-    "/memory", "/skills", "/version", "/about",
+    "/start",
+    "/status",
+    "/ram",
+    "/containers",
+    "/health",
+    "/help",
+    "/memory",
+    "/skills",
+    "/version",
+    "/about",
     # Sem barra (comandos alternativos)
-    "start", "status", "ram", "containers", "health", "help",
-    "memory", "skills", "version", "about",
-    "parar", "iniciar", "reiniciar", "ajuda",
+    "start",
+    "status",
+    "ram",
+    "containers",
+    "health",
+    "help",
+    "memory",
+    "skills",
+    "version",
+    "about",
+    "parar",
+    "iniciar",
+    "reiniciar",
+    "ajuda",
 ]
 
 # Palavras-chave que indicam tarefas de auto-melhoria
 SELF_IMPROVE_KEYWORDS = [
     # Criacao
-    "criar", "crie", "criando", "criacao",
-    "novo", "nova", "novos", "novas",
+    "criar",
+    "crie",
+    "criando",
+    "criacao",
+    "novo",
+    "nova",
+    "novos",
+    "novas",
     # Implementacao
-    "implementar", "implementa", "implementando", "implementacao",
-    "desenvolver", "desenvolve", "desenvolvendo",
-    "codar", "codando", "programar", "programando",
+    "implementar",
+    "implementa",
+    "implementando",
+    "implementacao",
+    "desenvolver",
+    "desenvolve",
+    "desenvolvendo",
+    "codar",
+    "codando",
+    "programar",
+    "programando",
     # Agentes
-    "agente", "subagente", "sub-agente", "assistant", "bot",
+    "agente",
+    "subagente",
+    "sub-agente",
+    "assistant",
+    "bot",
     # Ferramentas e integracoes
-    "mcp", "ferramenta", "tool", "skill",
-    "integracao", "integrar", "conectar", "conexao",
-    "plugin", "extension", "extensao",
+    "mcp",
+    "ferramenta",
+    "tool",
+    "skill",
+    "integracao",
+    "integrar",
+    "conectar",
+    "conexao",
+    "plugin",
+    "extension",
+    "extensao",
     # Busca e pesquisa
-    "buscar", "busca", "procurar", "pesquisar", "search",
-    "monitorar", "monitoramento", "watch",
+    "buscar",
+    "busca",
+    "procurar",
+    "pesquisar",
+    "search",
+    "monitorar",
+    "monitoramento",
+    "watch",
     # GitHub especifico
-    "github", "repositorio", "repo", "repos", "pr", "pull request",
-    "commit", "branch", "merge", "issue",
+    "github",
+    "repositorio",
+    "repo",
+    "repos",
+    "pr",
+    "pull request",
+    "commit",
+    "branch",
+    "merge",
+    "issue",
 ]
 
 # Perguntas sobre o sistema
 SYSTEM_KEYWORDS = [
     # Hardware/Recursos
-    "ram", "memoria", "memory", "cpu", "disco", "disk", "espaco", "space",
+    "ram",
+    "memoria",
+    "memory",
+    "cpu",
+    "disco",
+    "disk",
+    "espaco",
+    "space",
     # Containers
-    "docker", "container", "containers", "imagem", "image",
+    "docker",
+    "container",
+    "containers",
+    "imagem",
+    "image",
     # Servicos
-    "servico", "service", "servicos", "services",
-    "postgresql", "postgres", "redis", "banco", "database",
+    "servico",
+    "service",
+    "servicos",
+    "services",
+    "postgresql",
+    "postgres",
+    "redis",
+    "banco",
+    "database",
     # Status
-    "status", "saude", "health", "como esta", "esta rodando",
+    "status",
+    "saude",
+    "health",
+    "como esta",
+    "esta rodando",
     # Rede
-    "rede", "network", "porta", "port", "ip",
+    "rede",
+    "network",
+    "porta",
+    "port",
+    "ip",
 ]
 
 # Perguntas gerais (indicadores de interrogacao)
 QUESTION_INDICATORS = [
-    "qual e", "quais sao", "o que e", "quem e", "onde esta",
-    "quanto e", "por que", "porque", "como", "quando", "para que",
-    "me explica", "me diz", "me conta", "voce sabe", "sabe dizer",
-    "nao entendo", "nao compreendo",
+    "qual e",
+    "quais sao",
+    "o que e",
+    "quem e",
+    "onde esta",
+    "quanto e",
+    "por que",
+    "porque",
+    "como",
+    "quando",
+    "para que",
+    "me explica",
+    "me diz",
+    "me conta",
+    "voce sabe",
+    "sabe dizer",
+    "nao entendo",
+    "nao compreendo",
 ]
 
 # Acoes a executar
 ACTION_KEYWORDS = [
     # Verbos de acao
-    "rode", "roda", "rode", "executar", "executa", "executando",
-    "rode", "run", "start", "iniciar", "inicia", "iniciando",
-    "parar", "para", "parando", "stop", "stop",
-    "reiniciar", "reinicia", "reiniciando", "restart",
-    "instale", "instala", "instalar", "instala", "instalando",
-    "configure", "configura", "configurar", "configurando",
-    "liste", "lista", "listar", "listando",
-    "mostre", "mostra", "mostrar", "mostrando",
+    "rode",
+    "roda",
+    "rode",
+    "executar",
+    "executa",
+    "executando",
+    "rode",
+    "run",
+    "start",
+    "iniciar",
+    "inicia",
+    "iniciando",
+    "parar",
+    "para",
+    "parando",
+    "stop",
+    "stop",
+    "reiniciar",
+    "reinicia",
+    "reiniciando",
+    "restart",
+    "instale",
+    "instala",
+    "instalar",
+    "instala",
+    "instalando",
+    "configure",
+    "configura",
+    "configurar",
+    "configurando",
+    "liste",
+    "lista",
+    "listar",
+    "listando",
+    "mostre",
+    "mostra",
+    "mostrar",
+    "mostrando",
     # Arquivos
-    "arquivo", "file", "criar", "criando", "editar", "editando",
-    "ler", "lendo", "leia", "deletar", "deletando",
+    "arquivo",
+    "file",
+    "criar",
+    "criando",
+    "editar",
+    "editando",
+    "ler",
+    "lendo",
+    "leia",
+    "deletar",
+    "deletando",
 ]
 
 # Palavras de conversa natural
 CHAT_KEYWORDS = [
-    "oi", "ola", "hello", "hi", "e ai", "eai",
-    "tudo bem", "como vai", "bom dia", "boa tarde", "boa noite",
-    "obrigado", "obrigada", "thanks", "thank",
-    "por favor", "please",
-    "posso", "pode", "voce consegue", "voce pode",
+    "oi",
+    "ola",
+    "hello",
+    "hi",
+    "e ai",
+    "eai",
+    "tudo bem",
+    "como vai",
+    "bom dia",
+    "boa tarde",
+    "boa noite",
+    "obrigado",
+    "obrigada",
+    "thanks",
+    "thank",
+    "por favor",
+    "please",
+    "posso",
+    "pode",
+    "voce consegue",
+    "voce pode",
 ]
 
 # Keywords que indicam skills faltantes (para resposta smarter)
@@ -122,6 +277,7 @@ SKILL_INDICATORS = {
 
 
 # ============ Funcoes de Classificacao ============
+
 
 def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
     """
@@ -141,11 +297,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
     # 1. Verificar comandos diretos do Telegram
     for cmd in TELEGRAM_COMMANDS:
         if message_lower.startswith(cmd):
-            return (
-                Intent.COMMAND,
-                0.95,
-                {"command": cmd, "matched": "telegram_command"}
-            )
+            return (Intent.COMMAND, 0.95, {"command": cmd, "matched": "telegram_command"})
 
     # 2. Verificar palavras-chave de self_improve (antes das outras)
     self_improve_score = _check_keywords(message_lower, SELF_IMPROVE_KEYWORDS)
@@ -153,7 +305,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
         return (
             Intent.SELF_IMPROVE,
             self_improve_score,
-            {"keywords": _get_matched_keywords(message_lower, SELF_IMPROVE_KEYWORDS)}
+            {"keywords": _get_matched_keywords(message_lower, SELF_IMPROVE_KEYWORDS)},
         )
 
     # 3. Verificar perguntas sobre o sistema
@@ -162,7 +314,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
         return (
             Intent.QUESTION,
             system_score,
-            {"keywords": _get_matched_keywords(message_lower, SYSTEM_KEYWORDS)}
+            {"keywords": _get_matched_keywords(message_lower, SYSTEM_KEYWORDS)},
         )
 
     # 3.5. Verificar indicadores de perguntas gerais
@@ -171,7 +323,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
         return (
             Intent.QUESTION,
             question_score,
-            {"keywords": _get_matched_keywords(message_lower, QUESTION_INDICATORS)}
+            {"keywords": _get_matched_keywords(message_lower, QUESTION_INDICATORS)},
         )
 
     # 4. Verificar acoes a executar
@@ -180,7 +332,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
         return (
             Intent.TASK,
             action_score,
-            {"keywords": _get_matched_keywords(message_lower, ACTION_KEYWORDS)}
+            {"keywords": _get_matched_keywords(message_lower, ACTION_KEYWORDS)},
         )
 
     # 5. Verificar conversa natural
@@ -189,24 +341,16 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
         return (
             Intent.CHAT,
             chat_score,
-            {"keywords": _get_matched_keywords(message_lower, CHAT_KEYWORDS)}
+            {"keywords": _get_matched_keywords(message_lower, CHAT_KEYWORDS)},
         )
 
     # 6. Verificar se parece com pedido de skill faltante
     skill_indicators = _detect_skill_indicators(message_lower)
     if skill_indicators:
-        return (
-            Intent.SELF_IMPROVE,
-            0.75,
-            {"skill_indicators": skill_indicators}
-        )
+        return (Intent.SELF_IMPROVE, 0.75, {"skill_indicators": skill_indicators})
 
     # 7. Default: conversa (assumir que e conversa ate prova em contrario)
-    return (
-        Intent.CHAT,
-        0.60,
-        {"reason": "default_fallback"}
-    )
+    return (Intent.CHAT, 0.60, {"reason": "default_fallback"})
 
 
 def _check_keywords(message: str, keywords: List[str]) -> float:
@@ -228,6 +372,7 @@ def _check_keywords(message: str, keywords: List[str]) -> float:
     ratio = matched / len(keywords)
     # Aplicar log para evitar scores muito altos com poucos matches
     import math
+
     score = min(1.0, math.log1p(matched) * 0.3 + ratio * 0.5)
 
     return score
@@ -265,8 +410,7 @@ def _detect_skill_indicators(message: str) -> Dict[str, bool]:
 
 
 def classify_with_context(
-    message: str,
-    conversation_history: List[Dict[str, Any]] = None
+    message: str, conversation_history: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Classifica intencao considerando contexto da conversa.
@@ -285,8 +429,7 @@ def classify_with_context(
     if conversation_history:
         # Verificar se ha uma tendencia
         intents_in_history = [
-            msg.get("intent") for msg in conversation_history[-5:]
-            if msg.get("intent")
+            msg.get("intent") for msg in conversation_history[-5:] if msg.get("intent")
         ]
 
         if intents_in_history:
@@ -404,8 +547,7 @@ def build_classification_prompt(message: str, history: str = "") -> str:
         Prompt completo
     """
     return INTENT_CLASSIFICATION_PROMPT.format(
-        message=message,
-        history=history or "Nenhum historico"
+        message=message, history=history or "Nenhum historico"
     )
 
 

@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Optional
 
 class CircuitState(Enum):
     """Estados do circuit breaker."""
+
     CLOSED = "closed"  # Funcionando normalmente
     OPEN = "open"  # Circuito aberto (falha)
     HALF_OPEN = "half_open"  # Testando se recuperou
@@ -22,6 +23,7 @@ class CircuitState(Enum):
 @dataclass
 class CircuitBreakerConfig:
     """Configuração do circuit breaker."""
+
     failure_threshold: int = 5  # Número de falhas para abrir
     success_threshold: int = 2  # Número de sucessos para fechar
     timeout: float = 60.0  # Tempo em segundos para tentar novamente
@@ -31,6 +33,7 @@ class CircuitBreakerConfig:
 @dataclass
 class CircuitBreakerStats:
     """Estatísticas do circuit breaker."""
+
     total_calls: int = 0
     successful_calls: int = 0
     failed_calls: int = 0
@@ -54,6 +57,7 @@ class CircuitBreakerStats:
 
 class CircuitBreakerError(Exception):
     """Erro do circuit breaker."""
+
     def __init__(self, message: str, state: CircuitState):
         super().__init__(message)
         self.state = state
@@ -138,10 +142,7 @@ class CircuitBreaker:
             CircuitBreakerError: Se o circuito estiver aberto
         """
         if not self._should_attempt():
-            raise CircuitBreakerError(
-                f"Circuit breaker is {self.state.value}",
-                self.state
-            )
+            raise CircuitBreakerError(f"Circuit breaker is {self.state.value}", self.state)
 
         try:
             result = func(*args, **kwargs)
@@ -167,10 +168,7 @@ class CircuitBreaker:
             CircuitBreakerError: Se o circuito estiver aberto
         """
         if not self._should_attempt():
-            raise CircuitBreakerError(
-                f"Circuit breaker is {self.state.value}",
-                self.state
-            )
+            raise CircuitBreakerError(f"Circuit breaker is {self.state.value}", self.state)
 
         try:
             result = await func(*args, **kwargs)
@@ -203,7 +201,7 @@ class RetryPolicy:
         max_attempts: int = 3,
         base_delay: float = 1.0,
         max_delay: float = 10.0,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         self.max_attempts = max_attempts
         self.base_delay = base_delay
@@ -218,6 +216,7 @@ class RetryPolicy:
 
 class RetryError(Exception):
     """Erro de retry esgotado."""
+
     def __init__(self, message: str, attempts: int, last_error: Exception):
         super().__init__(message)
         self.attempts = attempts
@@ -225,10 +224,7 @@ class RetryError(Exception):
 
 
 async def retry_with_backoff(
-    func: Callable,
-    policy: Optional[RetryPolicy] = None,
-    *args,
-    **kwargs
+    func: Callable, policy: Optional[RetryPolicy] = None, *args, **kwargs
 ) -> Any:
     """
     Executa uma função com retry e backoff exponencial.
@@ -253,9 +249,7 @@ async def retry_with_backoff(
         except Exception as e:
             if attempt == policy.max_attempts:
                 raise RetryError(
-                    f"Max retry attempts ({policy.max_attempts}) reached",
-                    policy.max_attempts,
-                    e
+                    f"Max retry attempts ({policy.max_attempts}) reached", policy.max_attempts, e
                 )
 
             # Aguardar antes da próxima tentativa
@@ -264,10 +258,7 @@ async def retry_with_backoff(
 
 
 def retry_with_backoff_sync(
-    func: Callable,
-    policy: Optional[RetryPolicy] = None,
-    *args,
-    **kwargs
+    func: Callable, policy: Optional[RetryPolicy] = None, *args, **kwargs
 ) -> Any:
     """
     Executa uma função síncrona com retry e backoff exponencial.
@@ -292,9 +283,7 @@ def retry_with_backoff_sync(
         except Exception as e:
             if attempt == policy.max_attempts:
                 raise RetryError(
-                    f"Max retry attempts ({policy.max_attempts}) reached",
-                    policy.max_attempts,
-                    e
+                    f"Max retry attempts ({policy.max_attempts}) reached", policy.max_attempts, e
                 )
 
             # Aguardar antes da próxima tentativa

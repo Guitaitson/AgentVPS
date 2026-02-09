@@ -2,6 +2,7 @@
 Nodes do agente LangGraph.
 Cada função é um nó no grafo de decisões.
 """
+
 import subprocess
 from datetime import datetime
 
@@ -103,12 +104,7 @@ def node_execute(state: AgentState) -> AgentState:
 
     try:
         if action_type == "command" and action == "ram":
-            result = subprocess.run(
-                ["free", "-m"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = subprocess.run(["free", "-m"], capture_output=True, text=True, timeout=10)
             output = result.stdout
 
             lines = output.strip().split("\n")
@@ -127,7 +123,7 @@ def node_execute(state: AgentState) -> AgentState:
                 ["docker", "ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             return {
                 **state,
@@ -135,12 +131,7 @@ def node_execute(state: AgentState) -> AgentState:
             }
 
         elif action_type == "command" and action == "status":
-            result = subprocess.run(
-                ["free", "-m"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = subprocess.run(["free", "-m"], capture_output=True, text=True, timeout=10)
             ram_info = result.stdout
 
             return {
@@ -150,6 +141,7 @@ def node_execute(state: AgentState) -> AgentState:
 
         elif action_type == "command" and action == "health":
             from .error_handler import check_system_health
+
             checks = []
 
             health = check_system_health()
@@ -160,13 +152,14 @@ def node_execute(state: AgentState) -> AgentState:
                 import os
 
                 import psycopg2
+
                 conn = psycopg2.connect(
                     host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
                     port=int(os.getenv("POSTGRES_PORT", 5432)),
                     dbname=os.getenv("POSTGRES_DB", "vps_agent"),
                     user=os.getenv("POSTGRES_USER"),
                     password=os.getenv("POSTGRES_PASSWORD"),
-                    connect_timeout=5
+                    connect_timeout=5,
                 )
                 conn.close()
                 checks.append("✅ PostgreSQL")
@@ -176,10 +169,11 @@ def node_execute(state: AgentState) -> AgentState:
             # Redis
             try:
                 import redis
+
                 r = redis.Redis(
                     host=os.getenv("REDIS_HOST", "127.0.0.1"),
                     port=int(os.getenv("REDIS_PORT", 6379)),
-                    socket_timeout=5
+                    socket_timeout=5,
                 )
                 r.ping()
                 checks.append("✅ Redis")
@@ -200,11 +194,10 @@ def node_execute(state: AgentState) -> AgentState:
                 detect_missing_skill_keywords,
                 generate_smart_unavailable_response,
             )
+
             detected = detect_missing_skill_keywords(f"{action_type} {action}")
             response = generate_smart_unavailable_response(
-                f"{action_type} {action}",
-                detected_skills=detected,
-                intent=intent
+                f"{action_type} {action}", detected_skills=detected, intent=intent
             )
             return {
                 **state,
@@ -238,13 +231,14 @@ def node_generate_response(state: AgentState) -> AgentState:
     # Se há resultado de execução, usar diretamente
     if execution_result:
         # Verificar se é uma mensagem de "não implementado"
-        if "não implementado" in execution_result.lower() or "not implemented" in execution_result.lower():
+        if (
+            "não implementado" in execution_result.lower()
+            or "not implemented" in execution_result.lower()
+        ):
             # Gerar resposta smarter com plano de ação
             detected = detect_missing_skill_keywords(user_message.lower())
             response = generate_smart_unavailable_response(
-                user_message,
-                detected_skills=detected,
-                intent=intent
+                user_message, detected_skills=detected, intent=intent
             )
         else:
             response = execution_result
@@ -254,7 +248,7 @@ def node_generate_response(state: AgentState) -> AgentState:
         response = generate_smart_unavailable_response(
             user_message,
             detected_skills=detect_missing_skill_keywords(user_message.lower()),
-            intent=intent
+            intent=intent,
         )
 
     # Para conversas e perguntas, usar LLM com identidade VPS-Agent
@@ -312,8 +306,13 @@ def node_generate_response(state: AgentState) -> AgentState:
         "response": response,
         "should_save_memory": should_save,
         "memory_updates": [
-            {"key": "last_interaction", "value": {"type": intent, "time": datetime.now().isoformat()}}
-        ] if should_save else [],
+            {
+                "key": "last_interaction",
+                "value": {"type": intent, "time": datetime.now().isoformat()},
+            }
+        ]
+        if should_save
+        else [],
     }
 
 
@@ -332,6 +331,7 @@ def node_save_memory(state: AgentState) -> AgentState:
 
 # ============ Self-Improvement Nodes ============
 
+
 def node_check_capabilities(state: AgentState) -> AgentState:
     """Verifica se o agente tem as capacidades necessárias."""
     try:
@@ -346,21 +346,21 @@ def node_check_capabilities(state: AgentState) -> AgentState:
                 **state,
                 "missing_capabilities": missing_list,
                 "needs_improvement": True,
-                "improvement_summary": f"Detectei {len(missing)} capacidades faltantes: {', '.join(cap.name for cap in missing)}"
+                "improvement_summary": f"Detectei {len(missing)} capacidades faltantes: {', '.join(cap.name for cap in missing)}",
             }
 
         return {
             **state,
             "missing_capabilities": [],
             "needs_improvement": False,
-            "improvement_summary": "Todas as capacidades necessárias estão disponíveis."
+            "improvement_summary": "Todas as capacidades necessárias estão disponíveis.",
         }
     except ImportError as e:
         return {
             **state,
             "missing_capabilities": [],
             "needs_improvement": False,
-            "improvement_summary": f"Capabilities registry não disponível: {e}"
+            "improvement_summary": f"Capabilities registry não disponível: {e}",
         }
 
 
@@ -372,11 +372,7 @@ def node_self_improve(state: AgentState) -> AgentState:
         missing = state.get("missing_capabilities", [])
 
         if not missing:
-            return {
-                **state,
-                "should_improve": False,
-                "improvement_plan": None
-            }
+            return {**state, "should_improve": False, "improvement_plan": None}
 
         # Criar plano de implementação
         plan = []
@@ -384,23 +380,25 @@ def node_self_improve(state: AgentState) -> AgentState:
             cap_name = cap_dict["name"]
             cap = capabilities_registry.get_capability(cap_name)
             if cap:
-                plan.append({
-                    "capability": cap.to_dict(),
-                    "steps": capabilities_registry.get_implementation_plan(cap)
-                })
+                plan.append(
+                    {
+                        "capability": cap.to_dict(),
+                        "steps": capabilities_registry.get_implementation_plan(cap),
+                    }
+                )
 
         return {
             **state,
             "improvement_plan": plan,
             "should_improve": True,
-            "improvement_status": "planning"
+            "improvement_status": "planning",
         }
     except ImportError as e:
         return {
             **state,
             "should_improve": False,
             "improvement_plan": None,
-            "improvement_summary": f"Não foi possível acessar capabilities registry: {e}"
+            "improvement_summary": f"Não foi possível acessar capabilities registry: {e}",
         }
 
 
@@ -413,7 +411,7 @@ def node_implement_capability(state: AgentState) -> AgentState:
             return {
                 **state,
                 "implementation_result": "Nada para implementar",
-                "new_capability": None
+                "new_capability": None,
             }
 
         # Chamar CLI para implementar a primeira capacidade
@@ -453,7 +451,7 @@ Por favor, implemente esta capacidade seguindo o plano acima.
         implementation_code = f"""# Placeholder para {cap_name}
 # Esta capacidade será implementada pelo CLI/Kilocode
 
-def {cap_name.replace('-', '_')}():
+def {cap_name.replace("-", "_")}():
     \"\"\"{cap_description}\"\"\"
     # TODO: Implementar funcionalidade
     pass
@@ -464,11 +462,11 @@ def {cap_name.replace('-', '_')}():
             "implementation_result": f"Código gerado para {cap_name}. Agora preciso integrar e testar.",
             "generated_code": implementation_code,
             "new_capability": cap_name,
-            "implementation_status": "code_generated"
+            "implementation_status": "code_generated",
         }
     except ImportError as e:
         return {
             **state,
             "implementation_result": f"Não foi possível implementar: {e}",
-            "new_capability": None
+            "new_capability": None,
         }

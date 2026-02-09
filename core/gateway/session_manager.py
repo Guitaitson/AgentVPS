@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 @dataclass
 class Session:
     """Represents a user session."""
+
     session_id: str
     user_id: str
     created_at: float = field(default_factory=time.time)
@@ -40,7 +41,7 @@ class Session:
             last_activity=data.get("last_activity", time.time()),
             context=data.get("context", {}),
             message_count=data.get("message_count", 0),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
         )
 
 
@@ -86,19 +87,11 @@ class SessionManager:
         """
         session_id = str(uuid.uuid4())
 
-        session = Session(
-            session_id=session_id,
-            user_id=user_id,
-            metadata=metadata or {}
-        )
+        session = Session(session_id=session_id, user_id=user_id, metadata=metadata or {})
 
         if self.redis:
             key = self._get_redis_key(session_id)
-            await self.redis.setex(
-                key,
-                self.timeout,
-                json.dumps(session.to_dict())
-            )
+            await self.redis.setex(key, self.timeout, json.dumps(session.to_dict()))
         else:
             self.local_sessions[session_id] = session
 
@@ -137,11 +130,7 @@ class SessionManager:
 
         if self.redis:
             key = self._get_redis_key(session.session_id)
-            await self.redis.setex(
-                key,
-                self.timeout,
-                json.dumps(session.to_dict())
-            )
+            await self.redis.setex(key, self.timeout, json.dumps(session.to_dict()))
         else:
             self.local_sessions[session.session_id] = session
 
@@ -174,11 +163,7 @@ class SessionManager:
             role: Message role (user, assistant, system)
             content: Message content
         """
-        message = {
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat()
-        }
+        message = {"role": role, "content": content, "timestamp": datetime.now().isoformat()}
 
         if "messages" not in session.context:
             session.context["messages"] = []
@@ -188,7 +173,7 @@ class SessionManager:
 
         # Trim old messages if over limit
         if len(session.context["messages"]) > self.max_messages:
-            session.context["messages"] = session.context["messages"][-self.max_messages:]
+            session.context["messages"] = session.context["messages"][-self.max_messages :]
 
         await self.update_session(session)
 
@@ -220,7 +205,8 @@ class SessionManager:
         if not self.redis:
             now = time.time()
             expired = [
-                sid for sid, session in self.local_sessions.items()
+                sid
+                for sid, session in self.local_sessions.items()
                 if now - session.last_activity > self.timeout
             ]
 
@@ -245,10 +231,7 @@ class SessionManager:
             List of active sessions
         """
         if not self.redis:
-            return [
-                s for s in self.local_sessions.values()
-                if s.user_id == user_id
-            ]
+            return [s for s in self.local_sessions.values() if s.user_id == user_id]
         return []
 
 
@@ -263,6 +246,7 @@ class SyncSessionManager:
     def _get_loop(self):
         """Get or create event loop."""
         import asyncio
+
         if self.loop is None or self.loop.is_closed():
             self.loop = asyncio.new_event_loop()
         return self.loop

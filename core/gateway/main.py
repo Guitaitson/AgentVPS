@@ -25,8 +25,7 @@ from core.vps_agent.agent import process_message_async
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -40,8 +39,10 @@ rate_limiter = RateLimiter(requests_per_minute=60)
 
 # ============ Pydantic Models ============
 
+
 class MessageRequest(BaseModel):
     """Request model for sending messages to the agent."""
+
     user_id: str = Field(..., description="User identifier")
     message: str = Field(..., description="Message to process")
     session_id: Optional[str] = Field(None, description="Session ID for continuity")
@@ -49,6 +50,7 @@ class MessageRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     """Response model for agent messages."""
+
     response: str
     session_id: str
     intent: Optional[str] = None
@@ -57,6 +59,7 @@ class MessageResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response model."""
+
     status: str
     version: str
     components: dict
@@ -64,11 +67,13 @@ class HealthResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Error response model."""
+
     detail: str
     error_code: Optional[str] = None
 
 
 # ============ Lifespan Context Manager ============
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,7 +92,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS
@@ -102,9 +107,10 @@ app.add_middleware(
 
 # ============ Security Dependencies ============
 
+
 async def verify_api_key(
     api_key: Optional[str] = Security(api_key_header),
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme)
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> str:
     """Verify API key or bearer token."""
     # API Key check
@@ -125,14 +131,11 @@ async def verify_api_key(
 
 # ============ Routes ============
 
+
 @app.get("/", tags=["Root"])
 async def root():
     """Root endpoint."""
-    return {
-        "service": "AgentVPS Gateway",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    return {"service": "AgentVPS Gateway", "version": "1.0.0", "docs": "/docs"}
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
@@ -154,30 +157,26 @@ async def health_check():
     # Check memory
     try:
         from vps_langgraph.memory import AgentMemory
+
         AgentMemory()
         components["memory"] = "healthy"
     except Exception as e:
         components["memory"] = f"unhealthy: {str(e)}"
 
-    overall_status = "healthy" if all(
-        "healthy" in str(v) for v in components.values()
-    ) else "degraded"
-
-    return HealthResponse(
-        status=overall_status,
-        version="1.0.0",
-        components=components
+    overall_status = (
+        "healthy" if all("healthy" in str(v) for v in components.values()) else "degraded"
     )
 
+    return HealthResponse(status=overall_status, version="1.0.0", components=components)
 
-@app.post("/api/v1/messages",
-          response_model=MessageResponse,
-          responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
-          tags=["Messages"])
-async def send_message(
-    request: MessageRequest,
-    user_identifier: str = Depends(verify_api_key)
-):
+
+@app.post(
+    "/api/v1/messages",
+    response_model=MessageResponse,
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    tags=["Messages"],
+)
+async def send_message(request: MessageRequest, user_identifier: str = Depends(verify_api_key)):
     """
     Send a message to the agent.
 
@@ -186,34 +185,26 @@ async def send_message(
     # Rate limiting
     client_id = request.user_id
     if not rate_limiter.allow_request(client_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Too many requests. Please try again later."
-        )
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
 
     try:
         logger.info(f"📨 Message from {request.user_id}: {request.message[:100]}...")
 
         # Process message through agent
         result = await process_message_async(
-            user_id=request.user_id,
-            message=request.message,
-            session_id=request.session_id
+            user_id=request.user_id, message=request.message, session_id=request.session_id
         )
 
         return MessageResponse(
             response=result.get("response", "Erro ao processar mensagem"),
             session_id=result.get("session_id", request.session_id or ""),
             intent=result.get("intent"),
-            confidence=result.get("intent_confidence")
+            confidence=result.get("intent_confidence"),
         )
 
     except Exception as e:
         logger.error(f"❌ Error processing message: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/api/v1/capabilities", tags=["Capabilities"])
@@ -221,11 +212,9 @@ async def get_capabilities():
     """Get the list of available capabilities."""
     try:
         from capabilities import capabilities_registry
+
         capabilities = capabilities_registry.list_capabilities()
-        return {
-            "capabilities": [cap.to_dict() for cap in capabilities],
-            "count": len(capabilities)
-        }
+        return {"capabilities": [cap.to_dict() for cap in capabilities], "count": len(capabilities)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -261,6 +250,7 @@ async def get_session(session_id: str):
     """Get session information."""
     try:
         from core.gateway.session_manager import SessionManager
+
         manager = SessionManager()
         session = manager.get_session(session_id)
 
@@ -276,6 +266,7 @@ async def get_session(session_id: str):
 
 
 # ============ Run Server ============
+
 
 def run_server():
     """Main entry point for running the gateway server."""
