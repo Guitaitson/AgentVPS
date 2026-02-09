@@ -14,10 +14,12 @@ authors = [
 ]
 dependencies = [
     "pydantic>=2.7.0",
+    "pydantic-settings>=2.0.0",
     "structlog>=24.0.0",
     "python-dotenv>=1.0.0",
     "PyYAML>=6.0.0",
     "psycopg2-binary>=2.9.9",
+    "asyncpg>=0.29.0",
     "redis>=5.0.0",
     "httpx>=0.26.0",
     "python-telegram-bot>=21.0",
@@ -25,20 +27,27 @@ dependencies = [
     "fastapi>=0.109.0",
     "fastapi-mcp>=0.2.0",
     "uvicorn>=0.27.0",
+    "docker>=7.0.0",
+    "qdrant-client>=1.16.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
 ]
 
 [project.scripts]
 vps-agent = "telegram_bot.bot:main"
+vps-mcp = "core.mcp_server:main"
+vps-gateway = "core.gateway.main:run_server"
 
 [tool.setuptools.packages.find]
-where = [""]
-include = ["core.*"]
+where = ["."]
+include = ["core*", "telegram_bot*"]
+exclude = ["tests*", "docs*", "scripts*", "plans*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -54,13 +63,24 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py312"
+line-length = 100
 
 [tool.ruff.lint]
-select = ["F", "E"]
+select = ["F", "E", "W", "I", "N"]
 ignore = [
-    "E402",  # Allow sys.path.insert before imports in test files
+    "E402",  # Allow imports after statements in some cases
     "E501",  # Line length warnings (not critical)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["E402"]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__
+
+[tool.coverage.run]
+source = ["core", "telegram_bot"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+precision = 2
+skip_empty = true
+fail_under = 60

@@ -2,9 +2,7 @@
 Memória Semântica com Qdrant.
 Armazena conversas e contexto como vetores para busca semântica.
 """
-import sys
 import uuid
-sys.path.insert(0, "/opt/vps-agent/core")
 
 from typing import List, Dict, Optional
 from datetime import datetime

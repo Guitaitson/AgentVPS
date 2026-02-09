@@ -3,10 +3,8 @@ Testes para o Error Handling + Circuit Breaker.
 """
 
 import pytest
-import sys
-sys.path.insert(0, 'core')
 
-from resilience.circuit_breaker import (
+from core.resilience.circuit_breaker import (
     CircuitState,
     CircuitBreakerConfig,
     CircuitBreakerError,

@@ -2,8 +2,6 @@
 Testes basicos para o VPS-Agent v2.
 """
 import pytest
-import sys
-sys.path.insert(0, 'core')
 
 
 class TestAgentState:
@@ -11,12 +9,12 @@ class TestAgentState:
     
     def test_agent_state_import(self):
         """Testa se AgentState pode ser importado."""
-        from vps_langgraph.state import AgentState
+        from core.vps_langgraph.state import AgentState
         assert AgentState is not None
     
     def test_agent_state_structure(self):
         """Testa a estrutura do AgentState."""
-        from vps_langgraph.state import AgentState
+        from core.vps_langgraph.state import AgentState
         state = AgentState(
             user_id="test_user",
             user_message="Hello",
@@ -33,7 +31,7 @@ class TestNodes:
     
     def test_node_classify_intent_command(self):
         """Testa classificacao de comandos."""
-        from vps_langgraph.nodes import node_classify_intent
+        from core.vps_langgraph.nodes import node_classify_intent
         
         state = {
             "user_id": "123",
@@ -46,7 +44,7 @@ class TestNodes:
     
     def test_node_classify_intent_question(self):
         """Testa classificacao de perguntas."""
-        from vps_langgraph.nodes import node_classify_intent
+        from core.vps_langgraph.nodes import node_classify_intent
         
         # Pergunta factual clara - sem "e" isolado para evitar match com self_improve
         state = {
@@ -60,7 +58,7 @@ class TestNodes:
     
     def test_node_classify_intent_chat(self):
         """Testa classificacao de chat."""
-        from vps_langgraph.nodes import node_classify_intent
+        from core.vps_langgraph.nodes import node_classify_intent
         
         state = {
             "user_id": "123",
@@ -76,7 +74,7 @@ class TestGraph:
     
     def test_build_agent_graph(self):
         """Testa se o grafo pode ser construido."""
-        from vps_langgraph.graph import build_agent_graph
+        from core.vps_langgraph.graph import build_agent_graph
         
         graph = build_agent_graph()
         assert graph is not None
@@ -87,7 +85,7 @@ class TestMemory:
     
     def test_memory_import(self):
         """Testa se AgentMemory pode ser importado."""
-        from vps_langgraph.memory import AgentMemory
+        from core.vps_langgraph.memory import AgentMemory
         assert AgentMemory is not None
 
 

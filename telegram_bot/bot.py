@@ -7,9 +7,6 @@ import sys
 import logging
 from datetime import datetime, timezone
 
-# Adicionar core ao path para importar nosso langgraph
-sys.path.insert(0, "/opt/vps-agent/core")
-
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -24,10 +21,10 @@ import psycopg2
 import redis
 
 # Telegram Log Handler (F0-06)
-from telegram_handler import get_telegram_notifier
+from telegram_bot.telegram_handler import get_telegram_notifier
 
 # VPS-Agent Core (nosso módulo)
-from vps_agent.agent import process_message_async
+from core.vps_agent.agent import process_message_async
 
 # Configuração de logging estruturado
 structlog.configure(
@@ -254,6 +251,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     
     # Enviar para Telegram (F0-06)
     try:
+        from telegram_bot.telegram_handler import get_telegram_notifier
         notifier = get_telegram_notifier()
         notifier.send_error(f"Erro no Bot:\n```\n{error_msg[:500]}\n```")
     except Exception:

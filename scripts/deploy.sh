@@ -44,10 +44,10 @@ deploy() {
     git fetch origin main
     git reset --hard origin/main
     
-    # Install dependencies
-    log "Instalando dependências..."
+    # Install package and dependencies
+    log "Instalando pacote e dependências..."
     source "$REPO_DIR/core/venv/bin/activate"
-    pip install -r "$REPO_DIR/requirements.txt" --quiet
+    pip install -e "$REPO_DIR" --quiet
     
     # Restart services
     log "Reiniciando serviços..."

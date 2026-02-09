@@ -218,9 +218,6 @@ def node_execute(state: AgentState) -> AgentState:
 
 def node_generate_response(state: AgentState) -> AgentState:
     """Gera resposta final ao usuário com identidade VPS-Agent."""
-    import sys
-    sys.path.insert(0, "/opt/vps-agent/core")
-    
     from .smart_responses import (
         generate_smart_unavailable_response,
         get_capabilities_summary,
@@ -333,11 +330,8 @@ def node_save_memory(state: AgentState) -> AgentState:
 
 def node_check_capabilities(state: AgentState) -> AgentState:
     """Verifica se o agente tem as capacidades necessárias."""
-    import sys
-    sys.path.insert(0, "/opt/vps-agent/core")
-    
     try:
-        from capabilities import capabilities_registry
+        from ..capabilities import capabilities_registry
         
         task = state.get("user_message", "")
         missing = capabilities_registry.detect_missing(task)
@@ -368,11 +362,8 @@ def node_check_capabilities(state: AgentState) -> AgentState:
 
 def node_self_improve(state: AgentState) -> AgentState:
     """Planeja e executa auto-improvement."""
-    import sys
-    sys.path.insert(0, "/opt/vps-agent/core")
-    
     try:
-        from capabilities import capabilities_registry
+        from ..capabilities import capabilities_registry
         
         missing = state.get("missing_capabilities", [])
         
@@ -411,9 +402,6 @@ def node_self_improve(state: AgentState) -> AgentState:
 
 def node_implement_capability(state: AgentState) -> AgentState:
     """Implementa uma nova capacidade usando o CLI."""
-    import sys
-    sys.path.insert(0, "/opt/vps-agent/core")
-    
     try:
         plan = state.get("improvement_plan", [])
         

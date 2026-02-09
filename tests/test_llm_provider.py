@@ -3,10 +3,8 @@ Testes para o LLM Provider Abstraction.
 """
 
 import pytest
-import sys
-sys.path.insert(0, 'core')
 
-from llm.provider import (
+from core.llm.provider import (
     LLMProviderType,
     LLMMessage,
     LLMResponse,

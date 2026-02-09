@@ -8,16 +8,12 @@ Usage:
 The server will be available at http://localhost:8000/mcp
 """
 import subprocess
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi_mcp import FastApiMCP
 
-# Add core to path
-sys.path.insert(0, '/opt/vps-agent/core')
-
-from resource_manager.manager import (
+from core.resource_manager.manager import (
     get_available_ram,
     get_tools_status,
     start_tool,
@@ -204,7 +200,8 @@ mcp = FastApiMCP(
 mcp.mount_http()
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the MCP server."""
     import uvicorn
     
     print("=" * 50)
@@ -221,3 +218,7 @@ if __name__ == "__main__":
         port=8000,
         log_level="info"
     )
+
+
+if __name__ == "__main__":
+    main()

@@ -3,10 +3,8 @@ Testes para o Prompt Composer Dinâmico.
 """
 
 import pytest
-import sys
-sys.path.insert(0, 'core')
 
-from llm.prompt_composer import (
+from core.llm.prompt_composer import (
     PromptTemplate,
     create_context,
     get_default_composer,

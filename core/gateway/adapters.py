@@ -7,12 +7,8 @@ Provides protocol adapters for:
 """
 
 import logging
-import sys
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
-
-# Add core to path
-sys.path.insert(0, "/opt/vps-agent/core")
 
 logger = logging.getLogger(__name__)
 

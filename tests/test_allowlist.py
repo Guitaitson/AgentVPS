@@ -3,10 +3,8 @@ Testes para o Allowlist de Segurança.
 """
 
 import pytest
-import sys
-sys.path.insert(0, 'core')
 
-from security.allowlist import (
+from core.security.allowlist import (
     PermissionLevel,
     ResourceType,
     AllowlistRule,

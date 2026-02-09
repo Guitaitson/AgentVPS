@@ -3,12 +3,10 @@ Testes para o Structured Logging.
 """
 
 import pytest
-import sys
 import json
 import io
-sys.path.insert(0, 'core')
 
-from structured_logging import (
+from core.structured_logging import (
     LogLevel,
     LogCategory,
     LogEntry,

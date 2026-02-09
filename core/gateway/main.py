@@ -9,7 +9,6 @@ Provides HTTP endpoints for:
 """
 
 import logging
-import sys
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -20,12 +19,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
-# Add core to path
-sys.path.insert(0, "/opt/vps-agent/core")
-
-from vps_agent.agent import process_message_async
-from gateway.rate_limiter import RateLimiter
-from gateway.adapters import TelegramAdapter
+from core.vps_agent.agent import process_message_async
+from core.gateway.rate_limiter import RateLimiter
+from core.gateway.adapters import TelegramAdapter
 
 # Configure logging
 logging.basicConfig(
@@ -264,7 +260,7 @@ async def telegram_webhook(request: Request):
 async def get_session(session_id: str):
     """Get session information."""
     try:
-        from gateway.session_manager import SessionManager
+        from core.gateway.session_manager import SessionManager
         manager = SessionManager()
         session = manager.get_session(session_id)
         
@@ -281,9 +277,17 @@ async def get_session(session_id: str):
 
 # ============ Run Server ============
 
-if __name__ == "__main__":
-    port = int(sys.getenv("GATEWAY_PORT", "8080"))
-    host = sys.getenv("GATEWAY_HOST", "0.0.0.0")
+def run_server():
+    """Main entry point for running the gateway server."""
+    import sys
+    import os
+    
+    port = int(os.getenv("GATEWAY_PORT", "8080"))
+    host = os.getenv("GATEWAY_HOST", "0.0.0.0")
     
     logger.info(f"🌐 Starting Gateway on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    run_server()

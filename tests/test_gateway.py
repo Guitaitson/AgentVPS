@@ -5,12 +5,8 @@ Tests for FastAPI endpoints, rate limiting, adapters, and session management.
 """
 
 import pytest
-import sys
 import time
 from unittest.mock import MagicMock
-
-# Add core to path
-sys.path.insert(0, "/opt/vps-agent/core")
 
 
 # ============ Rate Limiter Tests ============
@@ -20,7 +16,7 @@ class TestRateLimiter:
     
     def test_allow_request_under_limit(self):
         """Test that requests under the limit are allowed."""
-        from gateway.rate_limiter import RateLimiter
+        from core.gateway.rate_limiter import RateLimiter
         
         limiter = RateLimiter(requests_per_minute=10)
         
@@ -30,7 +26,7 @@ class TestRateLimiter:
     
     def test_allow_request_over_limit(self):
         """Test that requests over the limit are denied."""
-        from gateway.rate_limiter import RateLimiter
+        from core.gateway.rate_limiter import RateLimiter
         
         limiter = RateLimiter(requests_per_minute=5)
         
@@ -43,7 +39,7 @@ class TestRateLimiter:
     
     def test_different_clients_have_separate_limits(self):
         """Test that different clients have separate rate limits."""
-        from gateway.rate_limiter import RateLimiter
+        from core.gateway.rate_limiter import RateLimiter
         
         limiter = RateLimiter(requests_per_minute=2)
         
@@ -59,7 +55,7 @@ class TestRateLimiter:
     
     def test_get_remaining_requests(self):
         """Test getting remaining requests."""
-        from gateway.rate_limiter import RateLimiter
+        from core.gateway.rate_limiter import RateLimiter
         
         limiter = RateLimiter(requests_per_minute=5)
         
@@ -72,7 +68,7 @@ class TestRateLimiter:
     
     def test_cleanup_old_tokens(self):
         """Test that old tokens are cleaned up."""
-        from gateway.rate_limiter import RateLimiter
+        from core.gateway.rate_limiter import RateLimiter
         
         limiter = RateLimiter(requests_per_minute=10)
         
@@ -95,7 +91,7 @@ class TestTelegramAdapter:
     
     def test_process_message(self):
         """Test processing a Telegram message."""
-        from gateway.adapters import TelegramAdapter
+        from core.gateway.adapters import TelegramAdapter
         
         adapter = TelegramAdapter(bot_token="test_token")
         
@@ -118,7 +114,7 @@ class TestTelegramAdapter:
     
     def test_process_callback_query(self):
         """Test processing a callback query."""
-        from gateway.adapters import TelegramAdapter
+        from core.gateway.adapters import TelegramAdapter
         
         adapter = TelegramAdapter(bot_token="test_token")
         
@@ -140,7 +136,7 @@ class TestTelegramAdapter:
     
     def test_process_inline_query(self):
         """Test processing an inline query."""
-        from gateway.adapters import TelegramAdapter
+        from core.gateway.adapters import TelegramAdapter
         
         adapter = TelegramAdapter(bot_token="test_token")
         
@@ -164,7 +160,7 @@ class TestWebhookAdapter:
     
     def test_process_webhook(self):
         """Test processing a generic webhook."""
-        from gateway.adapters import WebhookAdapter
+        from core.gateway.adapters import WebhookAdapter
         
         adapter = WebhookAdapter(secret_token="secret123")
         
@@ -180,7 +176,7 @@ class TestWebhookAdapter:
     
     def test_verify_signature_with_secret(self):
         """Test signature verification with secret."""
-        from gateway.adapters import WebhookAdapter
+        from core.gateway.adapters import WebhookAdapter
         import hmac
         import hashlib
         
@@ -209,7 +205,7 @@ class TestSessionManager:
     
     def test_create_session(self):
         """Test creating a new session."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager()
         
@@ -222,7 +218,7 @@ class TestSessionManager:
     
     def test_get_session(self):
         """Test getting a session by ID."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager()
         
@@ -235,7 +231,7 @@ class TestSessionManager:
     
     def test_get_nonexistent_session(self):
         """Test getting a session that doesn't exist."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager()
         
@@ -245,7 +241,7 @@ class TestSessionManager:
     
     def test_add_message(self):
         """Test adding a message to a session."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager()
         
@@ -262,7 +258,7 @@ class TestSessionManager:
     
     def test_session_message_limit(self):
         """Test that session has a message limit."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager(max_messages=5)
         
@@ -280,7 +276,7 @@ class TestSessionManager:
     
     def test_end_session(self):
         """Test ending a session."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager()
         
@@ -292,7 +288,7 @@ class TestSessionManager:
     
     def test_end_nonexistent_session(self):
         """Test ending a session that doesn't exist."""
-        from gateway.session_manager import SyncSessionManager
+        from core.gateway.session_manager import SyncSessionManager
         
         manager = SyncSessionManager()
         
@@ -308,7 +304,7 @@ class TestGatewayEndpoints:
     def client(self):
         """Create a test client."""
         from fastapi.testclient import TestClient
-        from gateway.main import app
+        from core.gateway.main import app
         return TestClient(app)
     
     def test_root_endpoint(self, client):

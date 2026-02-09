@@ -3,12 +3,14 @@
 import sys
 from pathlib import Path
 
-# Add the project root to the path
+# Add the project root to the path for development mode
+# When the package is installed via pip install -e ., this is not necessary
 project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root / 'core'))
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Import from the package
-from vps_agent.agent import process_message_async
+from core.vps_agent.agent import process_message_async
 import asyncio
 
 

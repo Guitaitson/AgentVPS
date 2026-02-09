@@ -3,11 +3,12 @@
 import sys
 from pathlib import Path
 
-# Add core/ to path dynamically
-core_path = Path(__file__).parent / 'core'
-sys.path.insert(0, str(core_path))
+# Add the project root to the path for development mode
+project_root = Path(__file__).parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-from vps_agent.agent import process_message_async
+from core.vps_agent.agent import process_message_async
 import asyncio
 
 async def main():

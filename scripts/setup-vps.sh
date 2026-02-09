@@ -33,9 +33,9 @@ else
     git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
-echo -e "${GREEN}[2/4]${NC} Instalando dependências..."
-cd "$INSTALL_DIR/core"
-pip install -q -r requirements-mcp.txt
+echo -e "${GREEN}[2/4]${NC} Instalando pacote e dependências..."
+cd "$INSTALL_DIR"
+pip install -q -e "."
 
 echo -e "${GREEN}[3/4]${NC} Instalando serviço MCP..."
 cp "$INSTALL_DIR/configs/mcp-server.service" /etc/systemd/system/

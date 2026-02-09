@@ -1,15 +1,11 @@
 # VPS Agent - Interface principal entre Telegram Bot e LangGraph
 
-import sys
 import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-# Adicionar core ao path
-sys.path.insert(0, "/opt/vps-agent/core")
-
-from vps_langgraph.graph import build_agent_graph
-from vps_langgraph.state import AgentState
+from core.vps_langgraph.graph import build_agent_graph
+from core.vps_langgraph.state import AgentState
 import structlog
 
 logger = structlog.get_logger()
@@ -65,7 +61,7 @@ def get_agent_status() -> Dict[str, Any]:
     Returns:
         Dicionário com informações sobre o agente
     """
-    from capabilities import capabilities_registry
+    from core.capabilities import capabilities_registry
     
     summary = capabilities_registry.get_summary()
     

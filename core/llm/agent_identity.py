@@ -5,9 +5,6 @@ Este módulo fornece ao LLM todas as informações necessárias
 para que o agente se identifique corretamente e conheça
 suas capacidades.
 """
-import sys
-sys.path.insert(0, "/opt/vps-agent/core")
-
 from typing import Dict, List
 
 
@@ -30,7 +27,7 @@ def get_system_info() -> str:
 def get_capabilities_list() -> str:
     """Retorna lista de capacidades implementadas."""
     try:
-        from capabilities import capabilities_registry
+        from ..capabilities import capabilities_registry
         
         caps = capabilities_registry.get_implemented_capabilities()
         cap_lines = []
