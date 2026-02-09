@@ -4,8 +4,8 @@ Define o fluxo de decisão completo com Self-Improvement.
 """
 from langgraph.graph import StateGraph
 
-from vps_langgraph.memory import AgentMemory
-from vps_langgraph.nodes import (
+from .memory import AgentMemory
+from .nodes import (
     node_check_capabilities,
     node_classify_intent,
     node_execute,
@@ -16,7 +16,7 @@ from vps_langgraph.nodes import (
     node_save_memory,
     node_self_improve,
 )
-from vps_langgraph.state import AgentState
+from .state import AgentState
 
 memory = AgentMemory()
 
