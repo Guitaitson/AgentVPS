@@ -47,7 +47,7 @@ class Session:
 class SessionManager:
     """
     Manages user sessions for conversation continuity.
-    
+
     Provides in-memory session storage with optional Redis backing
     for distributed deployments.
     """
@@ -58,7 +58,7 @@ class SessionManager:
     def __init__(self, redis_client=None, timeout: int = None, max_messages: int = None):
         """
         Initialize the session manager.
-        
+
         Args:
             redis_client: Optional Redis client for distributed storage
             timeout: Session timeout in seconds (default 1 hour)
@@ -76,11 +76,11 @@ class SessionManager:
     async def create_session(self, user_id: str, metadata: Dict[str, Any] = None) -> Session:
         """
         Create a new session for a user.
-        
+
         Args:
             user_id: User identifier
             metadata: Optional initial metadata
-        
+
         Returns:
             Created session
         """
@@ -108,10 +108,10 @@ class SessionManager:
     async def get_session(self, session_id: str) -> Optional[Session]:
         """
         Get a session by ID.
-        
+
         Args:
             session_id: Session identifier
-        
+
         Returns:
             Session if found, None otherwise
         """
@@ -129,7 +129,7 @@ class SessionManager:
     async def update_session(self, session: Session) -> None:
         """
         Update an existing session.
-        
+
         Args:
             session: Session to update
         """
@@ -148,10 +148,10 @@ class SessionManager:
     async def end_session(self, session_id: str) -> bool:
         """
         End and delete a session.
-        
+
         Args:
             session_id: Session identifier
-        
+
         Returns:
             True if session was deleted, False if not found
         """
@@ -168,7 +168,7 @@ class SessionManager:
     async def add_message(self, session: Session, role: str, content: str) -> None:
         """
         Add a message to the session history.
-        
+
         Args:
             session: Session to update
             role: Message role (user, assistant, system)
@@ -195,10 +195,10 @@ class SessionManager:
     async def get_conversation_history(self, session_id: str) -> list:
         """
         Get conversation history for a session.
-        
+
         Args:
             session_id: Session identifier
-        
+
         Returns:
             List of messages
         """
@@ -211,9 +211,9 @@ class SessionManager:
     async def cleanup_expired(self) -> int:
         """
         Clean up expired sessions.
-        
+
         Note: This only works for local sessions, Redis handles expiry automatically.
-        
+
         Returns:
             Number of sessions cleaned up
         """
@@ -235,12 +235,12 @@ class SessionManager:
     async def get_user_sessions(self, user_id: str) -> list:
         """
         Get all active sessions for a user.
-        
+
         Note: This only works for local sessions.
-        
+
         Args:
             user_id: User identifier
-        
+
         Returns:
             List of active sessions
         """

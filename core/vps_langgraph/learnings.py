@@ -54,7 +54,7 @@ def db_cursor():
 def init_learnings_table():
     """
     Inicializa a tabela learnings se não existir.
-    
+
     Returns:
         True se a tabela foi criada com sucesso
     """
@@ -67,20 +67,20 @@ def init_learnings_table():
         success BOOLEAN DEFAULT TRUE,
         metadata JSONB DEFAULT '{}',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        
+
         -- Índices para busca eficiente
         CONSTRAINT learnings_category_check CHECK (category IN (
-            'api_failure', 'tool_choice', 'execution_error', 
+            'api_failure', 'tool_choice', 'execution_error',
             'user_feedback', 'system_learning', 'security'
         ))
     );
-    
+
     -- Índice para buscar por categoria
     CREATE INDEX IF NOT EXISTS learnings_category_idx ON learnings(category);
-    
+
     -- Índice para buscar por gatilho (uso de texto simples)
     CREATE INDEX IF NOT EXISTS learnings_trigger_idx ON learnings USING gin(to_tsvector('portuguese', trigger));
-    
+
     -- Índice para buscar por lição
     CREATE INDEX IF NOT EXISTS learnings_lesson_idx ON learnings USING gin(to_tsvector('portuguese', lesson));
     """
@@ -118,14 +118,14 @@ class LearningsManager:
     ) -> int:
         """
         Adiciona um novo aprendizado.
-        
+
         Args:
             category: Categoria do aprendizado
             trigger: O que disparou o aprendizado
             lesson: O que foi aprendido
             success: Se foi um sucesso ou falha
             metadata: Metadados adicionais
-        
+
         Returns:
             ID do aprendizado criado
         """
@@ -166,12 +166,12 @@ class LearningsManager:
     ) -> List[Dict[str, Any]]:
         """
         Recupera aprendizados.
-        
+
         Args:
             category: Filtrar por categoria (opcional)
             limit: Número máximo de resultados
             offset: Deslocamento para paginação
-        
+
         Returns:
             Lista de aprendizados
         """
@@ -200,18 +200,18 @@ class LearningsManager:
     def search_learnings(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Busca aprendizados por palavra-chave.
-        
+
         Args:
             query: Termo de busca
             limit: Número máximo de resultados
-        
+
         Returns:
             Lista de aprendizados encontrados
         """
         self.ensure_initialized()
 
         search_sql = """
-        SELECT * FROM learnings 
+        SELECT * FROM learnings
         WHERE trigger ILIKE %s OR lesson ILIKE %s
         ORDER BY created_at DESC
         LIMIT %s
@@ -233,19 +233,19 @@ class LearningsManager:
     def get_recent_failures(self, days: int = 7, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Recupera falhas recentes para análise.
-        
+
         Args:
             days: Número de dias para buscar
             limit: Número máximo de resultados
-        
+
         Returns:
             Lista de falhas recentes
         """
         self.ensure_initialized()
 
         query = """
-        SELECT * FROM learnings 
-        WHERE success = FALSE 
+        SELECT * FROM learnings
+        WHERE success = FALSE
         AND created_at > NOW() - INTERVAL '%s days'
         ORDER BY created_at DESC
         LIMIT %s
@@ -271,11 +271,11 @@ class LearningsManager:
     ) -> List[str]:
         """
         Recupera lições relevantes antes de executar uma ação.
-        
+
         Args:
             action_type: Tipo de ação (ex: 'github_api', 'web_search')
             context: Contexto adicional da ação
-        
+
         Returns:
             Lista de lições aprendidas
         """
@@ -302,12 +302,12 @@ class LearningsManager:
     ) -> int:
         """
         Registra falha de API específica.
-        
+
         Args:
             api_name: Nome da API que falhou
             error: Erro ocorrido
             suggestion: Sugestão de solução
-        
+
         Returns:
             ID do aprendizado criado
         """
@@ -327,12 +327,12 @@ class LearningsManager:
     ) -> int:
         """
         Registra escolha de ferramenta e seu resultado.
-        
+
         Args:
             tool: Ferramenta escolhida
             reason: Razão da escolha
             outcome: Resultado da execução
-        
+
         Returns:
             ID do aprendizado criado
         """
@@ -347,14 +347,14 @@ class LearningsManager:
     def get_summary(self) -> Dict[str, Any]:
         """
         Retorna resumo dos aprendizados.
-        
+
         Returns:
             Dicionário com estatísticas
         """
         self.ensure_initialized()
 
         query = """
-        SELECT 
+        SELECT
             category,
             COUNT(*) as total,
             SUM(CASE WHEN success = TRUE THEN 1 ELSE 0 END) as successes,
@@ -401,12 +401,12 @@ learnings_manager = LearningsManager()
 def record_failure_and_continue(api_name: str, error: str, suggestion: str = ""):
     """
     Registra falha e retorna lições aprendidas anteriormente.
-    
+
     Args:
         api_name: Nome da API que falhou
         error: Erro ocorrido
         suggestion: Sugestão de solução
-    
+
     Returns:
         Lista de lições aprendidas anteriormente
     """
@@ -420,11 +420,11 @@ def record_failure_and_continue(api_name: str, error: str, suggestion: str = "")
 def check_before_action(action_type: str, context: str = "") -> Dict[str, Any]:
     """
     Verifica lições aprendidas antes de executar uma ação.
-    
+
     Args:
         action_type: Tipo da ação
         context: Contexto adicional
-    
+
     Returns:
         Dicionário com lições relevantes
     """

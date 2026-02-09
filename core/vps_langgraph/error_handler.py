@@ -129,10 +129,10 @@ class NetworkError(VPSAgentError):
 def categorize_error(error: Exception) -> ErrorCategory:
     """
     Categoriza um erro baseado no tipo.
-    
+
     Args:
         error: Exceção a categorizar
-        
+
     Returns:
         Categoria do erro
     """
@@ -171,12 +171,12 @@ def wrap_error(
 ) -> VPSAgentError:
     """
     Envolve uma exceção em VPSAgentError.
-    
+
     Args:
         error: Exceção original
         user_message: Mensagem para o usuário (opcional)
         metadata: Metadados adicionais (opcional)
-        
+
     Returns:
         VPSAgentError envolvido
     """
@@ -194,10 +194,10 @@ def wrap_error(
 def format_error_for_user(error: Exception) -> str:
     """
     Formata um erro para exibição ao usuário.
-    
+
     Args:
         error: Exceção a formatar
-        
+
     Returns:
         Mensagem formatada para usuário
     """
@@ -237,7 +237,7 @@ def log_error(
 ):
     """
     Faz logging estruturado de erro.
-    
+
     Args:
         error: Exceção a logar
         context: Contexto adicional
@@ -272,13 +272,13 @@ def error_handler(
 ):
     """
     Decorador para tratamento de erros em funções.
-    
+
     Args:
         user_message: Mensagem para o usuário em caso de erro
         fallback: Função fallback em caso de erro
         default_return: Valor padrão de retorno
         log_context: Contexto para logging
-        
+
     Returns:
         Decorator
     """
@@ -310,10 +310,10 @@ def error_handler(
 def suggest_recovery(error: Exception) -> str:
     """
     Sugere ações de recuperação baseadas no erro.
-    
+
     Args:
         error: Erro ocorrido
-        
+
     Returns:
         Sugestão de recuperação
     """
@@ -339,7 +339,7 @@ def suggest_recovery(error: Exception) -> str:
 def check_system_health() -> Dict[str, Any]:
     """
     Verifica a saúde do sistema.
-    
+
     Returns:
         Dicionário com status de saúde
     """

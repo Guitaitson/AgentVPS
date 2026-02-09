@@ -108,10 +108,10 @@ SKILL_GUIDE = {
 def detect_missing_skill_keywords(message: str) -> list:
     """
     Detecta palavras-chave que indicam habilidades faltantes.
-    
+
     Args:
         message: Mensagem do usuário (já em lowercase)
-    
+
     Returns:
         Lista de chaves de habilidades detectadas
     """
@@ -129,15 +129,15 @@ def generate_smart_unavailable_response(
 ) -> str:
     """
     Gera uma resposta inteligente quando uma habilidade não está disponível.
-    
+
     Esta função implementa a recomendação do Opus 4.6:
     "Em vez de 'não tenho ferramenta direta', responder com plano de ação"
-    
+
     Args:
         user_message: Mensagem original do usuário
         detected_skills: Lista de habilidades detectadas como faltantes
         intent: Intento classificado
-    
+
     Returns:
         Resposta formatada com plano de ação
     """
@@ -177,10 +177,10 @@ def generate_smart_unavailable_response(
 def _generate_generic_unavailable_response(intent: str) -> str:
     """
     Gera resposta genérica quando não detecta skill específica.
-    
+
     Args:
         intent: Intento classificado
-    
+
     Returns:
         Resposta genérica formatada
     """
@@ -227,11 +227,11 @@ def generate_capability_detected_response(
 ) -> str:
     """
     Gera resposta quando uma capacidade é detectada.
-    
+
     Args:
         capability_name: Nome da capacidade
         is_implemented: Se já está implementada
-    
+
     Returns:
         Resposta formatada
     """
@@ -254,13 +254,13 @@ def create_learning_message(
 ) -> str:
     """
     Cria uma mensagem formatada para registrar um aprendizado.
-    
+
     Args:
         category: Categoria do aprendizado (api_failure, tool_choice, etc.)
         trigger: O que disparou o aprendizado
         lesson: O que foi aprendido
         success: Se foi um sucesso ou falha
-    
+
     Returns:
         Mensagem formatada para logging/registro
     """
@@ -280,7 +280,7 @@ def create_learning_message(
 def get_capabilities_summary() -> str:
     """
     Retorna resumo das capacidades atuais do agente.
-    
+
     Returns:
         String formatada com resumo
     """

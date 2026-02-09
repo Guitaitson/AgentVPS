@@ -190,12 +190,12 @@ class PromptComposer:
     ) -> ComposedPrompt:
         """
         Compõe um prompt baseado em um template e contexto.
-        
+
         Args:
             template_name: Nome do template a usar
             context: Contexto da conversa
             additional_vars: Variáveis adicionais
-            
+
         Returns:
             Prompt composto
         """
@@ -244,11 +244,11 @@ class PromptComposer:
     ) -> ComposedPrompt:
         """
         Compõe um prompt baseado na intenção do usuário.
-        
+
         Args:
             intent: Intenção classificada
             context: Contexto da conversa
-            
+
         Returns:
             Prompt composto
         """
@@ -272,11 +272,11 @@ class PromptComposer:
     ) -> ComposedPrompt:
         """
         Compõe um prompt com consciência de contexto expandida.
-        
+
         Args:
             context: Contexto da conversa
             max_history_items: Máximo de itens do histórico
-            
+
         Returns:
             Prompt composto com contexto expandido
         """
@@ -301,11 +301,11 @@ class PromptComposer:
     ) -> ComposedPrompt:
         """
         Otimiza o prompt para respeitar limite de tokens.
-        
+
         Args:
             prompt: Prompt composto
             max_tokens: Máximo de tokens permitido
-            
+
         Returns:
             Prompt otimizado
         """

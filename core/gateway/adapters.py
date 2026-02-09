@@ -35,14 +35,14 @@ class TelegramUpdate:
 class TelegramAdapter:
     """
     Adapter for Telegram Bot API.
-    
+
     Handles incoming updates and formats them for the agent.
     """
 
     def __init__(self, bot_token: str = None):
         """
         Initialize the Telegram adapter.
-        
+
         Args:
             bot_token: Telegram Bot Token (loaded from env if not provided)
         """
@@ -52,10 +52,10 @@ class TelegramAdapter:
     def process_update(self, update: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a Telegram update.
-        
+
         Args:
             update: Raw update from Telegram webhook
-        
+
         Returns:
             Formatted result for agent processing
         """
@@ -152,12 +152,12 @@ class TelegramAdapter:
     def send_message(self, chat_id: str, text: str, **kwargs) -> Dict[str, Any]:
         """
         Send a message to a chat.
-        
+
         Args:
             chat_id: Target chat ID
             text: Message text
             **kwargs: Additional parameters (parse_mode, reply_markup, etc.)
-        
+
         Returns:
             API response
         """
@@ -201,14 +201,14 @@ class TelegramAdapter:
 class WebhookAdapter:
     """
     Generic webhook adapter.
-    
+
     Handles incoming webhooks from various sources.
     """
 
     def __init__(self, secret_token: str = None):
         """
         Initialize the webhook adapter.
-        
+
         Args:
             secret_token: Optional secret token for verification
         """
@@ -217,12 +217,12 @@ class WebhookAdapter:
     def verify_signature(self, request: Any, payload: bytes, signature: str = None) -> bool:
         """
         Verify webhook signature.
-        
+
         Args:
             request: FastAPI request object
             payload: Raw request body
             signature: Signature from header
-        
+
         Returns:
             True if signature is valid
         """
@@ -251,12 +251,12 @@ class WebhookAdapter:
     def process_webhook(self, source: str, data: Dict[str, Any], headers: Dict[str, str] = None) -> Dict[str, Any]:
         """
         Process a generic webhook.
-        
+
         Args:
             source: Webhook source identifier
             data: Webhook payload
             headers: Request headers
-        
+
         Returns:
             Formatted result for agent processing
         """

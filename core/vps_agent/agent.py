@@ -15,13 +15,13 @@ logger = structlog.get_logger()
 async def process_message_async(user_id: str, message: str) -> str:
     """
     Processa mensagem do usuário através do LangGraph.
-    
+
     Esta é a função principal que conecta o Telegram Bot ao agente LangGraph.
-    
+
     Args:
         user_id: ID do usuário no Telegram
         message: Mensagem enviada pelo usuário
-    
+
     Returns:
         Resposta gerada pelo agente
     """
@@ -58,7 +58,7 @@ async def process_message_async(user_id: str, message: str) -> str:
 def get_agent_status() -> Dict[str, Any]:
     """
     Retorna status atual do agente.
-    
+
     Returns:
         Dicionário com informações sobre o agente
     """

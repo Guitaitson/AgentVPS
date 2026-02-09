@@ -210,12 +210,12 @@ class LoggerManager:
     ) -> StructuredLogger:
         """
         Obtém ou cria um logger.
-        
+
         Args:
             name: Nome do logger
             level: Nível de log
             output: Arquivo de saída (opcional)
-            
+
         Returns:
             Instância do logger
         """
@@ -245,7 +245,7 @@ def log_performance(
 ) -> None:
     """
     Loga uma métrica de performance.
-    
+
     Args:
         logger: Logger a usar
         operation: Nome da operação
@@ -273,7 +273,7 @@ def log_error(
 ) -> None:
     """
     Loga um erro.
-    
+
     Args:
         logger: Logger a usar
         error: Exceção a logar
@@ -300,10 +300,10 @@ def log_error(
 def get_logger(name: str) -> StructuredLogger:
     """
     Obtém um logger pelo nome.
-    
+
     Args:
         name: Nome do logger
-        
+
     Returns:
         Instância do logger
     """

@@ -139,7 +139,7 @@ async def root():
 async def health_check():
     """
     Health check endpoint.
-    
+
     Returns the status of the gateway and its dependencies.
     """
     components = {}
@@ -180,7 +180,7 @@ async def send_message(
 ):
     """
     Send a message to the agent.
-    
+
     This is the main endpoint for interacting with the agent via HTTP.
     """
     # Rate limiting
@@ -234,7 +234,7 @@ async def get_capabilities():
 async def telegram_webhook(request: Request):
     """
     Telegram webhook endpoint.
-    
+
     Receives updates from Telegram and processes them through the agent.
     """
     # Verify rate limit

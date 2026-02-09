@@ -126,10 +126,10 @@ SKILL_INDICATORS = {
 def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
     """
     Classifica a intencao do usuario com base na mensagem.
-    
+
     Args:
         message: Mensagem do usuario
-        
+
     Returns:
         Tupla de (intent, confidence, details)
         - intent: Enum da intencao classificada
@@ -212,11 +212,11 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
 def _check_keywords(message: str, keywords: List[str]) -> float:
     """
     Calcula score baseado em palavras-chave encontradas.
-    
+
     Args:
         message: Mensagem processada
         keywords: Lista de palavras-chave
-        
+
     Returns:
         Score de 0.0 a 1.0
     """
@@ -236,11 +236,11 @@ def _check_keywords(message: str, keywords: List[str]) -> float:
 def _get_matched_keywords(message: str, keywords: List[str]) -> List[str]:
     """
     Retorna lista de palavras-chave encontradas na mensagem.
-    
+
     Args:
         message: Mensagem processada
         keywords: Lista de palavras-chave
-        
+
     Returns:
         Lista de palavras-chave encontradas
     """
@@ -250,10 +250,10 @@ def _get_matched_keywords(message: str, keywords: List[str]) -> List[str]:
 def _detect_skill_indicators(message: str) -> Dict[str, bool]:
     """
     Detecta indicadores de skills que podem estar faltando.
-    
+
     Args:
         message: Mensagem processada
-        
+
     Returns:
         Dicionario com skills detectadas
     """
@@ -270,11 +270,11 @@ def classify_with_context(
 ) -> Dict[str, Any]:
     """
     Classifica intencao considerando contexto da conversa.
-    
+
     Args:
         message: Mensagem atual
         conversation_history: Historico de mensagens anteriores
-        
+
     Returns:
         Dicionario completo com classificacao
     """
@@ -310,10 +310,10 @@ def classify_with_context(
 def get_intent_description(intent: Intent) -> str:
     """
     Retorna descricao legivel do intent.
-    
+
     Args:
         intent: Enum do intent
-        
+
     Returns:
         Descricao formatada
     """
@@ -331,10 +331,10 @@ def get_intent_description(intent: Intent) -> str:
 def suggest_alternatives(message: str) -> List[str]:
     """
     Sugere alternativas quando a classificacao e incerta.
-    
+
     Args:
         message: Mensagem original
-        
+
     Returns:
         Lista de sugestoes
     """
@@ -395,11 +395,11 @@ Historico recente: {history}
 def build_classification_prompt(message: str, history: str = "") -> str:
     """
     Constroi prompt para classificacao por LLM.
-    
+
     Args:
         message: Mensagem a classificar
         history: Historico formatado
-        
+
     Returns:
         Prompt completo
     """

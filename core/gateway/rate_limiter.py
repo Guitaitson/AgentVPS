@@ -21,7 +21,7 @@ class RateLimitConfig:
 class RateLimiter:
     """
     Token bucket rate limiter.
-    
+
     Tracks requests per client and enforces rate limits.
     """
 
@@ -52,11 +52,11 @@ class RateLimiter:
     def allow_request(self, client_id: str, window: int = 60) -> bool:
         """
         Check if a request is allowed for the given client.
-        
+
         Args:
             client_id: Unique identifier for the client
             window: Time window in seconds (default 60 for per-minute)
-        
+
         Returns:
             True if the request is allowed, False otherwise
         """
@@ -90,7 +90,7 @@ class RateLimiter:
 class DistributedRateLimiter:
     """
     Redis-backed distributed rate limiter for multi-instance deployments.
-    
+
     Uses Redis INCR and EXPIRE for atomic operations.
     """
 
@@ -101,7 +101,7 @@ class DistributedRateLimiter:
     async def allow_request(self, client_id: str, limit: int = 60) -> bool:
         """
         Check if a request is allowed using Redis.
-        
+
         Falls back to local limiter if Redis is unavailable.
         """
         if not self.redis:

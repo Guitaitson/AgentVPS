@@ -61,7 +61,7 @@ class SystemHealth:
 class HealthCheck:
     """
     Verificações de saúde para o agente.
-    
+
     Provides methods to check:
     - PostgreSQL connection
     - Redis connection
@@ -87,7 +87,7 @@ class HealthCheck:
     ):
         """
         Inicializa o health check.
-        
+
         Args:
             postgres_dsn: Data Source Name para PostgreSQL
             redis_url: URL de conexão para Redis
@@ -491,7 +491,7 @@ class HealthCheck:
 class Doctor:
     """
     Doctor - Diagnostic tool for the agent.
-    
+
     Provides comprehensive health reports and recommendations.
     """
 
@@ -502,7 +502,7 @@ class Doctor:
     def diagnose(self) -> Dict[str, Any]:
         """
         Run comprehensive diagnosis.
-        
+
         Returns:
             Dict with overall status, results, and recommendations.
         """
@@ -624,12 +624,12 @@ async def run_health_check(
 ) -> Dict[str, Any]:
     """
     Run health check (sync or async wrapper).
-    
+
     Args:
         postgres_dsn: PostgreSQL connection string
         redis_url: Redis connection URL
         full: Run full check or quick check
-    
+
     Returns:
         Health check results
     """

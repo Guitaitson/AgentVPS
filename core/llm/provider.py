@@ -70,11 +70,11 @@ class LLMProvider(ABC):
     ) -> LLMResponse:
         """
         Gera uma resposta do LLM.
-        
+
         Args:
             messages: Lista de mensagens
             **kwargs: Parâmetros adicionais
-            
+
         Returns:
             Resposta do LLM
         """
@@ -88,11 +88,11 @@ class LLMProvider(ABC):
     ):
         """
         Gera uma resposta em streaming.
-        
+
         Args:
             messages: Lista de mensagens
             **kwargs: Parâmetros adicionais
-            
+
         Yields:
             Chunks da resposta
         """
@@ -320,10 +320,10 @@ class LLMProviderFactory:
     def create(cls, config: LLMConfig) -> LLMProvider:
         """
         Cria um provedor de LLM baseado na configuração.
-        
+
         Args:
             config: Configuração do provedor
-            
+
         Returns:
             Instância do provedor
         """
@@ -341,7 +341,7 @@ class LLMProviderFactory:
     ) -> None:
         """
         Registra um novo provedor.
-        
+
         Args:
             provider_type: Tipo do provedor
             provider_class: Classe do provedor

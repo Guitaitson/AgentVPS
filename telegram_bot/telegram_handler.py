@@ -33,7 +33,7 @@ def get_bot() -> Optional[Bot]:
 class TelegramLogHandler(logging.Handler):
     """
     Handler de logging que envia mensagens CRITICAL para Telegram.
-    
+
     Uso:
         handler = TelegramLogHandler()
         logger.addHandler(handler)
@@ -90,7 +90,7 @@ class TelegramLogHandler(logging.Handler):
 class TelegramNotifier:
     """
     Classe para enviar notificações específicas via Telegram.
-    
+
     Uso:
         notifier = TelegramNotifier()
         notifier.send_critical("Container com alta RAM")
@@ -164,7 +164,7 @@ class TelegramNotifier:
 def setup_telegram_logging(logger_name: str = None) -> tuple:
     """
     Configura logging com Telegram Handler.
-    
+
     Returns:
         tuple: (structlog logger, TelegramNotifier instance)
     """

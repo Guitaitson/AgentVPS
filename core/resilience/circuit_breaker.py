@@ -125,15 +125,15 @@ class CircuitBreaker:
     def call(self, func: Callable, *args, **kwargs) -> Any:
         """
         Executa uma função com proteção do circuit breaker.
-        
+
         Args:
             func: Função a executar
             *args: Argumentos posicionais
             **kwargs: Argumentos nomeados
-            
+
         Returns:
             Resultado da função
-            
+
         Raises:
             CircuitBreakerError: Se o circuito estiver aberto
         """
@@ -154,15 +154,15 @@ class CircuitBreaker:
     async def call_async(self, func: Callable, *args, **kwargs) -> Any:
         """
         Executa uma função assíncrona com proteção do circuit breaker.
-        
+
         Args:
             func: Função a executar
             *args: Argumentos posicionais
             **kwargs: Argumentos nomeados
-            
+
         Returns:
             Resultado da função
-            
+
         Raises:
             CircuitBreakerError: Se o circuito estiver aberto
         """
@@ -232,16 +232,16 @@ async def retry_with_backoff(
 ) -> Any:
     """
     Executa uma função com retry e backoff exponencial.
-    
+
     Args:
         func: Função a executar
         policy: Política de retry
         *args: Argumentos posicionais
         **kwargs: Argumentos nomeados
-        
+
     Returns:
         Resultado da função
-        
+
     Raises:
         RetryError: Se todas as tentativas falharem
     """
@@ -271,16 +271,16 @@ def retry_with_backoff_sync(
 ) -> Any:
     """
     Executa uma função síncrona com retry e backoff exponencial.
-    
+
     Args:
         func: Função a executar
         policy: Política de retry
         *args: Argumentos posicionais
         **kwargs: Argumentos nomeados
-        
+
     Returns:
         Resultado da função
-        
+
     Raises:
         RetryError: Se todas as tentativas falharem
     """
@@ -320,11 +320,11 @@ class ErrorHandler:
     def handle(self, error: Exception, context: Optional[Dict[str, Any]] = None) -> Any:
         """
         Trata um erro.
-        
+
         Args:
             error: Exceção a tratar
             context: Contexto adicional
-            
+
         Returns:
             Resultado do handler
         """

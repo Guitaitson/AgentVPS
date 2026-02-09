@@ -94,12 +94,12 @@ class SecurityAllowlist:
     ) -> AllowlistResult:
         """
         Verifica se uma operação é permitida.
-        
+
         Args:
             resource_type: Tipo de recurso
             value: Valor a verificar
             context: Contexto adicional
-            
+
         Returns:
             Resultado da verificação
         """

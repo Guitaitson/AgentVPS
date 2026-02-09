@@ -67,7 +67,7 @@ class AgentMemory:
             """
             INSERT INTO agent_memory (user_id, memory_type, key, value, confidence)
             VALUES (%s, 'fact', %s, %s, %s)
-            ON CONFLICT (user_id, memory_type, key) 
+            ON CONFLICT (user_id, memory_type, key)
             DO UPDATE SET value = EXCLUDED.value, confidence = EXCLUDED.confidence
             """,
             (user_id, key, Json(value), confidence)
