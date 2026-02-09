@@ -10,8 +10,9 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 # Import from the package
-from core.vps_agent.agent import process_message_async
 import asyncio
+
+from core.vps_agent.agent import process_message_async
 
 
 def test_process_message():

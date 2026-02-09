@@ -11,12 +11,12 @@ Este módulo implementa recomendações para melhorar error handling:
 """
 
 import traceback
-import structlog
-from typing import Optional, Dict, Any, Callable
-from functools import wraps
 from datetime import datetime
 from enum import Enum
+from functools import wraps
+from typing import Any, Callable, Dict, Optional
 
+import structlog
 
 logger = structlog.get_logger()
 
@@ -36,7 +36,7 @@ class ErrorCategory(Enum):
 
 class VPSAgentError(Exception):
     """Exceção base do agente VPS."""
-    
+
     def __init__(
         self,
         message: str,
@@ -54,7 +54,7 @@ class VPSAgentError(Exception):
         self.user_message = user_message or self._default_user_message()
         self.metadata = metadata or {}
         self.timestamp = datetime.now().isoformat()
-    
+
     def _default_user_message(self) -> str:
         """Retorna mensagem amigável baseada na categoria."""
         messages = {
@@ -69,7 +69,7 @@ class VPSAgentError(Exception):
             ErrorCategory.UNKNOWN: "Ocorreu um erro inesperado. Tente novamente.",
         }
         return messages.get(self.category, "Ocorreu um erro.")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário."""
         return {
@@ -85,7 +85,7 @@ class VPSAgentError(Exception):
 
 class ValidationError(VPSAgentError):
     """Erro de validação de entrada."""
-    
+
     def __init__(self, message: str, field: Optional[str] = None, **kwargs):
         super().__init__(message, ErrorCategory.VALIDATION, **kwargs)
         self.field = field
@@ -96,7 +96,7 @@ class ValidationError(VPSAgentError):
 
 class ExecutionError(VPSAgentError):
     """Erro durante execução de comando."""
-    
+
     def __init__(self, message: str, command: Optional[str] = None, **kwargs):
         super().__init__(message, ErrorCategory.EXECUTION, **kwargs)
         self.command = command
@@ -106,7 +106,7 @@ class ExecutionError(VPSAgentError):
 
 class DatabaseError(VPSAgentError):
     """Erro de banco de dados."""
-    
+
     def __init__(self, message: str, query: Optional[str] = None, **kwargs):
         super().__init__(message, ErrorCategory.DATABASE, **kwargs)
         self.query = query
@@ -116,7 +116,7 @@ class DatabaseError(VPSAgentError):
 
 class NetworkError(VPSAgentError):
     """Erro de rede."""
-    
+
     def __init__(self, message: str, url: Optional[str] = None, **kwargs):
         super().__init__(message, ErrorCategory.NETWORK, **kwargs)
         self.url = url
@@ -138,29 +138,29 @@ def categorize_error(error: Exception) -> ErrorCategory:
     """
     error_type = type(error).__name__
     error_message = str(error).lower()
-    
+
     # Padrões de categorização
     if "validation" in error_type.lower() or "value" in error_message:
         return ErrorCategory.VALIDATION
-    
+
     if "timeout" in error_message or "timed out" in error_message:
         return ErrorCategory.TIMEOUT
-    
+
     if any(kw in error_message for kw in ["connection", "network", "socket", "dns"]):
         return ErrorCategory.NETWORK
-    
+
     if any(kw in error_message for kw in ["postgres", "psycopg", "redis", "database", "sql"]):
         return ErrorCategory.DATABASE
-    
+
     if any(kw in error_message for kw in ["auth", "token", "credential", "password", "api_key"]):
         return ErrorCategory.AUTHENTICATION
-    
+
     if any(kw in error_message for kw in ["permission", "denied", "access", "forbidden", "unauthorized"]):
         return ErrorCategory.PERMISSION
-    
+
     if any(kw in error_message for kw in ["memory", "ram", "disk", "space", "quota", "limit"]):
         return ErrorCategory.RESOURCE
-    
+
     return ErrorCategory.UNKNOWN
 
 
@@ -181,7 +181,7 @@ def wrap_error(
         VPSAgentError envolvido
     """
     category = categorize_error(error)
-    
+
     return VPSAgentError(
         message=str(error) or error.__class__.__name__,
         category=category,
@@ -204,10 +204,10 @@ def format_error_for_user(error: Exception) -> str:
     # Se já é VPSAgentError
     if isinstance(error, VPSAgentError):
         return error.user_message
-    
+
     # Categorizar e formatar
     category = categorize_error(error)
-    
+
     prefixes = {
         ErrorCategory.VALIDATION: "⚠️",
         ErrorCategory.EXECUTION: "❌",
@@ -219,14 +219,14 @@ def format_error_for_user(error: Exception) -> str:
         ErrorCategory.TIMEOUT: "⏰",
         ErrorCategory.UNKNOWN: "❓",
     }
-    
+
     prefix = prefixes.get(category, "❌")
     base_message = str(error) if str(error) else "Ocorreu um erro"
-    
+
     # Truncar mensagens longas
     if len(base_message) > 200:
         base_message = base_message[:200] + "..."
-    
+
     return f"{prefix} {base_message}"
 
 
@@ -248,10 +248,10 @@ def log_error(
         "error_message": str(error),
         "category": categorize_error(error).value,
     }
-    
+
     if context:
         error_info["context"] = context
-    
+
     if isinstance(error, VPSAgentError):
         error_info.update({
             "recoverable": error.recoverable,
@@ -318,7 +318,7 @@ def suggest_recovery(error: Exception) -> str:
         Sugestão de recuperação
     """
     category = categorize_error(error)
-    
+
     suggestions = {
         ErrorCategory.VALIDATION: "Verifique os dados fornecidos e tente novamente.",
         ErrorCategory.EXECUTION: "Tente executar a operação novamente. Se persistir, reporte o erro.",
@@ -330,7 +330,7 @@ def suggest_recovery(error: Exception) -> str:
         ErrorCategory.TIMEOUT: "A operação demorou muito. Tente novamente.",
         ErrorCategory.UNKNOWN: "Ocorreu um erro desconhecido. Tente novamente.",
     }
-    
+
     return suggestions.get(category, "Tente novamente.")
 
 
@@ -344,13 +344,14 @@ def check_system_health() -> Dict[str, Any]:
         Dicionário com status de saúde
     """
     import subprocess
-    
+
     checks = {}
-    
+
     # Verificar PostgreSQL
     try:
-        import psycopg2
         import os
+
+        import psycopg2
         conn = psycopg2.connect(
             host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
             port=int(os.getenv("POSTGRES_PORT", 5432)),
@@ -363,7 +364,7 @@ def check_system_health() -> Dict[str, Any]:
         checks["postgresql"] = {"status": "healthy", "latency_ms": "<10"}
     except Exception as e:
         checks["postgresql"] = {"status": "unhealthy", "error": str(e)[:100]}
-    
+
     # Verificar Redis
     try:
         import redis
@@ -376,7 +377,7 @@ def check_system_health() -> Dict[str, Any]:
         checks["redis"] = {"status": "healthy", "latency_ms": "<10"}
     except Exception as e:
         checks["redis"] = {"status": "unhealthy", "error": str(e)[:100]}
-    
+
     # Verificar memória
     try:
         result = subprocess.run(["free", "-m"], capture_output=True, text=True, timeout=5)
@@ -394,12 +395,12 @@ def check_system_health() -> Dict[str, Any]:
             }
     except Exception as e:
         checks["memory"] = {"status": "unknown", "error": str(e)[:100]}
-    
+
     # Status geral
     all_healthy = all(c.get("status") == "healthy" for c in checks.values())
     checks["overall"] = {
         "status": "healthy" if all_healthy else "degraded",
         "timestamp": datetime.now().isoformat(),
     }
-    
+
     return checks

@@ -6,10 +6,11 @@ Modelos suportados:
 - openai/gpt-4o
 - anthropic/claude-sonnet-4-20250514
 """
-import os
 import asyncio
+import os
+from typing import Dict, List
+
 import httpx
-from typing import List, Dict
 from dotenv import load_dotenv
 
 load_dotenv("/opt/vps-agent/core/.env")
@@ -57,12 +58,12 @@ def get_capabilities_context() -> str:
     try:
         from capabilities import capabilities_registry
         caps = capabilities_registry.get_implemented_capabilities()
-        
+
         lines = ["## Suas Capacidades Atuais"]
         for cap in caps:
             status = "✅" if cap.implemented else "❌"
             lines.append(f"{status} **{cap.name}**: {cap.description}")
-        
+
         return "\n".join(lines)
     except Exception as e:
         return f"## Capacidades\n⚠️ Erro ao carregar: {e}"
@@ -107,7 +108,7 @@ def build_system_prompt(user_name: str = "Guilherme") -> str:
         "- Aprender e evoluir com cada interação",
         "- Ser honesto sobre suas capacidades",
     ]
-    
+
     return "\n".join(parts)
 
 
@@ -128,7 +129,7 @@ def build_conversation_prompt(
             context_parts.append("Contexto do usuário:")
             for key, value in facts.items():
                 context_parts.append(f"- {key}: {value}")
-    
+
     # Histórico
     history_parts = []
     if history:
@@ -136,27 +137,27 @@ def build_conversation_prompt(
             role = msg.get("role", "user")
             content = msg.get("content", "")[:200]
             history_parts.append(f"- {role}: {content}")
-    
+
     parts = [
         build_system_prompt(user_name),
         "",
         "=== CONVERSA ATUAL ===",
     ]
-    
+
     if history_parts:
         parts.append("Histórico recente:")
         parts.extend(history_parts)
         parts.append("")
-    
+
     if context_parts:
         parts.extend(context_parts)
         parts.append("")
-    
+
     parts.append(f"Nova mensagem do usuário: \"{user_message}\"")
     parts.append("")
     parts.append("Responda de forma como o VPS-Agent que você é:")
-    
-    return "\ natural e útil,n".join(parts)
+
+    return r"\ natural e útil,n".join(parts)
 
 
 async def generate_response(
@@ -255,13 +256,13 @@ def generate_response_sync(
 
 if __name__ == "__main__":
     print("=== Testing VPS-Agent Identity ===\n")
-    
+
     response = generate_response_sync(
         user_message="Oi, você é um assistente AI?",
         conversation_history=[],
         user_context={},
     )
-    
+
     if response:
         print("Response:")
         print(response)

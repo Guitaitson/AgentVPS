@@ -6,8 +6,8 @@ Abstração para múltiplos provedores de LLM (OpenAI, Anthropic, etc).
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class LLMProviderType(Enum):
@@ -52,16 +52,16 @@ class LLMConfig:
 
 class LLMProvider(ABC):
     """Classe base abstrata para provedores de LLM."""
-    
+
     def __init__(self, config: LLMConfig):
         self.config = config
         self._validate_config()
-    
+
     @abstractmethod
     def _validate_config(self) -> None:
         """Valida a configuração do provedor."""
         pass
-    
+
     @abstractmethod
     async def generate(
         self,
@@ -79,7 +79,7 @@ class LLMProvider(ABC):
             Resposta do LLM
         """
         pass
-    
+
     @abstractmethod
     async def generate_stream(
         self,
@@ -97,7 +97,7 @@ class LLMProvider(ABC):
             Chunks da resposta
         """
         pass
-    
+
     def get_model_info(self) -> Dict[str, Any]:
         """Retorna informações sobre o modelo."""
         return {
@@ -110,12 +110,12 @@ class LLMProvider(ABC):
 
 class OpenAIProvider(LLMProvider):
     """Provedor OpenAI."""
-    
+
     def _validate_config(self) -> None:
         """Valida a configuração do OpenAI."""
         if not self.config.api_key:
             raise ValueError("API key do OpenAI é obrigatória")
-    
+
     async def generate(
         self,
         messages: List[LLMMessage],
@@ -124,29 +124,29 @@ class OpenAIProvider(LLMProvider):
         """Gera uma resposta do OpenAI."""
         try:
             from openai import AsyncOpenAI
-            
+
             client = AsyncOpenAI(
                 api_key=self.config.api_key,
                 base_url=self.config.base_url,
                 timeout=self.config.timeout,
             )
-            
+
             # Converter mensagens para formato OpenAI
             openai_messages = [
                 {"role": msg.role, "content": msg.content}
                 for msg in messages
             ]
-            
+
             # Chamar API
             response = await client.chat.completions.create(
                 model=self.config.model,
                 messages=openai_messages,
                 max_tokens=kwargs.get("max_tokens", self.config.max_tokens),
                 temperature=kwargs.get("temperature", self.config.temperature),
-                **{k: v for k, v in kwargs.items() 
+                **{k: v for k, v in kwargs.items()
                    if k not in ["max_tokens", "temperature"]}
             )
-            
+
             # Extrair resposta
             choice = response.choices[0]
             return LLMResponse(
@@ -161,7 +161,7 @@ class OpenAIProvider(LLMProvider):
             )
         except Exception as e:
             raise RuntimeError(f"Erro ao chamar OpenAI: {e}")
-    
+
     async def generate_stream(
         self,
         messages: List[LLMMessage],
@@ -170,19 +170,19 @@ class OpenAIProvider(LLMProvider):
         """Gera uma resposta em streaming do OpenAI."""
         try:
             from openai import AsyncOpenAI
-            
+
             client = AsyncOpenAI(
                 api_key=self.config.api_key,
                 base_url=self.config.base_url,
                 timeout=self.config.timeout,
             )
-            
+
             # Converter mensagens para formato OpenAI
             openai_messages = [
                 {"role": msg.role, "content": msg.content}
                 for msg in messages
             ]
-            
+
             # Chamar API em streaming
             stream = await client.chat.completions.create(
                 model=self.config.model,
@@ -190,27 +190,27 @@ class OpenAIProvider(LLMProvider):
                 max_tokens=kwargs.get("max_tokens", self.config.max_tokens),
                 temperature=kwargs.get("temperature", self.config.temperature),
                 stream=True,
-                **{k: v for k, v in kwargs.items() 
+                **{k: v for k, v in kwargs.items()
                    if k not in ["max_tokens", "temperature", "stream"]}
             )
-            
+
             # Yield chunks
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-                    
+
         except Exception as e:
             raise RuntimeError(f"Erro ao chamar OpenAI streaming: {e}")
 
 
 class AnthropicProvider(LLMProvider):
     """Provedor Anthropic."""
-    
+
     def _validate_config(self) -> None:
         """Valida a configuração do Anthropic."""
         if not self.config.api_key:
             raise ValueError("API key do Anthropic é obrigatória")
-    
+
     async def generate(
         self,
         messages: List[LLMMessage],
@@ -219,17 +219,17 @@ class AnthropicProvider(LLMProvider):
         """Gera uma resposta do Anthropic."""
         try:
             from anthropic import AsyncAnthropic
-            
+
             client = AsyncAnthropic(
                 api_key=self.config.api_key,
                 timeout=self.config.timeout,
             )
-            
+
             # Converter mensagens para formato Anthropic
             # Anthropic requer que a primeira mensagem seja "system"
             system_message = None
             anthropic_messages = []
-            
+
             for msg in messages:
                 if msg.role == "system":
                     system_message = msg.content
@@ -238,7 +238,7 @@ class AnthropicProvider(LLMProvider):
                         "role": msg.role,
                         "content": msg.content
                     })
-            
+
             # Chamar API
             response = await client.messages.create(
                 model=self.config.model,
@@ -246,10 +246,10 @@ class AnthropicProvider(LLMProvider):
                 messages=anthropic_messages,
                 max_tokens=kwargs.get("max_tokens", self.config.max_tokens),
                 temperature=kwargs.get("temperature", self.config.temperature),
-                **{k: v for k, v in kwargs.items() 
+                **{k: v for k, v in kwargs.items()
                    if k not in ["max_tokens", "temperature"]}
             )
-            
+
             # Extrair resposta
             return LLMResponse(
                 content=response.content[0].text,
@@ -263,7 +263,7 @@ class AnthropicProvider(LLMProvider):
             )
         except Exception as e:
             raise RuntimeError(f"Erro ao chamar Anthropic: {e}")
-    
+
     async def generate_stream(
         self,
         messages: List[LLMMessage],
@@ -272,16 +272,16 @@ class AnthropicProvider(LLMProvider):
         """Gera uma resposta em streaming do Anthropic."""
         try:
             from anthropic import AsyncAnthropic
-            
+
             client = AsyncAnthropic(
                 api_key=self.config.api_key,
                 timeout=self.config.timeout,
             )
-            
+
             # Converter mensagens para formato Anthropic
             system_message = None
             anthropic_messages = []
-            
+
             for msg in messages:
                 if msg.role == "system":
                     system_message = msg.content
@@ -290,7 +290,7 @@ class AnthropicProvider(LLMProvider):
                         "role": msg.role,
                         "content": msg.content
                     })
-            
+
             # Chamar API em streaming
             async with client.messages.stream(
                 model=self.config.model,
@@ -298,24 +298,24 @@ class AnthropicProvider(LLMProvider):
                 messages=anthropic_messages,
                 max_tokens=kwargs.get("max_tokens", self.config.max_tokens),
                 temperature=kwargs.get("temperature", self.config.temperature),
-                **{k: v for k, v in kwargs.items() 
+                **{k: v for k, v in kwargs.items()
                    if k not in ["max_tokens", "temperature"]}
             ) as stream:
                 async for text in stream.text_stream:
                     yield text
-                    
+
         except Exception as e:
             raise RuntimeError(f"Erro ao chamar Anthropic streaming: {e}")
 
 
 class LLMProviderFactory:
     """Fábrica para criar provedores de LLM."""
-    
+
     _providers = {
         LLMProviderType.OPENAI: OpenAIProvider,
         LLMProviderType.ANTHROPIC: AnthropicProvider,
     }
-    
+
     @classmethod
     def create(cls, config: LLMConfig) -> LLMProvider:
         """
@@ -330,9 +330,9 @@ class LLMProviderFactory:
         provider_class = cls._providers.get(config.provider_type)
         if not provider_class:
             raise ValueError(f"Provedor não suportado: {config.provider_type}")
-        
+
         return provider_class(config)
-    
+
     @classmethod
     def register_provider(
         cls,

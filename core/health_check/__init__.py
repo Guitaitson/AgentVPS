@@ -5,12 +5,12 @@ Módulo de verificação de saúde do sistema e diagnóstico.
 """
 
 from .doctor import (
+    Doctor,
     HealthCheck,
-    HealthStatus,
     HealthCheckResult,
+    HealthStatus,
     ServiceHealth,
     SystemHealth,
-    Doctor,
     run_health_check,
 )
 

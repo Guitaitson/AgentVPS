@@ -2,8 +2,8 @@
 Resource Manager — Gerencia RAM subindo/descendo containers sob demanda.
 Regra: nunca ultrapassar 2.4 GB total. Serviços core (~750 MB) sempre ligados.
 """
-import subprocess
 import os
+import subprocess
 
 import structlog
 
@@ -61,7 +61,7 @@ def get_running_tools() -> list:
         capture_output=True, text=True
     )
     containers = result.stdout.strip().split("\n") if result.stdout.strip() else []
-    
+
     running = []
     for tool_name, config in TOOLS_CONFIG.items():
         # Verifica se algum container da ferramenta está rodando
@@ -74,26 +74,26 @@ def can_start_tool(tool_name: str) -> tuple[bool, str]:
     """Verifica se é possível iniciar uma ferramenta."""
     if tool_name not in TOOLS_CONFIG:
         return False, f"Ferramenta '{tool_name}' não existe."
-    
+
     available = get_available_ram()
     needed = TOOLS_CONFIG[tool_name]["ram_mb"]
     running = get_running_tools()
-    
+
     if tool_name in running:
         return False, f"'{tool_name}' já está rodando."
-    
+
     if len(running) >= 2:
         return False, (
             f"Já existem 2 ferramentas rodando ({', '.join(running)}). "
             f"Pare uma antes de iniciar outra."
         )
-    
+
     if available < needed + SAFETY_MARGIN_MB:
         return False, (
             f"RAM insuficiente. Disponível: {available}MB. "
             f"Necessário: {needed}MB + {SAFETY_MARGIN_MB}MB margem."
         )
-    
+
     return True, "OK"
 
 
@@ -102,23 +102,23 @@ def start_tool(tool_name: str) -> tuple[bool, str]:
     can_start, reason = can_start_tool(tool_name)
     if not can_start:
         return False, reason
-    
+
     config = TOOLS_CONFIG[tool_name]
     compose_file = config["compose_file"]
-    
+
     if not os.path.exists(compose_file):
         return False, f"Arquivo compose não encontrado: {compose_file}"
-    
+
     logger.info("iniciando_ferramenta", tool=tool_name, ram_estimada=config["ram_mb"])
-    
+
     result = subprocess.run(
         ["docker", "compose", "-f", compose_file, "up", "-d"],
         capture_output=True, text=True
     )
-    
+
     if result.returncode != 0:
         return False, f"Erro ao iniciar: {result.stderr[:300]}"
-    
+
     return True, f"✅ {tool_name} iniciado com sucesso."
 
 
@@ -126,23 +126,23 @@ def stop_tool(tool_name: str) -> tuple[bool, str]:
     """Para uma ferramenta sob demanda."""
     if tool_name not in TOOLS_CONFIG:
         return False, f"Ferramenta '{tool_name}' não existe."
-    
+
     config = TOOLS_CONFIG[tool_name]
     compose_file = config["compose_file"]
-    
+
     if not os.path.exists(compose_file):
         return False, f"Arquivo compose não encontrado: {compose_file}"
-    
+
     logger.info("parando_ferramenta", tool=tool_name)
-    
+
     result = subprocess.run(
         ["docker", "compose", "-f", compose_file, "down"],
         capture_output=True, text=True
     )
-    
+
     if result.returncode != 0:
         return False, f"Erro ao parar: {result.stderr[:300]}"
-    
+
     return True, f"✅ {tool_name} parado."
 
 
@@ -150,12 +150,12 @@ def get_tools_status() -> dict:
     """Retorna status de todas as ferramentas."""
     running = get_running_tools()
     available_ram = get_available_ram()
-    
+
     status = {}
     for name, config in TOOLS_CONFIG.items():
         is_running = name in running
         can_start_it, reason = can_start_tool(name) if not is_running else (False, "Já rodando")
-        
+
         status[name] = {
             "running": is_running,
             "ram_mb": config["ram_mb"],
@@ -163,7 +163,7 @@ def get_tools_status() -> dict:
             "reason": reason if not can_start_it and not is_running else "",
             "description": config["description"],
         }
-    
+
     return {
         "tools": status,
         "running_count": len(running),

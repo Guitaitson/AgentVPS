@@ -9,9 +9,9 @@ Este módulo permite gerar prompts dinâmicos baseados em:
 - Estado atual da sessão
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -63,7 +63,7 @@ Capacidades disponíveis:
 Responda de forma natural, concisa e útil. Mantenha respostas curtas (1-2 frases) para conversas casuais.""",
         variables=["user_id", "intent", "history_summary", "capabilities"]
     ),
-    
+
     "command": PromptTemplate(
         name="command",
         description="Execução de comandos do sistema",
@@ -78,7 +78,7 @@ Contexto:
 Execute o comando e retorne o resultado de forma clara e concisa. Se houver erro, explique o que aconteceu.""",
         variables=["user_id", "intent", "capabilities", "system_state"]
     ),
-    
+
     "task": PromptTemplate(
         name="task",
         description="Execução de tarefas",
@@ -94,7 +94,7 @@ Contexto:
 Execute a tarefa e retorne o resultado de forma clara. Se precisar de mais informações, pergunte ao usuário.""",
         variables=["user_id", "intent", "capabilities", "system_state", "history_summary"]
     ),
-    
+
     "question": PromptTemplate(
         name="question",
         description="Resposta a perguntas sobre o sistema",
@@ -110,7 +110,7 @@ Contexto:
 Responda à pergunta de forma clara e precisa. Se não souber a resposta, seja honesto e sugira alternativas.""",
         variables=["user_id", "intent", "capabilities", "system_state", "history_summary"]
     ),
-    
+
     "self_improve": PromptTemplate(
         name="self_improve",
         description="Auto-melhoria do agente",
@@ -143,45 +143,45 @@ Retorne um plano detalhado com:
 
 class PromptComposer:
     """Compositor de prompts dinâmicos."""
-    
+
     def __init__(self, templates: Optional[Dict[str, PromptTemplate]] = None):
         self.templates = templates or DEFAULT_TEMPLATES.copy()
-    
+
     def get_template(self, name: str) -> Optional[PromptTemplate]:
         """Retorna um template pelo nome."""
         return self.templates.get(name)
-    
+
     def add_template(self, template: PromptTemplate) -> None:
         """Adiciona um novo template."""
         self.templates[template.name] = template
-    
+
     def remove_template(self, name: str) -> None:
         """Remove um template."""
         if name in self.templates:
             del self.templates[name]
-    
+
     def _summarize_history(self, history: List[Dict[str, Any]], max_items: int = 5) -> str:
         """Gera um resumo do histórico de conversa."""
         if not history:
             return "Nenhum histórico recente"
-        
+
         recent = history[-max_items:]
         summary_parts = []
-        
+
         for msg in recent:
             intent = msg.get("intent", "desconhecido")
             content = msg.get("user_message", "")[:50]
             summary_parts.append(f"- {intent}: {content}")
-        
+
         return "\n".join(summary_parts)
-    
+
     def _format_capabilities(self, capabilities: List[str]) -> str:
         """Formata a lista de capacidades."""
         if not capabilities:
             return "Nenhuma capacidade disponível"
-        
+
         return ", ".join(capabilities)
-    
+
     def compose(
         self,
         template_name: str,
@@ -202,7 +202,7 @@ class PromptComposer:
         template = self.get_template(template_name)
         if not template:
             raise ValueError(f"Template '{template_name}' não encontrado")
-        
+
         # Variáveis base do template
         variables = {
             "user_id": context.user_id,
@@ -212,20 +212,20 @@ class PromptComposer:
             "capabilities": self._format_capabilities(context.capabilities),
             "system_state": str(context.system_state),
         }
-        
+
         # Adicionar variáveis adicionais
         if additional_vars:
             variables.update(additional_vars)
-        
+
         # Substituir variáveis no template
         try:
             system_prompt = template.template.format(**variables)
         except KeyError as e:
             raise ValueError(f"Variável não encontrada no template: {e}")
-        
+
         # Prompt do usuário é a mensagem atual
         user_prompt = context.system_state.get("current_message", "")
-        
+
         return ComposedPrompt(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -236,7 +236,7 @@ class PromptComposer:
                 "variables_used": list(variables.keys()),
             }
         )
-    
+
     def compose_for_intent(
         self,
         intent: str,
@@ -260,11 +260,11 @@ class PromptComposer:
             "question": "question",
             "self_improve": "self_improve",
         }
-        
+
         template_name = intent_to_template.get(intent, "chat")
-        
+
         return self.compose(template_name, context)
-    
+
     def compose_with_context_awareness(
         self,
         context: PromptContext,
@@ -285,15 +285,15 @@ class PromptComposer:
             context.conversation_history,
             max_history_items
         )
-        
+
         # Adicionar consciência de contexto ao template
         additional_vars = {
             "extended_history": history_summary,
             "context_awareness": "Você tem acesso ao histórico completo da conversa.",
         }
-        
+
         return self.compose(context.current_intent, context, additional_vars)
-    
+
     def optimize_for_token_limit(
         self,
         prompt: ComposedPrompt,
@@ -311,7 +311,7 @@ class PromptComposer:
         """
         # Estimativa aproximada de tokens (4 caracteres ≈ 1 token)
         estimated_tokens = len(prompt.system_prompt) // 4 + len(prompt.user_prompt) // 4
-        
+
         if estimated_tokens > max_tokens:
             # Truncar histórico se necessário
             max_history_items = max(1, (max_tokens - 1000) // 100)  # Reservar 1000 tokens para system + user
@@ -319,15 +319,15 @@ class PromptComposer:
                 prompt.context.conversation_history,
                 max_history_items
             )
-            
+
             # Recompor com histórico resumido
             additional_vars = {
                 "truncated_history": history_summary,
                 "optimization_note": f"Histórico truncado para {max_history_items} mensagens devido ao limite de tokens.",
             }
-            
+
             return self.compose(prompt.context.current_intent, prompt.context, additional_vars)
-        
+
         return prompt
 
 
@@ -362,7 +362,7 @@ def get_default_composer() -> PromptComposer:
 if __name__ == "__main__":
     # Teste básico
     composer = get_default_composer()
-    
+
     context = create_context(
         user_id="test_user",
         session_id="test_session",
@@ -374,9 +374,9 @@ if __name__ == "__main__":
         capabilities=["ram", "containers", "status"],
         system_state={"current_message": "quanto de RAM está disponível?"},
     )
-    
+
     prompt = composer.compose_for_intent("question", context)
-    
+
     print("=== Prompt Composto ===")
     print(f"Template: {prompt.template_used}")
     print(f"\nSystem Prompt:\n{prompt.system_prompt}")

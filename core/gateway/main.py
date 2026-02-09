@@ -12,16 +12,16 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException, Depends, Security
-from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-import uvicorn
 
-from core.vps_agent.agent import process_message_async
-from core.gateway.rate_limiter import RateLimiter
 from core.gateway.adapters import TelegramAdapter
+from core.gateway.rate_limiter import RateLimiter
+from core.vps_agent.agent import process_message_async
 
 # Configure logging
 logging.basicConfig(
@@ -112,13 +112,13 @@ async def verify_api_key(
         expected_key = "your-api-key-here"  # Load from environment
         if api_key == expected_key:
             return f"apikey:{api_key}"
-    
+
     # Bearer token check
     if credentials:
         token = credentials.credentials
         # Verify JWT token here in production
         return f"bearer:{token[:10]}..."
-    
+
     # Allow unauthenticated access for development (configure appropriately)
     return "development:unauthenticated"
 
@@ -143,14 +143,14 @@ async def health_check():
     Returns the status of the gateway and its dependencies.
     """
     components = {}
-    
+
     # Check core agent
     try:
         # Basic import check
         components["agent"] = "healthy"
     except Exception as e:
         components["agent"] = f"unhealthy: {str(e)}"
-    
+
     # Check memory
     try:
         from vps_langgraph.memory import AgentMemory
@@ -158,11 +158,11 @@ async def health_check():
         components["memory"] = "healthy"
     except Exception as e:
         components["memory"] = f"unhealthy: {str(e)}"
-    
+
     overall_status = "healthy" if all(
         "healthy" in str(v) for v in components.values()
     ) else "degraded"
-    
+
     return HealthResponse(
         status=overall_status,
         version="1.0.0",
@@ -170,7 +170,7 @@ async def health_check():
     )
 
 
-@app.post("/api/v1/messages", 
+@app.post("/api/v1/messages",
           response_model=MessageResponse,
           responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
           tags=["Messages"])
@@ -190,24 +190,24 @@ async def send_message(
             status_code=429,
             detail="Too many requests. Please try again later."
         )
-    
+
     try:
         logger.info(f"📨 Message from {request.user_id}: {request.message[:100]}...")
-        
+
         # Process message through agent
         result = await process_message_async(
             user_id=request.user_id,
             message=request.message,
             session_id=request.session_id
         )
-        
+
         return MessageResponse(
             response=result.get("response", "Erro ao processar mensagem"),
             session_id=result.get("session_id", request.session_id or ""),
             intent=result.get("intent"),
             confidence=result.get("intent_confidence")
         )
-    
+
     except Exception as e:
         logger.error(f"❌ Error processing message: {e}")
         raise HTTPException(
@@ -240,17 +240,17 @@ async def telegram_webhook(request: Request):
     # Verify rate limit
     if not rate_limiter.allow_request("telegram:webhook"):
         return JSONResponse(status_code=429, content={"error": "Rate limited"})
-    
+
     try:
         update = await request.json()
         logger.info(f"📨 Telegram update received: {update.get('update_id', 'unknown')}")
-        
+
         # Process through Telegram adapter
         adapter = TelegramAdapter()
         result = adapter.process_update(update)
-        
+
         return result
-    
+
     except Exception as e:
         logger.error(f"❌ Telegram webhook error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -263,12 +263,12 @@ async def get_session(session_id: str):
         from core.gateway.session_manager import SessionManager
         manager = SessionManager()
         session = manager.get_session(session_id)
-        
+
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         return session
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -279,12 +279,11 @@ async def get_session(session_id: str):
 
 def run_server():
     """Main entry point for running the gateway server."""
-    import sys
     import os
-    
+
     port = int(os.getenv("GATEWAY_PORT", "8080"))
     host = os.getenv("GATEWAY_HOST", "0.0.0.0")
-    
+
     logger.info(f"🌐 Starting Gateway on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
 

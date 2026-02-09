@@ -28,14 +28,14 @@ def get_capabilities_list() -> str:
     """Retorna lista de capacidades implementadas."""
     try:
         from ..capabilities import capabilities_registry
-        
+
         caps = capabilities_registry.get_implemented_capabilities()
         cap_lines = []
-        
+
         for cap in caps:
             status = "✅" if cap.implemented else "❌"
             cap_lines.append(f"{status} **{cap.name}**: {cap.description}")
-        
+
         return f"""
 ## Capacidades Implementadas ({len(caps)})
 {chr(10).join(cap_lines)}
@@ -115,7 +115,7 @@ def get_full_system_prompt(user_name: str = "Guilherme") -> str:
         "- Mencionar suas capacidades quando relevante",
         "- Usar ferramentas disponíveis para ajudar",
     ]
-    
+
     return chr(10).join(parts)
 
 
@@ -129,7 +129,7 @@ def get_conversation_prompt(user_message: str, history: List[Dict] = None, conte
             role = msg.get("role", "user")
             content = msg.get("content", "")[:200]
             history_text += f"{role}: {content}\n"
-    
+
     context_text = ""
     if context:
         facts = context.get("user_facts", {})
@@ -137,7 +137,7 @@ def get_conversation_prompt(user_message: str, history: List[Dict] = None, conte
             context_text = "Contexto do usuário:\n"
             for key, value in facts.items():
                 context_text += f"- {key}: {value}\n"
-    
+
     prompt = f"""## Conversa Atual
 
 Histórico:
@@ -148,7 +148,7 @@ Histórico:
 Nova mensagem do usuário: "{user_message}"
 
 Como VPS-Agent, como você responde?"""
-    
+
     return prompt
 
 

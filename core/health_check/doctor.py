@@ -5,11 +5,11 @@ Sistema de verificação de saúde do agente e diagnóstico.
 Provides comprehensive health checks for services, system resources, and agent status.
 """
 
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
-import os
 
 
 class HealthStatus(Enum):
@@ -28,7 +28,7 @@ class HealthCheckResult:
     message: str
     details: Dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    
+
     @property
     def is_healthy(self) -> bool:
         """Verifica se está saudável."""
@@ -70,7 +70,7 @@ class HealthCheck:
     - Network connectivity
     - Agent-specific health checks
     """
-    
+
     # Configurações de limiares
     MEMORY_WARNING_THRESHOLD = 75.0
     MEMORY_CRITICAL_THRESHOLD = 90.0
@@ -78,7 +78,7 @@ class HealthCheck:
     CPU_CRITICAL_THRESHOLD = 90.0
     DISK_WARNING_THRESHOLD = 80.0
     DISK_CRITICAL_THRESHOLD = 95.0
-    
+
     def __init__(
         self,
         postgres_dsn: Optional[str] = None,
@@ -96,10 +96,10 @@ class HealthCheck:
         self.postgres_dsn = postgres_dsn or os.getenv("POSTGRES_DSN", "postgresql://postgres:postgres@localhost:5432/agentvps")
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.docker_socket = docker_socket or os.getenv("DOCKER_SOCKET", "/var/run/docker.sock")
-        
+
         self._check_functions: Dict[str, Callable] = {}
         self._register_default_checks()
-    
+
     def _register_default_checks(self):
         """Registra as verificações padrão."""
         self._check_functions = {
@@ -112,12 +112,12 @@ class HealthCheck:
             "network": self.check_network,
             "agent": self.check_agent,
         }
-    
+
     def check_postgresql(self) -> HealthCheckResult:
         """Verifica conexão com PostgreSQL."""
         import psycopg2
         from psycopg2 import OperationalError
-        
+
         try:
             conn = psycopg2.connect(self.postgres_dsn, connect_timeout=5)
             cursor = conn.cursor()
@@ -127,7 +127,7 @@ class HealthCheck:
             uptime = cursor.fetchone()[0]
             uptime_seconds = (datetime.now(timezone.utc) - uptime).total_seconds()
             conn.close()
-            
+
             return HealthCheckResult(
                 name="postgresql",
                 status=HealthStatus.HEALTHY,
@@ -152,19 +152,19 @@ class HealthCheck:
                 message=f"PostgreSQL com problema: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_redis(self) -> HealthCheckResult:
         """Verifica conexão com Redis."""
         import redis
         from redis import ConnectionError as RedisConnectionError
-        
+
         try:
             client = redis.from_url(self.redis_url, socket_timeout=5, socket_connect_timeout=5)
             client.ping()
-            
+
             info = client.info("memory")
             used_memory = info.get("used_memory_human", "unknown")
-            
+
             return HealthCheckResult(
                 name="redis",
                 status=HealthStatus.HEALTHY,
@@ -188,24 +188,24 @@ class HealthCheck:
                 message=f"Redis com problema: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_docker(self) -> HealthCheckResult:
         """Verifica status do Docker."""
         import docker
         from docker.errors import DockerException
-        
+
         try:
             client = docker.DockerSocketTimeoutError(
                 base_url=self.docker_socket, timeout=5
             )
             client.ping()
-            
+
             info = client.info()
             containers = client.containers.list(all=True)
-            
+
             running = len([c for c in containers if c.status == "running"])
             stopped = len([c for c in containers if c.status != "running"])
-            
+
             return HealthCheckResult(
                 name="docker",
                 status=HealthStatus.HEALTHY,
@@ -231,15 +231,15 @@ class HealthCheck:
                 message=f"Docker com problema: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_memory(self) -> HealthCheckResult:
         """Verifica uso de memória."""
         try:
             import psutil
-            
+
             memory = psutil.virtual_memory()
             percent = memory.percent
-            
+
             if percent >= self.MEMORY_CRITICAL_THRESHOLD:
                 status = HealthStatus.UNHEALTHY
                 message = f"Memória crítica: {percent:.1f}% usado"
@@ -249,7 +249,7 @@ class HealthCheck:
             else:
                 status = HealthStatus.HEALTHY
                 message = f"Memória normal: {percent:.1f}% usado"
-            
+
             return HealthCheckResult(
                 name="memory",
                 status=status,
@@ -275,14 +275,14 @@ class HealthCheck:
                 message=f"Erro ao verificar memória: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_cpu(self) -> HealthCheckResult:
         """Verifica uso de CPU."""
         try:
             import psutil
-            
+
             percent = psutil.cpu_percent(interval=1)
-            
+
             if percent >= self.CPU_CRITICAL_THRESHOLD:
                 status = HealthStatus.UNHEALTHY
                 message = f"CPU crítica: {percent:.1f}% usado"
@@ -292,7 +292,7 @@ class HealthCheck:
             else:
                 status = HealthStatus.HEALTHY
                 message = f"CPU normal: {percent:.1f}% usado"
-            
+
             return HealthCheckResult(
                 name="cpu",
                 status=status,
@@ -317,15 +317,15 @@ class HealthCheck:
                 message=f"Erro ao verificar CPU: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_disk(self) -> HealthCheckResult:
         """Verifica uso de disco."""
         try:
             import psutil
-            
+
             disk = psutil.disk_usage("/")
             percent = disk.percent
-            
+
             if percent >= self.DISK_CRITICAL_THRESHOLD:
                 status = HealthStatus.UNHEALTHY
                 message = f"Disco crítico: {percent:.1f}% usado"
@@ -335,7 +335,7 @@ class HealthCheck:
             else:
                 status = HealthStatus.HEALTHY
                 message = f"Disco normal: {percent:.1f}% usado"
-            
+
             return HealthCheckResult(
                 name="disk",
                 status=status,
@@ -361,18 +361,18 @@ class HealthCheck:
                 message=f"Erro ao verificar disco: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_network(self) -> HealthCheckResult:
         """Verifica conectividade de rede."""
         try:
             # Verificar conectividade externa
             import socket
-            
+
             hosts_to_check = [
                 ("8.8.8.8", 53, "DNS Google"),
                 ("1.1.1.1", 53, "DNS Cloudflare"),
             ]
-            
+
             results = []
             for host, port, description in hosts_to_check:
                 try:
@@ -383,9 +383,9 @@ class HealthCheck:
                     results.append((description, result == 0))
                 except Exception:
                     results.append((description, False))
-            
+
             all_healthy = all(r[1] for r in results)
-            
+
             if all_healthy:
                 status = HealthStatus.HEALTHY
                 message = "Conectividade de rede normal"
@@ -393,7 +393,7 @@ class HealthCheck:
                 failed = [r[0] for r in results if not r[1]]
                 status = HealthStatus.DEGRADED
                 message = f"Conectividade comprometida: {', '.join(failed)}"
-            
+
             return HealthCheckResult(
                 name="network",
                 status=status,
@@ -407,22 +407,22 @@ class HealthCheck:
                 message=f"Erro ao verificar rede: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def check_agent(self) -> HealthCheckResult:
         """Verifica saúde do agente."""
         try:
             import os
             from datetime import datetime, timezone
-            
+
             # Verificar se processos essenciais estão rodando
             checks = {
                 "agent_running": os.path.exists("/opt/vps-agent/.running"),
                 "config_exists": os.path.exists("/opt/vps-agent/.env"),
                 "logs_accessible": os.path.exists("/opt/vps-agent/logs"),
             }
-            
+
             all_healthy = all(checks.values())
-            
+
             if all_healthy:
                 status = HealthStatus.HEALTHY
                 message = "Agente operando normalmente"
@@ -430,7 +430,7 @@ class HealthCheck:
                 failed = [k for k, v in checks.items() if not v]
                 status = HealthStatus.DEGRADED
                 message = f"Agente com problemas: {', '.join(failed)}"
-            
+
             return HealthCheckResult(
                 name="agent",
                 status=status,
@@ -448,7 +448,7 @@ class HealthCheck:
                 message=f"Erro ao verificar agente: {str(e)}",
                 details={"error": str(e)}
             )
-    
+
     def run_check(self, check_name: str) -> HealthCheckResult:
         """Executa uma verificação específica."""
         if check_name not in self._check_functions:
@@ -458,33 +458,33 @@ class HealthCheck:
                 message=f"Verificação '{check_name}' não encontrada",
                 details={"available": list(self._check_functions.keys())}
             )
-        
+
         return self._check_functions[check_name]()
-    
+
     def run_all_checks(self) -> List[HealthCheckResult]:
         """Executa todas as verificações."""
         results = []
         for check_name in self._check_functions:
             results.append(self.run_check(check_name))
         return results
-    
+
     def get_overall_status(self, results: List[HealthCheckResult]) -> HealthStatus:
         """Determina status geral baseado nos resultados."""
         if not results:
             return HealthStatus.UNKNOWN
-        
+
         # Se algum estiver UNHEALTHY, status geral é UNHEALTHY
         if any(r.status == HealthStatus.UNHEALTHY for r in results):
             return HealthStatus.UNHEALTHY
-        
+
         # Se algum estiver DEGRADED, status geral é DEGRADED
         if any(r.status == HealthStatus.DEGRADED for r in results):
             return HealthStatus.DEGRADED
-        
+
         # Se todos estiverem HEALTHY, status geral é HEALTHY
         if all(r.status == HealthStatus.HEALTHY for r in results):
             return HealthStatus.HEALTHY
-        
+
         return HealthStatus.DEGRADED
 
 
@@ -494,11 +494,11 @@ class Doctor:
     
     Provides comprehensive health reports and recommendations.
     """
-    
+
     def __init__(self, health_check: Optional[HealthCheck] = None):
         """Initialize the doctor."""
         self.health_check = health_check or HealthCheck()
-    
+
     def diagnose(self) -> Dict[str, Any]:
         """
         Run comprehensive diagnosis.
@@ -508,9 +508,9 @@ class Doctor:
         """
         results = self.health_check.run_all_checks()
         overall_status = self.health_check.get_overall_status(results)
-        
+
         recommendations = self._generate_recommendations(results)
-        
+
         return {
             "status": overall_status.value,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -528,11 +528,11 @@ class Doctor:
             "degraded_count": len([r for r in results if r.status == HealthStatus.DEGRADED]),
             "unhealthy_count": len([r for r in results if r.status == HealthStatus.UNHEALTHY]),
         }
-    
+
     def _generate_recommendations(self, results: List[HealthCheckResult]) -> List[str]:
         """Generate recommendations based on check results."""
         recommendations = []
-        
+
         for result in results:
             if result.status == HealthStatus.UNHEALTHY:
                 if result.name == "memory":
@@ -556,22 +556,22 @@ class Doctor:
                     recommendations.append("💾 Disco elevado: Planejar limpeza de disco")
                 elif result.name == "network":
                     recommendations.append("🌐 Rede comprometida: Verificar conectividade")
-        
+
         return recommendations
-    
+
     def quick_check(self) -> HealthCheckResult:
         """Run quick health check (core services only)."""
         checks = ["postgresql", "redis", "memory", "cpu"]
         results = []
-        
+
         for check in checks:
             if check in self.health_check._check_functions:
                 results.append(self.health_check.run_check(check))
-        
+
         overall_status = self.health_check.get_overall_status(results)
         healthy_count = len([r for r in results if r.status == HealthStatus.HEALTHY])
         total_count = len(results)
-        
+
         return HealthCheckResult(
             name="quick_check",
             status=overall_status,
@@ -582,12 +582,12 @@ class Doctor:
                 "total_count": total_count,
             }
         )
-    
+
     def get_service_health(self) -> List[ServiceHealth]:
         """Get health status of all services."""
         services = ["postgresql", "redis", "docker"]
         health_list = []
-        
+
         for service_name in services:
             result = self.health_check.run_check(service_name)
             health = ServiceHealth(
@@ -596,15 +596,15 @@ class Doctor:
                 details=result.details,
             )
             health_list.append(health)
-        
+
         return health_list
-    
+
     def get_system_health(self) -> SystemHealth:
         """Get system resource health."""
         memory_result = self.health_check.run_check("memory")
         cpu_result = self.health_check.run_check("cpu")
         disk_result = self.health_check.run_check("disk")
-        
+
         return SystemHealth(
             cpu_percent=cpu_result.details.get("percent", 0),
             memory_percent=memory_result.details.get("percent", 0),
@@ -634,7 +634,7 @@ async def run_health_check(
         Health check results
     """
     doctor = Doctor(HealthCheck(postgres_dsn, redis_url))
-    
+
     if full:
         return doctor.diagnose()
     else:

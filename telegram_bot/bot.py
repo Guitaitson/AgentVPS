@@ -2,29 +2,27 @@
 VPS-Agent Telegram Bot — Interface principal
 Versão: 2.0 — Com LangGraph e timeout otimizado
 """
-import os
-import sys
 import logging
+import os
 from datetime import datetime, timezone
 
+import psycopg2
+import redis
+import structlog
+from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
-    MessageHandler,
     ContextTypes,
+    MessageHandler,
     filters,
 )
-import structlog
-from dotenv import load_dotenv
-import psycopg2
-import redis
-
-# Telegram Log Handler (F0-06)
-from telegram_bot.telegram_handler import get_telegram_notifier
 
 # VPS-Agent Core (nosso módulo)
 from core.vps_agent.agent import process_message_async
+
+# Telegram Log Handler (F0-06)
 
 # Configuração de logging estruturado
 structlog.configure(
@@ -39,8 +37,8 @@ load_dotenv("/opt/vps-agent/core/.env")
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ALLOWED_USERS = [
-    int(uid.strip()) 
-    for uid in os.getenv("TELEGRAM_ALLOWED_USERS", "").split(",") 
+    int(uid.strip())
+    for uid in os.getenv("TELEGRAM_ALLOWED_USERS", "").split(",")
     if uid.strip()
 ]
 
@@ -82,7 +80,7 @@ def authorized_only(func):
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /start."""
     user_name = update.effective_user.first_name
-    
+
     await update.message.reply_text(
         f"🤖 **VPS-Agent v2 Online!**\n\n"
         f"Olá, {user_name}! Seu agente autônomo está pronto.\n\n"
@@ -101,12 +99,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para mensagens gerais — usa LangGraph."""
     user_id = str(update.effective_user.id)
     message = update.message.text
-    
+
     logger.info("mensagem_recebida", user_id=user_id, message=message[:100])
-    
+
     # Processar através do LangGraph
     response = await process_message_async(user_id, message)
-    
+
     await update.message.reply_text(response)
 
 
@@ -115,7 +113,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /status — mostra estado geral."""
     redis_status = "❌"
     pg_status = "❌"
-    
+
     try:
         r = get_redis()
         if r.ping():
@@ -153,11 +151,11 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /ram — detalhe de memória por container."""
     import subprocess
     result = subprocess.run(
-        ["docker", "stats", "--no-stream", "--format", 
+        ["docker", "stats", "--no-stream", "--format",
          "{{.Name}}: {{.MemUsage}} ({{.MemPerc}})"],
         capture_output=True, text=True
     )
-    
+
     text = f"🧠 **RAM por Container:**\n\n```\n{result.stdout if result.stdout.strip() else 'Nenhum container'}```"
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -170,7 +168,7 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
         capture_output=True, text=True
     )
-    
+
     text = f"🐳 **Containers Ativos:**\n\n```\n{result.stdout if result.stdout.strip() else 'Nenhum container'}```"
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -179,7 +177,7 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /health — check completo."""
     checks = []
-    
+
     # PostgreSQL
     try:
         conn = get_db_conn()
@@ -187,7 +185,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
         checks.append(("PostgreSQL", "✅"))
     except Exception:
         checks.append(("PostgreSQL", "❌"))
-    
+
     # Redis
     try:
         r = get_redis()
@@ -195,7 +193,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
         checks.append(("Redis", "✅"))
     except Exception:
         checks.append(("Redis", "❌"))
-    
+
     # Docker
     try:
         import subprocess
@@ -206,7 +204,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
         checks.append(("Docker", f"✅ ({containers} containers)"))
     except Exception:
         checks.append(("Docker", "❌"))
-    
+
     # RAM
     try:
         import subprocess
@@ -217,7 +215,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
         checks.append(("RAM", f"✅ ({available}MB livre)"))
     except Exception:
         checks.append(("RAM", "❌"))
-    
+
     text = "🔍 **Health Check:**\n\n" + "\n".join(f"{name}: {status}" for name, status in checks)
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -245,10 +243,10 @@ Este bot controla o VPS-Agent, um agente autônomo que roda na VPS.
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Handler para erros — envia para Telegram e log local."""
     error_msg = str(context.error)
-    
+
     # Log local
     logger.error("erro_telegram", error=error_msg)
-    
+
     # Enviar para Telegram (F0-06)
     try:
         from telegram_bot.telegram_handler import get_telegram_notifier
@@ -261,7 +259,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Inicializa e roda o bot com timeout otimizado."""
     logger.info("iniciando_bot", token=f"{TOKEN[:10]}...")
-    
+
     app = (
         Application.builder()
         .token(TOKEN)
@@ -273,7 +271,7 @@ def main():
         .connection_pool_size(20)  # Tamanho do pool de conexões
         .build()
     )
-    
+
     # Handlers de comandos
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("status", cmd_status))
@@ -281,12 +279,12 @@ def main():
     app.add_handler(CommandHandler("containers", cmd_containers))
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("help", cmd_help))
-    
+
     # Handler para mensagens gerais (LangGraph)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
+
     app.add_error_handler(error_handler)
-    
+
     logger.info("bot_pronto")
     app.run_polling()
 

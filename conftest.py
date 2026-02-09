@@ -7,8 +7,8 @@ Com o novo sistema de pacotes (pyproject.toml), os imports devem ser:
 
 Para desenvolvimento local sem instalação, adicionamos o diretório raiz ao path.
 """
-import sys
 import os
+import sys
 
 # Add project root to path for imports (development mode)
 # Quando o pacote estiver instalado via pip install -e ., isso não é necessário
@@ -52,22 +52,22 @@ def mock_telegram_update():
             self.id = 123456
             self.first_name = "Test"
             self.username = "testuser"
-    
+
     class MockChat:
         def __init__(self):
             self.id = 123456
             self.type = "private"
-    
+
     class MockMessage:
         def __init__(self, text="/start"):
             self.text = text
             self.chat = MockChat()
             self.from_user = MockUser()
             self.message_id = 1
-    
+
     class MockUpdate:
         def __init__(self, text="/start"):
             self.message = MockMessage(text)
             self.effective_user = MockUser()
-    
+
     return MockUpdate

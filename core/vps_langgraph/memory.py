@@ -3,20 +3,20 @@ Sistema de memória do agente.
 Duas dimensões: por usuário e global.
 PostgreSQL para fatos, Redis para cache.
 """
-import os
 import json
+import os
 
 import psycopg2
-from psycopg2.extras import Json, RealDictCursor
 import redis
 from dotenv import load_dotenv
+from psycopg2.extras import Json, RealDictCursor
 
 load_dotenv("/opt/vps-agent/core/.env")
 
 
 class AgentMemory:
     """Gerencia memória persistente do agente."""
-    
+
     def __init__(self):
         self._db_config = {
             "host": os.getenv("POSTGRES_HOST", "127.0.0.1"),
@@ -26,16 +26,16 @@ class AgentMemory:
             "password": os.getenv("POSTGRES_PASSWORD"),
         }
         self._redis = redis.Redis(
-            host=os.getenv("REDIS_HOST", "127.0.0.1"), 
-            port=int(os.getenv("REDIS_PORT", 6379)), 
+            host=os.getenv("REDIS_HOST", "127.0.0.1"),
+            port=int(os.getenv("REDIS_PORT", 6379)),
             decode_responses=True
         )
-    
+
     def _get_conn(self):
         return psycopg2.connect(**self._db_config)
-    
+
     # --- Memória por usuário ---
-    
+
     def get_user_facts(self, user_id: str) -> dict:
         """Recupera todos os fatos conhecidos sobre um usuário."""
         # Tentar cache primeiro
@@ -43,7 +43,7 @@ class AgentMemory:
         cached = self._redis.get(cache_key)
         if cached:
             return json.loads(cached)
-        
+
         conn = self._get_conn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
@@ -54,11 +54,11 @@ class AgentMemory:
         )
         facts = {row["key"]: row["value"] for row in cur.fetchall()}
         conn.close()
-        
+
         # Cache por 5 minutos
         self._redis.setex(cache_key, 300, json.dumps(facts))
         return facts
-    
+
     def save_fact(self, user_id: str, key: str, value: dict, confidence: float = 1.0):
         """Salva ou atualiza um fato sobre o usuário."""
         conn = self._get_conn()
@@ -74,17 +74,17 @@ class AgentMemory:
         )
         conn.commit()
         conn.close()
-        
+
         # Invalida cache
         self._redis.delete(f"user_facts:{user_id}")
-    
+
     def get_conversation_history(self, user_id: str, limit: int = 10) -> list:
         """Recupera histórico de conversa recente."""
         cache_key = f"conv_history:{user_id}:{limit}"
         cached = self._redis.get(cache_key)
         if cached:
             return json.loads(cached)
-        
+
         conn = self._get_conn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
@@ -98,10 +98,10 @@ class AgentMemory:
         ]
         conn.close()
         history.reverse()  # chronological order
-        
+
         self._redis.setex(cache_key, 60, json.dumps(history))
         return history
-    
+
     def save_conversation(
         self, user_id: str, role: str, content: str
     ):
@@ -117,27 +117,27 @@ class AgentMemory:
         )
         conn.commit()
         conn.close()
-        
+
         # Invalida cache
         self._redis.delete(f"conv_history:{user_id}:*")
-    
+
     # --- Memória global ---
-    
+
     def get_system_state(self) -> dict:
         """Recupera estado global do sistema."""
         cached = self._redis.get("system_state")
         if cached:
             return json.loads(cached)
-        
+
         conn = self._get_conn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute("SELECT key, value FROM system_state")
         state = {row["key"]: row["value"] for row in cur.fetchall()}
         conn.close()
-        
+
         self._redis.setex("system_state", 60, json.dumps(state))
         return state
-    
+
     def set_system_state(self, key: str, value: dict):
         """Atualiza estado global."""
         conn = self._get_conn()
@@ -152,11 +152,11 @@ class AgentMemory:
         )
         conn.commit()
         conn.close()
-        
+
         self._redis.delete("system_state")
-    
+
     # --- Cleanup ---
-    
+
     def close(self):
         """Fecha conexões."""
         if hasattr(self, '_redis'):

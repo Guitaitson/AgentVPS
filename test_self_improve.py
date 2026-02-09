@@ -8,8 +8,10 @@ project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from core.vps_agent.agent import process_message_async
 import asyncio
+
+from core.vps_agent.agent import process_message_async
+
 
 async def main():
     print("Testando fluxo self_improve...")

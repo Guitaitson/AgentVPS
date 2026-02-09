@@ -13,11 +13,12 @@ Estrutura da tabela learnings:
 | 2  | tool_choice | web_search | Brave Search > Google Custom Search | 2026-02-09 |
 """
 
-import os
 import json
-import structlog
-from typing import Optional, List, Dict, Any
+import os
 from contextlib import contextmanager
+from typing import Any, Dict, List, Optional
+
+import structlog
 
 logger = structlog.get_logger()
 
@@ -83,7 +84,7 @@ def init_learnings_table():
     -- Índice para buscar por lição
     CREATE INDEX IF NOT EXISTS learnings_lesson_idx ON learnings USING gin(to_tsvector('portuguese', lesson));
     """
-    
+
     try:
         with db_cursor() as cursor:
             cursor.execute(create_sql)
@@ -96,17 +97,17 @@ def init_learnings_table():
 
 class LearningsManager:
     """Gerenciador de aprendizados do agente."""
-    
+
     def __init__(self):
         """Inicializa o gerenciador."""
         self._initialized = False
-    
+
     def ensure_initialized(self):
         """Garante que a tabela existe."""
         if not self._initialized:
             init_learnings_table()
             self._initialized = True
-    
+
     def add_learning(
         self,
         category: str,
@@ -129,13 +130,13 @@ class LearningsManager:
             ID do aprendizado criado
         """
         self.ensure_initialized()
-        
+
         insert_sql = """
         INSERT INTO learnings (category, trigger, lesson, success, metadata)
         VALUES (%s, %s, %s, %s, %s)
         RETURNING id
         """
-        
+
         try:
             with db_cursor() as cursor:
                 cursor.execute(
@@ -144,7 +145,7 @@ class LearningsManager:
                 )
                 result = cursor.fetchone()
                 learning_id = result[0] if result else None
-            
+
             logger.info(
                 "learning_added",
                 category=category,
@@ -152,11 +153,11 @@ class LearningsManager:
                 success=success
             )
             return learning_id
-            
+
         except Exception as e:
             logger.error("learning_add_failed", error=str(e))
             return -1
-    
+
     def get_learnings(
         self,
         category: Optional[str] = None,
@@ -175,27 +176,27 @@ class LearningsManager:
             Lista de aprendizados
         """
         self.ensure_initialized()
-        
+
         if category:
             query = "SELECT * FROM learnings WHERE category = %s ORDER BY created_at DESC LIMIT %s OFFSET %s"
             params = (category, limit, offset)
         else:
             query = "SELECT * FROM learnings ORDER BY created_at DESC LIMIT %s OFFSET %s"
             params = (limit, offset)
-        
+
         try:
             with db_cursor() as cursor:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
-                
-                columns = ['id', 'category', 'trigger', 'lesson', 'success', 
+
+                columns = ['id', 'category', 'trigger', 'lesson', 'success',
                           'metadata', 'created_at']
                 return [dict(zip(columns, row)) for row in rows]
-                
+
         except Exception as e:
             logger.error("learnings_fetch_failed", error=str(e))
             return []
-    
+
     def search_learnings(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Busca aprendizados por palavra-chave.
@@ -208,27 +209,27 @@ class LearningsManager:
             Lista de aprendizados encontrados
         """
         self.ensure_initialized()
-        
+
         search_sql = """
         SELECT * FROM learnings 
         WHERE trigger ILIKE %s OR lesson ILIKE %s
         ORDER BY created_at DESC
         LIMIT %s
         """
-        
+
         try:
             with db_cursor() as cursor:
                 cursor.execute(search_sql, (f"%{query}%", f"%{query}%", limit))
                 rows = cursor.fetchall()
-                
+
                 columns = ['id', 'category', 'trigger', 'lesson', 'success',
                           'metadata', 'created_at']
                 return [dict(zip(columns, row)) for row in rows]
-                
+
         except Exception as e:
             logger.error("learnings_search_failed", error=str(e))
             return []
-    
+
     def get_recent_failures(self, days: int = 7, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Recupera falhas recentes para análise.
@@ -241,7 +242,7 @@ class LearningsManager:
             Lista de falhas recentes
         """
         self.ensure_initialized()
-        
+
         query = """
         SELECT * FROM learnings 
         WHERE success = FALSE 
@@ -249,20 +250,20 @@ class LearningsManager:
         ORDER BY created_at DESC
         LIMIT %s
         """
-        
+
         try:
             with db_cursor() as cursor:
                 cursor.execute(query, (days, limit))
                 rows = cursor.fetchall()
-                
+
                 columns = ['id', 'category', 'trigger', 'lesson', 'success',
                           'metadata', 'created_at']
                 return [dict(zip(columns, row)) for row in rows]
-                
+
         except Exception as e:
             logger.error("failures_fetch_failed", error=str(e))
             return []
-    
+
     def get_lessons_for_action(
         self,
         action_type: str,
@@ -280,19 +281,19 @@ class LearningsManager:
         """
         # Buscar por categoria ou gatilho relacionado
         learnings = self.search_learnings(action_type, limit=5)
-        
+
         # Se não encontrou, buscar por contexto
         if not learnings and context:
             learnings = self.search_learnings(context, limit=5)
-        
+
         # Filtrar apenas lições relevantes (sucesso = True)
         relevant_lessons = [
             lesson_item['lesson'] for lesson_item in learnings
             if lesson_item['success'] and lesson_item['category'] != 'execution_error'
         ]
-        
+
         return relevant_lessons
-    
+
     def record_api_failure(
         self,
         api_name: str,
@@ -317,7 +318,7 @@ class LearningsManager:
             success=False,
             metadata={"api_name": api_name, "error": error[:500]}
         )
-    
+
     def record_tool_choice(
         self,
         tool: str,
@@ -342,7 +343,7 @@ class LearningsManager:
             success="sucesso" in outcome.lower() or "funcionou" in outcome.lower(),
             metadata={"tool": tool, "reason": reason[:500]}
         )
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """
         Retorna resumo dos aprendizados.
@@ -351,7 +352,7 @@ class LearningsManager:
             Dicionário com estatísticas
         """
         self.ensure_initialized()
-        
+
         query = """
         SELECT 
             category,
@@ -364,12 +365,12 @@ class LearningsManager:
         GROUP BY category
         ORDER BY total DESC
         """
-        
+
         try:
             with db_cursor() as cursor:
                 cursor.execute(query)
                 rows = cursor.fetchall()
-                
+
                 categories = {}
                 for row in rows:
                     categories[row[0]] = {
@@ -379,13 +380,13 @@ class LearningsManager:
                         "oldest": row[4].isoformat() if row[4] else None,
                         "newest": row[5].isoformat() if row[5] else None
                     }
-                
+
                 return {
                     "total_learnings": sum(c["total"] for c in categories.values()),
                     "categories": categories,
                     "initialized": self._initialized
                 }
-                
+
         except Exception as e:
             logger.error("learnings_summary_failed", error=str(e))
             return {"error": str(e)}
@@ -411,7 +412,7 @@ def record_failure_and_continue(api_name: str, error: str, suggestion: str = "")
     """
     # Registrar a falha
     learnings_manager.record_api_failure(api_name, error, suggestion)
-    
+
     # Buscar lições anteriores
     return learnings_manager.get_lessons_for_action(api_name)
 
@@ -428,14 +429,14 @@ def check_before_action(action_type: str, context: str = "") -> Dict[str, Any]:
         Dicionário com lições relevantes
     """
     lessons = learnings_manager.get_lessons_for_action(action_type, context)
-    
+
     return {
         "action": action_type,
         "has_lessons": len(lessons) > 0,
         "lessons": lessons,
         "recommendation": (
             f"Encontrei {len(lessons)} lição(ões) anterior(es) para '{action_type}'. "
-            "Recomendo revisar antes de continuar." 
+            "Recomendo revisar antes de continuar."
             if lessons else
             "Sem lições anteriores. Primeira execução desta ação."
         )

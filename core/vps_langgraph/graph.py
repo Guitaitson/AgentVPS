@@ -3,19 +3,20 @@ Grafo principal do agente LangGraph.
 Define o fluxo de decisão completo com Self-Improvement.
 """
 from langgraph.graph import StateGraph
-from vps_langgraph.state import AgentState
+
 from vps_langgraph.memory import AgentMemory
 from vps_langgraph.nodes import (
+    node_check_capabilities,
     node_classify_intent,
-    node_load_context,
-    node_plan,
     node_execute,
     node_generate_response,
-    node_save_memory,
-    node_check_capabilities,
-    node_self_improve,
     node_implement_capability,
+    node_load_context,
+    node_plan,
+    node_save_memory,
+    node_self_improve,
 )
+from vps_langgraph.state import AgentState
 
 memory = AgentMemory()
 
@@ -23,7 +24,7 @@ memory = AgentMemory()
 def build_agent_graph():
     """Constrói e retorna o grafo do agente."""
     workflow = StateGraph(AgentState)
-    
+
     # Nós do workflow
     workflow.add_node("classify", node_classify_intent)
     workflow.add_node("load_context", node_load_context)
@@ -34,14 +35,14 @@ def build_agent_graph():
     workflow.add_node("check_capabilities", node_check_capabilities)
     workflow.add_node("self_improve", node_self_improve)
     workflow.add_node("implement_capability", node_implement_capability)
-    
+
     # Ponto de entrada
     workflow.set_entry_point("classify")
-    
+
     # Fluxo principal: classify → load_context → plan
     workflow.add_edge("classify", "load_context")
     workflow.add_edge("load_context", "plan")
-    
+
     # Planejamento → Execução/Resposta (baseado no intent)
     workflow.add_conditional_edges(
         "plan",
@@ -55,10 +56,10 @@ def build_agent_graph():
             "unknown": "respond",
         }
     )
-    
+
     # Execução → Salvar memória
     workflow.add_edge("execute", "save_memory")
-    
+
     # Self-improve: check_capabilities → self_improve → respond
     workflow.add_conditional_edges(
         "check_capabilities",
@@ -69,11 +70,11 @@ def build_agent_graph():
         }
     )
     workflow.add_edge("self_improve", "respond")
-    
+
     # Responder → Salvar memória → END
     workflow.add_edge("respond", "save_memory")
     workflow.set_finish_point("save_memory")
-    
+
     return workflow.compile()
 
 

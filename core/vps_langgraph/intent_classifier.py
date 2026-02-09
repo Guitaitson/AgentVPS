@@ -10,8 +10,8 @@ Este modulo implementa recomendacoes para melhorar a classificacao de intents:
 - Fallback para classificacao por LLM
 """
 
-from typing import Dict, List, Tuple, Any
 from enum import Enum
+from typing import Any, Dict, List, Tuple
 
 
 class Intent(Enum):
@@ -137,7 +137,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
         - details: Dicionario com detalhes da classificacao
     """
     message_lower = message.lower().strip()
-    
+
     # 1. Verificar comandos diretos do Telegram
     for cmd in TELEGRAM_COMMANDS:
         if message_lower.startswith(cmd):
@@ -146,7 +146,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
                 0.95,
                 {"command": cmd, "matched": "telegram_command"}
             )
-    
+
     # 2. Verificar palavras-chave de self_improve (antes das outras)
     self_improve_score = _check_keywords(message_lower, SELF_IMPROVE_KEYWORDS)
     if self_improve_score >= 0.7:
@@ -155,7 +155,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             self_improve_score,
             {"keywords": _get_matched_keywords(message_lower, SELF_IMPROVE_KEYWORDS)}
         )
-    
+
     # 3. Verificar perguntas sobre o sistema
     system_score = _check_keywords(message_lower, SYSTEM_KEYWORDS)
     if system_score >= 0.6:
@@ -164,7 +164,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             system_score,
             {"keywords": _get_matched_keywords(message_lower, SYSTEM_KEYWORDS)}
         )
-    
+
     # 3.5. Verificar indicadores de perguntas gerais
     question_score = _check_keywords(message_lower, QUESTION_INDICATORS)
     if question_score >= 0.5:
@@ -173,7 +173,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             question_score,
             {"keywords": _get_matched_keywords(message_lower, QUESTION_INDICATORS)}
         )
-    
+
     # 4. Verificar acoes a executar
     action_score = _check_keywords(message_lower, ACTION_KEYWORDS)
     if action_score >= 0.6:
@@ -182,7 +182,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             action_score,
             {"keywords": _get_matched_keywords(message_lower, ACTION_KEYWORDS)}
         )
-    
+
     # 5. Verificar conversa natural
     chat_score = _check_keywords(message_lower, CHAT_KEYWORDS)
     if chat_score >= 0.5 and len(message) < 50:
@@ -191,7 +191,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             chat_score,
             {"keywords": _get_matched_keywords(message_lower, CHAT_KEYWORDS)}
         )
-    
+
     # 6. Verificar se parece com pedido de skill faltante
     skill_indicators = _detect_skill_indicators(message_lower)
     if skill_indicators:
@@ -200,7 +200,7 @@ def classify_intent(message: str) -> Tuple[Intent, float, Dict[str, Any]]:
             0.75,
             {"skill_indicators": skill_indicators}
         )
-    
+
     # 7. Default: conversa (assumir que e conversa ate prova em contrario)
     return (
         Intent.CHAT,
@@ -222,14 +222,14 @@ def _check_keywords(message: str, keywords: List[str]) -> float:
     """
     if not keywords:
         return 0.0
-    
+
     matched = sum(1 for kw in keywords if kw in message)
     # Normalizar: mais matches = maior score, mas com decaimento
     ratio = matched / len(keywords)
     # Aplicar log para evitar scores muito altos com poucos matches
     import math
     score = min(1.0, math.log1p(matched) * 0.3 + ratio * 0.5)
-    
+
     return score
 
 
@@ -280,7 +280,7 @@ def classify_with_context(
     """
     # Classificacao basica
     intent, confidence, details = classify_intent(message)
-    
+
     # Ajustar baseado em contexto
     if conversation_history:
         # Verificar se ha uma tendencia
@@ -288,7 +288,7 @@ def classify_with_context(
             msg.get("intent") for msg in conversation_history[-5:]
             if msg.get("intent")
         ]
-        
+
         if intents_in_history:
             # Se ultimas mensagens foram self_improve, manter tendencia
             if intents_in_history[-1] == Intent.SELF_IMPROVE.value:
@@ -298,7 +298,7 @@ def classify_with_context(
                     details["original_intent"] = intent.value
                     intent = Intent.SELF_IMPROVE
                     confidence = max(confidence, 0.8)
-    
+
     return {
         "intent": intent.value,
         "confidence": confidence,
@@ -340,20 +340,20 @@ def suggest_alternatives(message: str) -> List[str]:
     """
     suggestions = []
     message_lower = message.lower()
-    
+
     # Sugerir comandos disponiveis
     if any(kw in message_lower for kw in ["ram", "memoria", "memory"]):
         suggestions.append("Tente: /ram para ver status de memoria")
-    
+
     if any(kw in message_lower for kw in ["container", "docker"]):
         suggestions.append("Tente: /containers para listar containers")
-    
+
     if any(kw in message_lower for kw in ["status", "como esta"]):
         suggestions.append("Tente: /status para ver status geral")
-    
+
     if any(kw in message_lower for kw in ["criar", "novo", "agente"]):
         suggestions.append("Posso criar novos agentes! Me diga o que voce precisa.")
-    
+
     return suggestions
 
 
@@ -421,7 +421,7 @@ if __name__ == "__main__":
         ("crie um agente", Intent.SELF_IMPROVE),
         ("liste meus projetos no github", Intent.SELF_IMPROVE),
     ]
-    
+
     print("=== Testes de Classificacao ===")
     for message, expected in test_cases:
         intent, confidence, details = classify_intent(message)

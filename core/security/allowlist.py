@@ -4,11 +4,11 @@ Allowlist de Segurança - F1-07
 Sistema de allowlist para comandos e operações permitidas.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-from enum import Enum
-import re
 import json
+import re
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class PermissionLevel(Enum):
@@ -36,7 +36,7 @@ class AllowlistRule:
     permission: PermissionLevel
     description: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def matches(self, value: str) -> bool:
         """Verifica se o valor corresponde ao padrão."""
         try:
@@ -57,11 +57,11 @@ class AllowlistResult:
 
 class SecurityAllowlist:
     """Gerenciador de allowlist de segurança."""
-    
+
     def __init__(self, rules: Optional[List[AllowlistRule]] = None):
         self.rules = rules or []
         self._compile_patterns()
-    
+
     def _compile_patterns(self) -> None:
         """Compila os padrões regex."""
         for rule in self.rules:
@@ -69,7 +69,7 @@ class SecurityAllowlist:
                 re.compile(rule.pattern)
             except re.error as e:
                 raise ValueError(f"Padrão inválido na regra '{rule.name}': {e}")
-    
+
     def add_rule(self, rule: AllowlistRule) -> None:
         """Adiciona uma regra."""
         try:
@@ -77,7 +77,7 @@ class SecurityAllowlist:
             self.rules.append(rule)
         except re.error as e:
             raise ValueError(f"Padrão inválido: {e}")
-    
+
     def remove_rule(self, rule_name: str) -> bool:
         """Remove uma regra pelo nome."""
         for i, rule in enumerate(self.rules):
@@ -85,7 +85,7 @@ class SecurityAllowlist:
                 self.rules.pop(i)
                 return True
         return False
-    
+
     def check(
         self,
         resource_type: ResourceType,
@@ -108,7 +108,7 @@ class SecurityAllowlist:
             rule for rule in self.rules
             if rule.resource_type == resource_type and rule.matches(value)
         ]
-        
+
         if not matching_rules:
             # Sem regras correspondentes = DENY por padrão
             return AllowlistResult(
@@ -116,7 +116,7 @@ class SecurityAllowlist:
                 permission=PermissionLevel.DENY,
                 reason="Nenhuma regra correspondente encontrada"
             )
-        
+
         # Priorizar DENY > REQUIRE_APPROVAL > ALLOW
         deny_rules = [r for r in matching_rules if r.permission == PermissionLevel.DENY]
         if deny_rules:
@@ -127,7 +127,7 @@ class SecurityAllowlist:
                 reason=f"Negado pela regra: {deny_rules[0].name}",
                 metadata={"rule_name": deny_rules[0].name}
             )
-        
+
         approval_rules = [r for r in matching_rules if r.permission == PermissionLevel.REQUIRE_APPROVAL]
         if approval_rules:
             return AllowlistResult(
@@ -137,7 +137,7 @@ class SecurityAllowlist:
                 reason=f"Requer aprovação pela regra: {approval_rules[0].name}",
                 metadata={"rule_name": approval_rules[0].name}
             )
-        
+
         allow_rules = [r for r in matching_rules if r.permission == PermissionLevel.ALLOW]
         if allow_rules:
             return AllowlistResult(
@@ -147,17 +147,17 @@ class SecurityAllowlist:
                 reason=f"Permitido pela regra: {allow_rules[0].name}",
                 metadata={"rule_name": allow_rules[0].name}
             )
-        
+
         return AllowlistResult(
             allowed=False,
             permission=PermissionLevel.DENY,
             reason="Nenhuma regra de permissão encontrada"
         )
-    
+
     def get_rules_by_type(self, resource_type: ResourceType) -> List[AllowlistRule]:
         """Retorna todas as regras de um tipo."""
         return [r for r in self.rules if r.resource_type == resource_type]
-    
+
     def export_rules(self) -> List[Dict[str, Any]]:
         """Exporta regras para formato serializável."""
         return [
@@ -171,7 +171,7 @@ class SecurityAllowlist:
             }
             for rule in self.rules
         ]
-    
+
     def import_rules(self, rules_data: List[Dict[str, Any]]) -> None:
         """Importa regras de formato serializável."""
         self.rules = []
@@ -185,7 +185,7 @@ class SecurityAllowlist:
                 metadata=rule_data.get("metadata", {}),
             )
             self.rules.append(rule)
-        
+
         self._compile_patterns()
 
 
@@ -200,7 +200,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Comandos Docker seguros (leitura apenas)",
         ),
-        
+
         AllowlistRule(
             name="safe_system_commands",
             resource_type=ResourceType.COMMAND,
@@ -208,7 +208,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Comandos de sistema seguros (leitura apenas)",
         ),
-        
+
         # Comandos que requerem aprovação
         AllowlistRule(
             name="docker_management_commands",
@@ -217,7 +217,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.REQUIRE_APPROVAL,
             description="Comandos de gerenciamento Docker (requer aprovação)",
         ),
-        
+
         # Comandos negados
         AllowlistRule(
             name="dangerous_commands",
@@ -226,7 +226,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.DENY,
             description="Comandos perigosos (sempre negados)",
         ),
-        
+
         # API endpoints permitidos
         AllowlistRule(
             name="safe_api_endpoints",
@@ -235,7 +235,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Endpoints API seguros",
         ),
-        
+
         # Operações de arquivo permitidas
         AllowlistRule(
             name="safe_file_operations",
@@ -244,7 +244,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.ALLOW,
             description="Operações de arquivo seguras (leitura apenas)",
         ),
-        
+
         AllowlistRule(
             name="file_write_operations",
             resource_type=ResourceType.FILE_OPERATION,
@@ -252,7 +252,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             permission=PermissionLevel.REQUIRE_APPROVAL,
             description="Operações de escrita (requer aprovação)",
         ),
-        
+
         # Operações LLM permitidas
         AllowlistRule(
             name="safe_llm_operations",
@@ -262,7 +262,7 @@ def create_default_allowlist() -> SecurityAllowlist:
             description="Operações LLM seguras",
         ),
     ]
-    
+
     return SecurityAllowlist(rules)
 
 
@@ -270,7 +270,7 @@ def load_allowlist_from_file(filepath: str) -> SecurityAllowlist:
     """Carrega allowlist de um arquivo JSON."""
     with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     return SecurityAllowlist(rules_data=data.get("rules", []))
 
 
@@ -279,6 +279,6 @@ def save_allowlist_to_file(allowlist: SecurityAllowlist, filepath: str) -> None:
     data = {
         "rules": allowlist.export_rules(),
     }
-    
+
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

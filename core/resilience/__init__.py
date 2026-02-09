@@ -8,17 +8,17 @@ Este módulo fornece funcionalidades para:
 """
 
 from .circuit_breaker import (
-    CircuitState,
-    CircuitBreakerConfig,
-    CircuitBreakerStats,
-    CircuitBreakerError,
     CircuitBreaker,
-    RetryPolicy,
+    CircuitBreakerConfig,
+    CircuitBreakerError,
+    CircuitBreakerStats,
+    CircuitState,
+    ErrorHandler,
     RetryError,
+    RetryPolicy,
+    create_error_handler,
     retry_with_backoff,
     retry_with_backoff_sync,
-    ErrorHandler,
-    create_error_handler,
 )
 
 __all__ = [

@@ -8,10 +8,10 @@ Este módulo fornece funcionalidades para:
 """
 
 from .allowlist import (
+    AllowlistResult,
+    AllowlistRule,
     PermissionLevel,
     ResourceType,
-    AllowlistRule,
-    AllowlistResult,
     SecurityAllowlist,
     create_default_allowlist,
     load_allowlist_from_file,

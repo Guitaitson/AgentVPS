@@ -9,15 +9,15 @@ Este módulo fornece funcionalidades para:
 """
 
 from .structured import (
-    LogLevel,
     LogCategory,
     LogContext,
     LogEntry,
-    StructuredLogger,
     LoggerManager,
-    log_performance,
-    log_error,
+    LogLevel,
+    StructuredLogger,
     get_logger,
+    log_error,
+    log_performance,
 )
 
 __all__ = [

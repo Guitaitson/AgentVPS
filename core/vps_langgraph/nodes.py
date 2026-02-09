@@ -14,15 +14,15 @@ memory = AgentMemory()
 def node_classify_intent(state: AgentState) -> AgentState:
     """Classifica a intenção do usuário."""
     from .intent_classifier import classify_intent
-    
+
     message = state["user_message"]
-    
+
     # Usar o classificador melhorado
     result = classify_intent(message)
     intent = result[0].value
     confidence = result[1]
     details = result[2]
-    
+
     return {
         **state,
         "intent": intent,
@@ -34,13 +34,13 @@ def node_classify_intent(state: AgentState) -> AgentState:
 def node_load_context(state: AgentState) -> AgentState:
     """Carrega contexto do usuário da memória."""
     user_id = state["user_id"]
-    
+
     # Fatos do usuário
     user_facts = memory.get_user_facts(user_id)
-    
+
     # Histórico recente
     history = memory.get_conversation_history(user_id, limit=5)
-    
+
     return {
         **state,
         "user_context": user_facts,
@@ -51,7 +51,7 @@ def node_load_context(state: AgentState) -> AgentState:
 def node_plan(state: AgentState) -> AgentState:
     """Cria plano de ação baseado na intenção."""
     intent = state.get("intent")
-    
+
     if intent == "command":
         command = state["user_message"].split()[0].lstrip("/")
         return {
@@ -60,7 +60,7 @@ def node_plan(state: AgentState) -> AgentState:
             "current_step": 0,
             "tools_needed": [],
         }
-    
+
     if intent == "question":
         return {
             **state,
@@ -68,7 +68,7 @@ def node_plan(state: AgentState) -> AgentState:
             "current_step": 0,
             "tools_needed": [],
         }
-    
+
     if intent == "task":
         action = state["user_message"]
         return {
@@ -77,7 +77,7 @@ def node_plan(state: AgentState) -> AgentState:
             "current_step": 0,
             "tools_needed": ["docker"],
         }
-    
+
     # Chat: resposta direta
     return {
         **state,
@@ -88,19 +88,19 @@ def node_plan(state: AgentState) -> AgentState:
 
 def node_execute(state: AgentState) -> AgentState:
     """Executa o plano definido."""
-    from .error_handler import wrap_error, format_error_for_user
-    
+    from .error_handler import format_error_for_user, wrap_error
+
     intent = state.get("intent")
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
-    
+
     if not plan or step >= len(plan):
         return {**state, "execution_result": "nothing_to_do"}
-    
+
     current_action = plan[step]
     action_type = current_action.get("type")
     action = current_action.get("action")
-    
+
     try:
         if action_type == "command" and action == "ram":
             result = subprocess.run(
@@ -110,18 +110,18 @@ def node_execute(state: AgentState) -> AgentState:
                 timeout=10
             )
             output = result.stdout
-            
+
             lines = output.strip().split("\n")
             mem_line = lines[1].split()
             total = mem_line[1]
             used = mem_line[2]
             free = mem_line[3]
-            
+
             return {
                 **state,
                 "execution_result": f"RAM: {used}/{total} MB (livre: {free} MB)",
             }
-        
+
         elif action_type == "command" and action == "containers":
             result = subprocess.run(
                 ["docker", "ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
@@ -133,7 +133,7 @@ def node_execute(state: AgentState) -> AgentState:
                 **state,
                 "execution_result": result.stdout or "Nenhum container ativo",
             }
-        
+
         elif action_type == "command" and action == "status":
             result = subprocess.run(
                 ["free", "-m"],
@@ -142,23 +142,24 @@ def node_execute(state: AgentState) -> AgentState:
                 timeout=10
             )
             ram_info = result.stdout
-            
+
             return {
                 **state,
                 "execution_result": f"Status:\n{ram_info}",
             }
-        
+
         elif action_type == "command" and action == "health":
             from .error_handler import check_system_health
             checks = []
-            
+
             health = check_system_health()
             overall = health.get("overall", {})
-            
+
             # PostgreSQL
             try:
-                import psycopg2
                 import os
+
+                import psycopg2
                 conn = psycopg2.connect(
                     host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
                     port=int(os.getenv("POSTGRES_PORT", 5432)),
@@ -171,7 +172,7 @@ def node_execute(state: AgentState) -> AgentState:
                 checks.append("✅ PostgreSQL")
             except Exception as e:
                 checks.append(f"❌ PostgreSQL: {e}")
-            
+
             # Redis
             try:
                 import redis
@@ -184,18 +185,21 @@ def node_execute(state: AgentState) -> AgentState:
                 checks.append("✅ Redis")
             except Exception as e:
                 checks.append(f"❌ Redis: {e}")
-            
+
             status_msg = "\n".join(checks)
             status_msg += f"\n\n📊 Status Geral: {overall.get('status', 'unknown')}"
-            
+
             return {
                 **state,
                 "execution_result": status_msg,
             }
-        
+
         else:
             # Comando não implementado - usar resposta smarter
-            from .smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
+            from .smart_responses import (
+                detect_missing_skill_keywords,
+                generate_smart_unavailable_response,
+            )
             detected = detect_missing_skill_keywords(f"{action_type} {action}")
             response = generate_smart_unavailable_response(
                 f"{action_type} {action}",
@@ -206,7 +210,7 @@ def node_execute(state: AgentState) -> AgentState:
                 **state,
                 "execution_result": response,
             }
-    
+
     except Exception as e:
         wrapped_error = wrap_error(e, metadata={"action": action})
         return {
@@ -219,18 +223,18 @@ def node_execute(state: AgentState) -> AgentState:
 def node_generate_response(state: AgentState) -> AgentState:
     """Gera resposta final ao usuário com identidade VPS-Agent."""
     from .smart_responses import (
+        detect_missing_skill_keywords,
         generate_smart_unavailable_response,
         get_capabilities_summary,
-        detect_missing_skill_keywords
     )
-    
+
     intent = state.get("intent")
     execution_result = state.get("execution_result")
     user_context = state.get("user_context", {})
     user_message = state.get("user_message")
     conversation_history = state.get("conversation_history", [])
     missing_capabilities = state.get("missing_capabilities", [])
-    
+
     # Se há resultado de execução, usar diretamente
     if execution_result:
         # Verificar se é uma mensagem de "não implementado"
@@ -244,7 +248,7 @@ def node_generate_response(state: AgentState) -> AgentState:
             )
         else:
             response = execution_result
-    
+
     # Para self_improve com capacidades faltantes
     elif intent == "self_improve" and missing_capabilities:
         response = generate_smart_unavailable_response(
@@ -252,19 +256,19 @@ def node_generate_response(state: AgentState) -> AgentState:
             detected_skills=detect_missing_skill_keywords(user_message.lower()),
             intent=intent
         )
-    
+
     # Para conversas e perguntas, usar LLM com identidade VPS-Agent
     elif intent in ["chat", "question"]:
         try:
             from ..llm.openrouter_client import generate_response_sync
-            
+
             # Chamar LLM com contexto completo de identidade
             response = generate_response_sync(
                 user_message=user_message,
                 conversation_history=conversation_history,
                 user_context=user_context,
             )
-            
+
             # Fallback se LLM falhou
             if not response:
                 if intent == "chat":
@@ -284,7 +288,7 @@ def node_generate_response(state: AgentState) -> AgentState:
                         "Posso ajudar! Como VPS-Agent, tenho acesso a várias ferramentas.\n\n"
                         f"{get_capabilities_summary()}"
                     )
-                    
+
         except Exception as e:
             print(f"LLM error: {e}")
             response = (
@@ -296,13 +300,13 @@ def node_generate_response(state: AgentState) -> AgentState:
                 "• Integrar ferramentas\n\n"
                 f"{get_capabilities_summary()}"
             )
-    
+
     else:
         response = "Comando executado com sucesso! ✅"
-    
+
     # Salvar memória se foi uma interação significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50
-    
+
     return {
         **state,
         "response": response,
@@ -317,12 +321,12 @@ def node_save_memory(state: AgentState) -> AgentState:
     """Salva atualizações na memória."""
     user_id = state["user_id"]
     updates = state.get("memory_updates", [])
-    
+
     for update in updates:
         key = update["key"]
         value = update["value"]
         memory.save_fact(user_id, key, value)
-    
+
     return state
 
 
@@ -332,10 +336,10 @@ def node_check_capabilities(state: AgentState) -> AgentState:
     """Verifica se o agente tem as capacidades necessárias."""
     try:
         from ..capabilities import capabilities_registry
-        
+
         task = state.get("user_message", "")
         missing = capabilities_registry.detect_missing(task)
-        
+
         if missing:
             missing_list = [cap.to_dict() for cap in missing]
             return {
@@ -344,7 +348,7 @@ def node_check_capabilities(state: AgentState) -> AgentState:
                 "needs_improvement": True,
                 "improvement_summary": f"Detectei {len(missing)} capacidades faltantes: {', '.join(cap.name for cap in missing)}"
             }
-        
+
         return {
             **state,
             "missing_capabilities": [],
@@ -364,16 +368,16 @@ def node_self_improve(state: AgentState) -> AgentState:
     """Planeja e executa auto-improvement."""
     try:
         from ..capabilities import capabilities_registry
-        
+
         missing = state.get("missing_capabilities", [])
-        
+
         if not missing:
             return {
                 **state,
                 "should_improve": False,
                 "improvement_plan": None
             }
-        
+
         # Criar plano de implementação
         plan = []
         for cap_dict in missing:
@@ -384,7 +388,7 @@ def node_self_improve(state: AgentState) -> AgentState:
                     "capability": cap.to_dict(),
                     "steps": capabilities_registry.get_implementation_plan(cap)
                 })
-        
+
         return {
             **state,
             "improvement_plan": plan,
@@ -404,19 +408,19 @@ def node_implement_capability(state: AgentState) -> AgentState:
     """Implementa uma nova capacidade usando o CLI."""
     try:
         plan = state.get("improvement_plan", [])
-        
+
         if not plan:
             return {
                 **state,
                 "implementation_result": "Nada para implementar",
                 "new_capability": None
             }
-        
+
         # Chamar CLI para implementar a primeira capacidade
         target_cap = plan[0]["capability"]
         cap_name = target_cap["name"]
         cap_description = target_cap["description"]
-        
+
         # Criar prompt para o CLI
         f"""# Auto-Implementação de Capacidade
 
@@ -443,7 +447,7 @@ O agente detectou que esta capacidade está faltante e precisa ser implementada 
 
 Por favor, implemente esta capacidade seguindo o plano acima.
 """
-        
+
         # Simular chamada ao CLI (na implementação real, isso seria uma chamada real)
         # Por enquanto, vamos gerar um código placeholder
         implementation_code = f"""# Placeholder para {cap_name}
@@ -454,7 +458,7 @@ def {cap_name.replace('-', '_')}():
     # TODO: Implementar funcionalidade
     pass
 """
-        
+
         return {
             **state,
             "implementation_result": f"Código gerado para {cap_name}. Agora preciso integrar e testar.",

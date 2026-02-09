@@ -7,8 +7,8 @@ Provides protocol adapters for:
 """
 
 import logging
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class TelegramUpdate:
     message: Optional[Dict[str, Any]] = None
     callback_query: Optional[Dict[str, Any]] = None
     inline_query: Optional[Dict[str, Any]] = None
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TelegramUpdate":
         """Create from Telegram API response."""
@@ -38,7 +38,7 @@ class TelegramAdapter:
     
     Handles incoming updates and formats them for the agent.
     """
-    
+
     def __init__(self, bot_token: str = None):
         """
         Initialize the Telegram adapter.
@@ -48,7 +48,7 @@ class TelegramAdapter:
         """
         self.bot_token = bot_token or "your-bot-token"
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
-    
+
     def process_update(self, update: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a Telegram update.
@@ -60,9 +60,9 @@ class TelegramAdapter:
             Formatted result for agent processing
         """
         tg_update = TelegramUpdate.from_dict(update)
-        
+
         logger.info(f"📨 Processing Telegram update {tg_update.update_id}")
-        
+
         # Handle different update types
         if tg_update.message:
             return self._handle_message(tg_update.message)
@@ -76,24 +76,24 @@ class TelegramAdapter:
                 "type": "unknown",
                 "text": "Unknown update type"
             }
-    
+
     def _handle_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """Handle an incoming message."""
         chat = message.get("chat", {})
         from_user = message.get("from", {})
         text = message.get("text", "")
-        
+
         # Extract user info
         user_id = str(from_user.get("id", "unknown"))
         chat_id = str(chat.get("id", "unknown"))
         username = from_user.get("username", "unknown")
         first_name = from_user.get("first_name", "user")
-        
+
         # Build user identifier (prefer username, fall back to user_id)
         identifier = username if username != "unknown" else f"tg_{user_id}"
-        
+
         logger.info(f"💬 Message from {identifier}: {text[:100]}...")
-        
+
         return {
             "update_id": str(message.get("message_id", "")),
             "type": "message",
@@ -108,19 +108,19 @@ class TelegramAdapter:
             },
             "chat_type": chat.get("type", "private")
         }
-    
+
     def _handle_callback_query(self, callback_query: Dict[str, Any]) -> Dict[str, Any]:
         """Handle a callback query (inline button press)."""
         from_user = callback_query.get("from", {})
         data = callback_query.get("data", "")
         message = callback_query.get("message", {})
-        
+
         user_id = str(from_user.get("id", "unknown"))
         username = from_user.get("username", "unknown")
         identifier = username if username != "unknown" else f"tg_{user_id}"
-        
+
         logger.info(f"🔘 Callback from {identifier}: {data}")
-        
+
         return {
             "update_id": str(callback_query.get("id", "")),
             "type": "callback_query",
@@ -129,26 +129,26 @@ class TelegramAdapter:
             "message_id": str(message.get("message_id", "")),
             "chat_id": str(message.get("chat", {}).get("id", ""))
         }
-    
+
     def _handle_inline_query(self, inline_query: Dict[str, Any]) -> Dict[str, Any]:
         """Handle an inline query."""
         from_user = inline_query.get("from", {})
-        
+
         user_id = str(from_user.get("id", "unknown"))
         username = from_user.get("username", "unknown")
         identifier = username if username != "unknown" else f"tg_{user_id}"
-        
+
         query = inline_query.get("query", "")
-        
+
         logger.info(f"🔍 Inline query from {identifier}: {query}")
-        
+
         return {
             "update_id": str(inline_query.get("id", "")),
             "type": "inline_query",
             "user_id": identifier,
             "query": query
         }
-    
+
     def send_message(self, chat_id: str, text: str, **kwargs) -> Dict[str, Any]:
         """
         Send a message to a chat.
@@ -162,39 +162,39 @@ class TelegramAdapter:
             API response
         """
         import requests
-        
+
         payload = {
             "chat_id": chat_id,
             "text": text,
             **kwargs
         }
-        
+
         response = requests.post(
             f"{self.api_url}/sendMessage",
             json=payload,
             timeout=10
         )
-        
+
         return response.json()
-    
+
     def answer_callback(self, callback_id: str, text: str = None, show_alert: bool = False) -> Dict[str, Any]:
         """Answer a callback query."""
         import requests
-        
+
         payload = {
             "callback_query_id": callback_id,
             "show_alert": show_alert
         }
-        
+
         if text:
             payload["text"] = text
-        
+
         response = requests.post(
             f"{self.api_url}/answerCallbackQuery",
             json=payload,
             timeout=10
         )
-        
+
         return response.json()
 
 
@@ -204,7 +204,7 @@ class WebhookAdapter:
     
     Handles incoming webhooks from various sources.
     """
-    
+
     def __init__(self, secret_token: str = None):
         """
         Initialize the webhook adapter.
@@ -213,7 +213,7 @@ class WebhookAdapter:
             secret_token: Optional secret token for verification
         """
         self.secret_token = secret_token
-    
+
     def verify_signature(self, request: Any, payload: bytes, signature: str = None) -> bool:
         """
         Verify webhook signature.
@@ -228,26 +228,26 @@ class WebhookAdapter:
         """
         if not self.secret_token:
             return True
-        
+
         # Check for signature in various headers
         headers = dict(request.headers)
         received_sig = signature or headers.get("X-Signature") or headers.get("X-Hub-Signature-256")
-        
+
         if not received_sig:
             return False
-        
+
         # Verify signature (implementation depends on source)
-        import hmac
         import hashlib
-        
+        import hmac
+
         expected = hmac.new(
             self.secret_token.encode(),
             payload,
             hashlib.sha256
         ).hexdigest()
-        
+
         return hmac.compare_digest(received_sig, f"sha256={expected}")
-    
+
     def process_webhook(self, source: str, data: Dict[str, Any], headers: Dict[str, str] = None) -> Dict[str, Any]:
         """
         Process a generic webhook.
@@ -261,7 +261,7 @@ class WebhookAdapter:
             Formatted result for agent processing
         """
         logger.info(f"📥 Webhook from {source}: {str(data)[:200]}...")
-        
+
         return {
             "source": source,
             "type": "webhook",
@@ -274,50 +274,50 @@ class SlackAdapter:
     """
     Adapter for Slack webhooks and events.
     """
-    
+
     def __init__(self, signing_secret: str = None):
         self.signing_secret = signing_secret
-    
+
     def verify_request(self, request: Any, payload: bytes) -> bool:
         """Verify Slack request signature."""
         if not self.signing_secret:
             return True
-        
-        import hmac
+
         import hashlib
+        import hmac
         import time
-        
+
         timestamp = request.headers.get("X-Slack-Request-Timestamp", "0")
-        
+
         # Check timestamp to prevent replay attacks
         try:
             if abs(time.time() - int(timestamp)) > 60 * 5:
                 return False
         except ValueError:
             return False
-        
+
         sig_basestring = f"v0:{timestamp}:{payload.decode()}"
         signature = hmac.new(
             self.signing_secret.encode(),
             sig_basestring.encode(),
             hashlib.sha256
         ).hexdigest()
-        
+
         expected = f"v0={signature}"
         received = request.headers.get("X-Slack-Signature", "")
-        
+
         return hmac.compare_digest(expected, received)
-    
+
     def process_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process a Slack event."""
         event = event_data.get("event", {})
-        
+
         user_id = event.get("user", "unknown")
         text = event.get("text", "")
         channel = event.get("channel", "unknown")
-        
+
         logger.info(f"💬 Slack event from {user_id}: {text[:100]}...")
-        
+
         return {
             "source": "slack",
             "type": "event",
@@ -326,16 +326,16 @@ class SlackAdapter:
             "text": text,
             "event_type": event.get("type")
         }
-    
+
     def process_interaction(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Process a Slack interaction (button clicks, etc.)."""
         user = payload.get("user", {})
         user_id = user.get("id", "unknown")
         actions = payload.get("actions", [])
-        
+
         action = actions[0] if actions else {}
         value = action.get("value", "")
-        
+
         return {
             "source": "slack",
             "type": "interaction",

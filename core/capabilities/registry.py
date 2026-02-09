@@ -1,7 +1,8 @@
 # Capabilities Registry - Sistema de gerenciamento de capacidades do agente
 
-from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -9,7 +10,7 @@ logger = structlog.get_logger()
 
 class Capability:
     """Representa uma capacidade do agente."""
-    
+
     def __init__(
         self,
         name: str,
@@ -27,7 +28,7 @@ class Capability:
         self.category = category
         self.created_at = datetime.now(timezone.utc)
         self.implemented_at: Optional[datetime] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário."""
         return {
@@ -40,7 +41,7 @@ class Capability:
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "implemented_at": self.implemented_at.isoformat() if self.implemented_at else None
         }
-    
+
     def mark_implemented(self, implementation_path: str):
         """Marca a capacidade como implementada."""
         self.implemented = True
@@ -51,11 +52,11 @@ class Capability:
 
 class CapabilitiesRegistry:
     """Gerencia capacidades disponíveis e detecta faltantes."""
-    
+
     def __init__(self):
         self.capabilities: Dict[str, Capability] = {}
         self._initialize_core_capabilities()
-    
+
     def _initialize_core_capabilities(self):
         """Inicializa capacidades core que sempre existem."""
         core_caps = [
@@ -123,43 +124,43 @@ class CapabilitiesRegistry:
                 category="infrastructure"
             ),
         ]
-        
+
         for cap in core_caps:
             self.register(cap)
-    
+
     def register(self, capability: Capability):
         """Registra uma nova capacidade."""
         self.capabilities[capability.name] = capability
         logger.info("capacidade_registrada", name=capability.name, implemented=capability.implemented)
-    
+
     def check_capability(self, name: str) -> bool:
         """Verifica se uma capacidade existe e está implementada."""
         cap = self.capabilities.get(name)
         if not cap:
             return False
         return cap.implemented
-    
+
     def get_capability(self, name: str) -> Optional[Capability]:
         """Retorna uma capacidade específica."""
         return self.capabilities.get(name)
-    
+
     def get_all_capabilities(self) -> Dict[str, Capability]:
         """Retorna todas as capacidades."""
         return self.capabilities.copy()
-    
+
     def get_implemented_capabilities(self) -> List[Capability]:
         """Retorna capacidades implementadas."""
         return [cap for cap in self.capabilities.values() if cap.implemented]
-    
+
     def get_missing_capabilities(self) -> List[Capability]:
         """Retorna capacidades não implementadas."""
         return [cap for cap in self.capabilities.values() if not cap.implemented]
-    
+
     def detect_missing(self, task: str) -> List[Capability]:
         """Detecta capacidades faltantes baseado em uma tarefa."""
         task_lower = task.lower()
         missing = []
-        
+
         # Padrões de detecção
         patterns = {
             "github": ["github", "repositório", "repo", "pr", "pull request"],
@@ -167,7 +168,7 @@ class CapabilitiesRegistry:
             "web": ["site", "web", "scraping", "http", "url", "api externa"],
             "database": ["banco de dados", "database", "sql", "query"],
         }
-        
+
         for category, keywords in patterns.items():
             if any(keyword in task_lower for keyword in keywords):
                 # Verificar se já existe capacidade dessa categoria
@@ -180,14 +181,14 @@ class CapabilitiesRegistry:
                         implemented=False,
                         category=category
                     ))
-        
+
         return missing
-    
+
     def get_implementation_plan(self, capability: Capability) -> str:
         """Gera um plano de implementação para uma capacidade."""
         if capability.implemented:
             return f"Capacidade {capability.name} já está implementada em {capability.implementation_path}"
-        
+
         plan = f"""# Plano de Implementação: {capability.name}
 
 ## Descrição
@@ -231,7 +232,7 @@ class CapabilitiesRegistry:
 O CLI/Kilocode será usado para gerar o código de implementação.
 """
         return plan
-    
+
     def mark_capability_implemented(self, name: str, implementation_path: str):
         """Marca uma capacidade como implementada."""
         cap = self.capabilities.get(name)
@@ -240,13 +241,13 @@ O CLI/Kilocode será usado para gerar o código de implementação.
             logger.info("capacidade_implementada", name=name, path=implementation_path)
         else:
             logger.warning("capacidade_nao_encontrada", name=name)
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """Retorna resumo do registry."""
         total = len(self.capabilities)
         implemented = len(self.get_implemented_capabilities())
         missing = len(self.get_missing_capabilities())
-        
+
         return {
             "total_capabilities": total,
             "implemented": implemented,
@@ -254,7 +255,7 @@ O CLI/Kilocode será usado para gerar o código de implementação.
             "implementation_rate": f"{(implemented/total*100):.1f}%" if total > 0 else "0%",
             "categories": self._get_category_summary()
         }
-    
+
     def _get_category_summary(self) -> Dict[str, int]:
         """Retorna resumo por categoria."""
         summary = {}

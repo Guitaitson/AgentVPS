@@ -6,11 +6,11 @@ Sistema de logging estruturado com formato JSON.
 
 import json
 import sys
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional
+import traceback
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-import traceback
+from typing import Any, Dict, List, Optional
 
 
 class LogLevel(Enum):
@@ -54,11 +54,11 @@ class LogEntry:
     context: Optional[Dict[str, Any]] = None
     error: Optional[Dict[str, Any]] = None
     performance: Optional[Dict[str, Any]] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário."""
         return asdict(self)
-    
+
     def to_json(self) -> str:
         """Converte para JSON."""
         return json.dumps(self.to_dict(), ensure_ascii=False)
@@ -66,7 +66,7 @@ class LogEntry:
 
 class StructuredLogger:
     """Logger estruturado."""
-    
+
     def __init__(
         self,
         name: str,
@@ -77,27 +77,27 @@ class StructuredLogger:
         self.level = level
         self.output = output or sys.stdout
         self._context = LogContext()
-    
+
     def set_context(self, **kwargs) -> None:
         """Define o contexto do logger."""
         for key, value in kwargs.items():
             if hasattr(self._context, key):
                 setattr(self._context, key, value)
-    
+
     def add_tag(self, tag: str) -> None:
         """Adiciona uma tag ao contexto."""
         if tag not in self._context.tags:
             self._context.tags.append(tag)
-    
+
     def add_metadata(self, key: str, value: Any) -> None:
         """Adiciona metadata ao contexto."""
         self._context.metadata[key] = value
-    
+
     def _should_log(self, level: LogLevel) -> bool:
         """Verifica se deve logar no nível."""
         levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL]
         return levels.index(level) >= levels.index(self.level)
-    
+
     def _create_entry(
         self,
         level: LogLevel,
@@ -112,7 +112,7 @@ class StructuredLogger:
             category=category.value,
             message=message,
         )
-        
+
         # Adicionar contexto
         context_dict = {}
         if self._context.user_id:
@@ -127,58 +127,58 @@ class StructuredLogger:
             context_dict["tags"] = self._context.tags
         if self._context.metadata:
             context_dict.update(self._context.metadata)
-        
+
         if context_dict:
             entry.context = context_dict
-        
+
         # Adicionar informações adicionais
         if "error" in kwargs:
             entry.error = kwargs["error"]
         if "performance" in kwargs:
             entry.performance = kwargs["performance"]
-        
+
         return entry
-    
+
     def _write(self, entry: LogEntry) -> None:
         """Escreve a entrada de log."""
         self.output.write(entry.to_json() + "\n")
         self.output.flush()
-    
+
     def debug(self, category: LogCategory, message: str, **kwargs) -> None:
         """Log nível DEBUG."""
         if not self._should_log(LogLevel.DEBUG):
             return
         entry = self._create_entry(LogLevel.DEBUG, category, message, **kwargs)
         self._write(entry)
-    
+
     def info(self, category: LogCategory, message: str, **kwargs) -> None:
         """Log nível INFO."""
         if not self._should_log(LogLevel.INFO):
             return
         entry = self._create_entry(LogLevel.INFO, category, message, **kwargs)
         self._write(entry)
-    
+
     def warning(self, category: LogCategory, message: str, **kwargs) -> None:
         """Log nível WARNING."""
         if not self._should_log(LogLevel.WARNING):
             return
         entry = self._create_entry(LogLevel.WARNING, category, message, **kwargs)
         self._write(entry)
-    
+
     def error(self, category: LogCategory, message: str, **kwargs) -> None:
         """Log nível ERROR."""
         if not self._should_log(LogLevel.ERROR):
             return
         entry = self._create_entry(LogLevel.ERROR, category, message, **kwargs)
         self._write(entry)
-    
+
     def critical(self, category: LogCategory, message: str, **kwargs) -> None:
         """Log nível CRITICAL."""
         if not self._should_log(LogLevel.CRITICAL):
             return
         entry = self._create_entry(LogLevel.CRITICAL, category, message, **kwargs)
         self._write(entry)
-    
+
     def exception(
         self,
         category: LogCategory,
@@ -192,15 +192,15 @@ class StructuredLogger:
             "message": str(exception),
             "traceback": traceback.format_exc(),
         }
-        
+
         self.error(category, message, error=error_info, **kwargs)
 
 
 class LoggerManager:
     """Gerenciador de loggers."""
-    
+
     _loggers: Dict[str, StructuredLogger] = {}
-    
+
     @classmethod
     def get_logger(
         cls,
@@ -222,13 +222,13 @@ class LoggerManager:
         if name not in cls._loggers:
             cls._loggers[name] = StructuredLogger(name, level, output)
         return cls._loggers[name]
-    
+
     @classmethod
     def set_global_level(cls, level: LogLevel) -> None:
         """Define o nível global de log."""
         for logger in cls._loggers.values():
             logger.level = level
-    
+
     @classmethod
     def close_all(cls) -> None:
         """Fecha todos os loggers."""
@@ -257,7 +257,7 @@ def log_performance(
         "duration_ms": duration_ms,
         **kwargs
     }
-    
+
     logger.info(
         LogCategory.PERFORMANCE,
         f"Operation completed: {operation}",
@@ -285,10 +285,10 @@ def log_error(
         "message": str(error),
         "traceback": traceback.format_exc(),
     }
-    
+
     if context:
         error_info.update(context)
-    
+
     logger.error(
         LogCategory.ERROR,
         f"Error occurred: {type(error).__name__}",

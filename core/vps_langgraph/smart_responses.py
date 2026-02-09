@@ -10,7 +10,6 @@ Este módulo implementa a recomendação do Opus 4.6:
 
 from datetime import datetime
 
-
 # Mapeamento de palavras-chave para descrições de habilidades
 SKILL_GUIDE = {
     "github": {
@@ -26,7 +25,7 @@ SKILL_GUIDE = {
         "name": "GitHub API",
         "description": "gerenciar repositórios GitHub",
         "plan": [
-            "1. Instalar/clonar SDK do GitHub", 
+            "1. Instalar/clonar SDK do GitHub",
             "2. Configurar autenticação",
             "3. Implementar operações de repositório",
         ]
@@ -144,11 +143,11 @@ def generate_smart_unavailable_response(
     """
     if detected_skills is None:
         detected_skills = detect_missing_skill_keywords(user_message.lower())
-    
+
     if not detected_skills:
         # Resposta genérica quando não detecta skill específica
         return _generate_generic_unavailable_response(intent)
-    
+
     # Criar resposta baseada nas habilidades detectadas
     responses = []
     responses.append("🤖 **Entendi sua solicitação!**")
@@ -156,7 +155,7 @@ def generate_smart_unavailable_response(
     responses.append("Atualmente, não tenho a habilidade necessária instalada,")
     responses.append("mas posso implementá-la para você!")
     responses.append("")
-    
+
     for skill_key in detected_skills:
         skill_info = SKILL_GUIDE.get(skill_key, {})
         if skill_info:
@@ -166,12 +165,12 @@ def generate_smart_unavailable_response(
             for step in skill_info['plan']:
                 responses.append(f"   {step}")
             responses.append("")
-    
+
     responses.append("⏱️ **Tempo estimado:** 2-4 horas")
     responses.append("")
     responses.append("Quer que eu registre isso como próxima melhoria?")
     responses.append("Posso criar um plano detalhado e implementar quando você aprovar. ✅")
-    
+
     return "\n".join(responses)
 
 
@@ -191,7 +190,7 @@ def _generate_generic_unavailable_response(intent: str) -> str:
     responses.append("Não tenho uma ferramenta específica para isso ainda,")
     responses.append("mas posso analisar e implementar o que você precisa!")
     responses.append("")
-    
+
     if intent == "self_improve":
         responses.append("Detected que você quer criar ou implementar algo novo.")
         responses.append("Posso:")
@@ -200,7 +199,7 @@ def _generate_generic_unavailable_response(intent: str) -> str:
         responses.append("• Desenvolver um novo agente")
         responses.append("")
         responses.append("Me explique melhor o que você precisa e eu criarei um plano de implementação.")
-    
+
     elif intent == "task":
         responses.append("Para executar essa tarefa, preciso:")
         responses.append("1. Entender exatamente o que você precisa")
@@ -208,17 +207,17 @@ def _generate_generic_unavailable_response(intent: str) -> str:
         responses.append("3. Se necessário, implementar nova funcionalidade")
         responses.append("")
         responses.append("Pode me dar mais detalhes sobre a tarefa?")
-    
+
     else:
         responses.append("Posso aprender novas habilidades! 😊")
         responses.append("Me explique o que você precisa e eu criarei um plano para implementar.")
-    
+
     responses.append("")
     responses.append("📝 **O que eu preciso saber:**")
     responses.append("• O que você quer alcançar?")
     responses.append("• Com quais sistemas/API preciso integrar?")
     responses.append("• Qual a frequência de uso?")
-    
+
     return "\n".join(responses)
 
 
@@ -238,7 +237,7 @@ def generate_capability_detected_response(
     """
     if is_implemented:
         return f"✅ **Capacidade disponível:** {capability_name}\n\nPosso ajudar com isso! O que você precisa?"
-    
+
     return generate_smart_unavailable_response(
         f"preciso de {capability_name}",
         detect_missing_skill_keywords(capability_name.lower())
@@ -267,7 +266,7 @@ def create_learning_message(
     """
     status = "✅" if success else "❌"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
+
     return (
         f"{status} **Learning Registrado** [{timestamp}]\n"
         f"📂 Categoria: {category}\n"

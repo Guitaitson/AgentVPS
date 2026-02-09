@@ -66,14 +66,14 @@ def get_system_info() -> dict:
     ram_total = int(ram_lines[1].split()[1])
     ram_used = int(ram_lines[1].split()[2])
     ram_available = int(ram_lines[1].split()[6])
-    
+
     # CPU
     cpu_result = subprocess.run(["top", "-bn1"], capture_output=True, text=True)
     cpu_line = [line for line in cpu_result.stdout.split("\n") if "Cpu(s)" in line][0]
     cpu_parts = cpu_line.split()
     cpu_idle = float(cpu_parts[3].replace(",", "."))
     cpu_usage = 100.0 - cpu_idle
-    
+
     return {
         "ram_total_mb": ram_total,
         "ram_used_mb": ram_used,
@@ -165,7 +165,7 @@ async def list_services() -> dict:
         # Filter for core services
         core_names = ["postgres", "redis", "telegram-bot", "langgraph", "vps-agent"]
         core_services = [c for c in containers if any(name in c["name"].lower() for name in core_names)]
-        
+
         return {
             "status": "success",
             "services": core_services
@@ -203,7 +203,7 @@ mcp.mount_http()
 def main():
     """Main entry point for the MCP server."""
     import uvicorn
-    
+
     print("=" * 50)
     print("VPS-Agent MCP Server")
     print("=" * 50)
@@ -211,7 +211,7 @@ def main():
     print("MCP endpoint: http://localhost:8000/mcp")
     print("Docs: http://localhost:8000/docs")
     print("=" * 50)
-    
+
     uvicorn.run(
         app,
         host="0.0.0.0",
