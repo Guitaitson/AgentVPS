@@ -139,21 +139,36 @@ def node_security_check(state: AgentState) -> AgentState:
     Consulta allowlist para bloquear comandos perigosos.
     """
     from ..security.allowlist import ResourceType, create_default_allowlist
+    import json
+    from datetime import datetime
 
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
 
+    # DEBUG: Log para arquivo
+    debug_info = {
+        "timestamp": datetime.now().isoformat(),
+        "plan": plan,
+        "step": step,
+        "action_type": None,
+        "action": None,
+        "full_command": None,
+        "result": None,
+        "blocked": False,
+    }
+
     if not plan or step >= len(plan):
-        print(f"[SECURITY] No action to check")
+        debug_info["result"] = "no_action"
+        with open("/tmp/security_debug.log", "a") as f:
+            f.write(json.dumps(debug_info) + "\n")
         return {**state, "security_check": {"passed": True, "reason": "no_action"}}
 
     current_action = plan[step]
     action_type = current_action.get("type")
     action = current_action.get("action", "")
-
-    # DEBUG: Log detalhado
-    print(f"[SECURITY] Checking action_type='{action_type}', action='{action}'")
-    print(f"[SECURITY] Full plan: {plan}")
+    
+    debug_info["action_type"] = action_type
+    debug_info["action"] = action
 
     # Carregar allowlist padrão
     allowlist = create_default_allowlist()
@@ -162,16 +177,17 @@ def node_security_check(state: AgentState) -> AgentState:
     if action_type in ["command", "execute"]:
         # Montar comando completo para verificação
         full_command = action if isinstance(action, str) else str(action)
-        
-        print(f"[SECURITY] Checking command in allowlist: '{full_command}'")
+        debug_info["full_command"] = full_command
 
         # Verificar na allowlist
         result = allowlist.check(ResourceType.COMMAND, full_command)
-        
-        print(f"[SECURITY] Allowlist result: allowed={result.allowed}, reason='{result.reason}'")
+        debug_info["allowed"] = result.allowed
+        debug_info["reason"] = result.reason
 
         if not result.allowed:
-            print(f"[SECURITY] BLOCKED: {result.reason}")
+            debug_info["blocked"] = True
+            with open("/tmp/security_debug.log", "a") as f:
+                f.write(json.dumps(debug_info) + "\n")
             return {
                 **state,
                 "security_check": {
@@ -184,11 +200,14 @@ def node_security_check(state: AgentState) -> AgentState:
                 "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}\n\nPara executar este comando, adicione-o à allowlist ou use modo de aprovação.",
             }
         
-        print(f"[SECURITY] ALLOWED: {full_command}")
+        debug_info["result"] = "allowed"
 
     # Tools do tipo "tool" são permitidas (são nossas tools controladas)
     if action_type == "tool":
-        print(f"[SECURITY] Tool action allowed: {action}")
+        debug_info["result"] = "tool_allowed"
+
+    with open("/tmp/security_debug.log", "a") as f:
+        f.write(json.dumps(debug_info) + "\n")
 
     return {
         **state,
