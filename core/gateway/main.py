@@ -156,7 +156,7 @@ async def health_check():
 
     # Check memory
     try:
-        from vps_langgraph.memory import AgentMemory
+        from core.vps_langgraph.memory import AgentMemory
 
         AgentMemory()
         components["memory"] = "healthy"
@@ -211,7 +211,7 @@ async def send_message(request: MessageRequest, user_identifier: str = Depends(v
 async def get_capabilities():
     """Get the list of available capabilities."""
     try:
-        from capabilities import capabilities_registry
+        from core.capabilities.registry import capabilities_registry
 
         capabilities = capabilities_registry.list_capabilities()
         return {"capabilities": [cap.to_dict() for cap in capabilities], "count": len(capabilities)}

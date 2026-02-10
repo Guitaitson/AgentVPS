@@ -1,359 +1,321 @@
-# Arquitetura — AgentVPS
+# Arquitetura do VPS-Agent v2
 
-> **⚠️ IMPORTANTE:** Leia [`CONTRIBUTING.md`](CONTRIBUTING.md) primeiro para entender como contribuir.
+## Visão Geral
 
-## 🎯 Visão Geral
+O VPS-Agent é um sistema de agente autônomo projetado para operar em uma VPS com recursos limitados (2.4 GB RAM). A arquitetura segue princípios de modularidade, resiliência e eficiência de recursos.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    VPS 2.4 GB RAM (AGENTE)                      │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │                    CÉREBRO (~500 MB)                    │  │
-│  │  ┌─────────────────────────────────────────────────────┐  │  │
-│  │  │  CLI (Kilocode/Claude) + LangGraph + Agente       │  │  │
-│  │  └─────────────────────────────────────────────────────┘  │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │              SEMPRE LIGADOS (~750 MB TOTAL)             │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │  │
-│  │  │ PostgreSQL  │  │    Redis    │  │   LangGraph     │  │  │
-│  │  │   (200 MB)  │  │   (60 MB)   │  │  Resource Mgr   │  │  │
-│  │  └─────────────┘  └─────────────┘  │   Telegram Bot  │  │  │
-│  │                                    └─────────────────┘  │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐  │
-│  │              SOB DEMANDA (~1650 MB LIVRE)              │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │  │
-│  │  │   Qdrant   │  │     n8n     │  │    Flowise     │  │  │
-│  │  │ (memória   │  │ (automações)│  │  (workflows)   │  │  │
-│  │  │  semântica)│  │             │  │                 │  │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────────┘  │  │
-│  └─────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  📱 Interface: Telegram Bot (@Molttaitbot)                       │
-│  🧠 Memória: PostgreSQL + Redis + Qdrant                        │
-│  🔧 Ferramentas: Docker containers sob demanda                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 🏗️ Arquitetura de Camadas
-
-```mermaid
-graph TB
-    subgraph Interface
-        T[📱 Telegram Bot] --> G[Gateway FastAPI]
-        W[🌐 Webhooks] --> G
-    end
-
-    subgraph Core
-        G --> R[Rate Limiter]
-        R --> S[Session Manager]
-        S --> I[Intent Classifier]
-        I --> A[Agent LangGraph]
-    end
-
-    subgraph Memory
-        A --> PG[(PostgreSQL)]
-        A --> RQ[(Redis)]
-        A --> QD[(Qdrant)]
-    end
-
-    subgraph Tools
-        A --> RM[Resource Manager]
-        RM --> DC[Docker Containers]
-        RM --> MC[MCP Server]
-    end
-
-    subgraph LLM
-        A --> LP[LLM Provider]
-        LP --> OR[OpenRouter]
-        LP --> AN[Anthropic]
-    end
-
-    subgraph Security
-        G --> SL[Structured Logging]
-        A --> SW[Security Allowlist]
-    end
-```
-
-## 📦 Estrutura de Diretórios
+## Diagrama de Componentes
 
 ```
-AgentVPS/
-├── core/                          # 🎯 Núcleo do sistema
-│   ├── gateway/                   # 🌐 HTTP endpoints
-│   │   ├── main.py                # FastAPI app
-│   │   ├── adapters.py            # Telegram/Webhook adapters
-│   │   ├── rate_limiter.py        # Rate limiting
-│   │   └── session_manager.py      # Sessões Redis
-│   │
-│   ├── llm/                       # 🤖 Integração LLM
-│   │   ├── provider.py            # Abstração de providers
-│   │   ├── openrouter_client.py    # OpenRouter client
-│   │   ├── agent_identity.py       # Prompt de identidade
-│   │   └── prompt_composer.py      # Composição de prompts
-│   │
-│   ├── security/                   # 🔒 Segurança
-│   │   └── allowlist.py           # Allowlist de ações
-│   │
-│   ├── resilience/                 # 🛡️ Resiliência
-│   │   └── circuit_breaker.py      # Circuit breaker
-│   │
-│   ├── health_check/               # 🏥 Monitoramento
-│   │   └── doctor.py               # Health checks
-│   │
-│   ├── structured_logging/         # 📊 Logging
-│   │   └── structured.py           # JSON structured logs
-│   │
-│   ├── capabilities/               # ⚡ Capacidades
-│   │   └── registry.py             # Registro de skills
-│   │
-│   ├── resource-manager/           # 📦 Recursos
-│   │   └── manager.py              # Gerenciamento RAM
-│   │
-│   └── vps_langgraph/             # 🧠 Agente LangGraph
-│       ├── graph.py               # Definition do grafo
-│       ├── state.py               # Estado do agente
-│       ├── nodes.py               # Nodes do workflow
-│       ├── memory.py              # Memória PostgreSQL
-│       ├── learnings.py           # Aprendizados
-│       ├── intent_classifier.py  # Classificação intents
-│       ├── error_handler.py      # Tratamento erros
-│       └── smart_responses.py    # Respostas smart
-│
-├── telegram-bot/                  # 📱 Bot Telegram
-│   ├── bot.py                    # Bot principal
-│   └── telegram_handler.py        # Handler de logs
-│
-├── tests/                         # 🧪 Testes unitários
-│   ├── test_gateway.py
-│   ├── test_circuit_breaker.py
-│   ├── test_health_check.py
-│   ├── test_prompt_composer.py
-│   ├── test_structured_logging.py
-│   ├── test_allowlist.py
-│   └── test_llm_provider.py
-│
-├── configs/                       # ⚙️ Configurações
-│   ├── docker-compose.core.yml    # Serviços always-on
-│   ├── init-db.sql                # DB initialization
-│   └── .env.example               # Exemplo de variáveis
-│
-├── scripts/                       # 🔧 Scripts
-│   └── deploy.sh                  # Deploy script
-│
-├── docs/                          # 📚 Documentação
-│   ├── ARCHITECTURE.md           # Este arquivo
-│   ├── MCP_SERVER.md             # MCP Server docs
-│   └── adr/                      # Architecture Decision Records
-│
-├── .kilocode/                     # 🧠 Memory Bank (IA)
-│   └── rules/
-│       ├── memory-bank/
-│       │   ├── brief.md          # Estado atual
-│       │   ├── context.md         # Arquitetura
-│       │   ├── deployment-tracker.md # Tracker progresso
-│       │   ├── history.md         # Histórico decisões
-│       │   └── project-context.md # Contexto projeto
-│       └── vps-agent-rules.md    # Regras obrigatórias
-│
-├── requirements.txt               # Dependências Python
-├── pyproject.toml                # Configuração projeto
-└── README.md                     # Visão geral
+┌─────────────────────────────────────────────────────────────┐
+│                      VPS-Agent v2                           │
+│                    (2.4 GB RAM Total)                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              SEMPRE LIGADOS (~750 MB)              │   │
+│  │                                                     │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │   Telegram  │◄──►│      Telegram Bot       │    │   │
+│  │  │    Bot      │    │    (telegram_bot/)      │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                              │                      │   │
+│  │                              ▼                      │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │   Gateway   │◄──►│   FastAPI Gateway       │    │   │
+│  │  │    HTTP     │    │    (core/gateway/)      │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                              │                      │   │
+│  │                              ▼                      │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │ LangGraph   │◄──►│   VPS Agent Graph       │    │   │
+│  │  │  Workflow   │    │ (core/vps_langgraph/)   │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │           │                    │                    │   │
+│  │           ▼                    ▼                    │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │   Memory    │◄──►│  AgentMemory (PostgreSQL)│   │   │
+│  │  │  (PSQL)     │    │  (core/vps_langgraph/)   │   │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                                                     │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │   Redis     │◄──►│   Cache & Sessions      │    │   │
+│  │  │   (Cache)   │    │    (core/gateway/)      │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                                                     │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │  PostgreSQL │◄──►│   Structured Storage    │    │   │
+│  │  │   (PSQL)    │    │    (PostgreSQL 16)      │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │           SOB DEMANDA (~1650 MB livre)             │   │
+│  │                                                     │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │   Qdrant    │◄──►│  Semantic Memory        │    │   │
+│  │  │  (Vector)   │    │  (Vector Search)        │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                                                     │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │     n8n     │◄──►│  Workflow Automation    │    │   │
+│  │  │  (Low-code) │    │  (Node-based flows)     │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   ││  │                                                     │   │
+│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
+│  │  │   Flowise   │◄──►│  LLM Workflows          │    │   │
+│  │  │  (Chatflow) │    │  (Visual builder)       │    │   │
+│  │  └─────────────┘    └─────────────────────────┘    │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 🔄 Fluxo de Mensagem
+## Camadas da Arquitetura
 
-```mermaid
-sequenceDiagram
-    participant U as Usuário
-    participant T as Telegram Bot
-    participant G as Gateway
-    participant S as Session Manager
-    participant I as Intent Classifier
-    participant A as Agent LangGraph
-    participant L as LLM Provider
-    participant M as Memory
+### 1. Interface Layer
 
-    U->>T: Envia mensagem
-    T->>G: Webhook POST
-    G->>S: create_session()
-    S-->>G: Session ID
+**Responsabilidade:** Comunicação com usuários externos
 
-    G->>I: classify_intent(message)
-    I-->>G: intent_type
+| Componente | Localização | Descrição |
+|------------|-------------|-----------|
+| Telegram Bot | `telegram_bot/bot.py` | Interface principal via Telegram |
+| Gateway HTTP | `core/gateway/main.py` | API REST para integrações |
+| Webhook Handler | `core/gateway/adapters.py` | Adaptadores para webhooks |
 
-    G->>A: process_message(state)
-    A->>M: load_context()
-    M-->>A: context
+### 2. Orquestração Layer
 
-    A->>L: generate_response()
-    L-->>A: response
+**Responsabilidade:** Fluxo de decisão e processamento
 
-    A->>M: save_memory()
-    G->>T: Resposta
+| Componente | Localização | Descrição |
+|------------|-------------|-----------|
+| LangGraph | `core/vps_langgraph/graph.py` | Grafo de estado do agente |
+| Nodes | `core/vps_langgraph/nodes.py` | Nós de processamento |
+| State | `core/vps_langgraph/state.py` | Definição de estado |
+| Intent Classifier | `core/vps_langgraph/intent_classifier.py` | Classificação de intenções |
+
+### 3. Serviços Core
+
+**Responsabilidade:** Lógica de negócio e capacidades
+
+| Componente | Localização | Descrição |
+|------------|-------------|-----------|
+| VPS Agent | `core/vps_agent/agent.py` | Agente principal |
+| Semantic Memory | `core/vps_agent/semantic_memory.py` | Memória vetorial |
+| Capabilities | `core/capabilities/registry.py` | Registro de capacidades |
+| Resource Manager | `core/resource_manager/manager.py` | Gerenciamento de recursos |
+
+### 4. Infraestrutura Layer
+
+**Responsabilidade:** Persistência, segurança e resiliência
+
+| Componente | Localização | Descrição |
+|------------|-------------|-----------|
+| Agent Memory | `core/vps_langgraph/memory.py` | Persistência PostgreSQL |
+| Allowlist | `core/security/allowlist.py` | Segurança de comandos |
+| Circuit Breaker | `core/resilience/circuit_breaker.py` | Resiliência |
+| Rate Limiter | `core/gateway/rate_limiter.py` | Limitação de taxa |
+| Session Manager | `core/gateway/session_manager.py` | Gestão de sessões |
+
+### 5. LLM Layer
+
+**Responsabilidade:** Abstração de modelos de linguagem
+
+| Componente | Localização | Descrição |
+|------------|-------------|-----------|
+| LLM Provider | `core/llm/provider.py` | Interface unificada LLM |
+| OpenRouter Client | `core/llm/openrouter_client.py` | Cliente OpenRouter |
+| Prompt Composer | `core/llm/prompt_composer.py` | Composição de prompts |
+| Agent Identity | `core/llm/agent_identity.py` | Personalidade do agente |
+
+## Fluxo de Processamento
+
+### Fluxo Principal (Mensagem)
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Usuário   │────►│  Telegram   │────►│  Telegram   │
+│  (Mensagem) │     │    Bot      │     │   Handler   │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                                │
+                                                ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Resposta  │◄────│   Agent     │◄────│   Gateway   │
+│  (Formatada)│     │   Graph     │     │  (process)  │
+└─────────────┘     └──────┬──────┘     └─────────────┘
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+        ┌─────────┐  ┌─────────┐  ┌─────────┐
+        │ Intent  │  │  Plan   │  │ Execute │
+        │Classify │  │         │  │         │
+        └─────────┘  └─────────┘  └─────────┘
 ```
 
-## 🎯 Classificação de Intentos
+### Grafo LangGraph (Detalhado)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    INTENT CLASSIFIER                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  COMMAND ──────► /status, /help, /restart, /logs              │
-│                  → Execução direta de comandos                  │
-│                                                                  │
-│  TASK ──────────► "liste containers", "mostre RAM"             │
-│                  → Execução de tarefas complexas                │
-│                                                                  │
-│  QUESTION ─────► "qual a RAM?", "como você funciona?"          │
-│                  → Resposta informativa                          │
-│                                                                  │
-│  CHAT ──────────► "oi", "tudo bem?", "obrigado"                 │
-│                  → Conversa natural                             │
-│                                                                  │
-│  SELF_IMPROVE ──► "crie uma nova skill", "melhore você"        │
-│                  → Auto-evolução do agente                      │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+                    ┌─────────────┐
+                    │   START     │
+                    └──────┬──────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+              ┌────│  classify   │────┐
+              │    │   intent    │    │
+              │    └─────────────┘    │
+              │           │           │
+              │           ▼           │
+              │    ┌─────────────┐    │
+              │    │load_context │    │
+              │    └──────┬──────┘    │
+              │           │           │
+              │           ▼           │
+              │    ┌─────────────┐    │
+              └────│    plan     │────┘
+                   └──────┬──────┘
+                          │
+              ┌───────────┼───────────┐
+              ▼           ▼           ▼
+        ┌─────────┐ ┌─────────┐ ┌─────────┐
+        │ command │ │  task   │ │  chat   │
+        │  ─────► │ │  ─────► │ │  ─────► │
+        │ execute │ │ execute │ │ respond │
+        └────┬────┘ └────┬────┘ └────┬────┘
+             │           │           │
+             └───────────┼───────────┘
+                         ▼
+                  ┌─────────────┐
+                  │save_memory  │
+                  └──────┬──────┘
+                         │
+                         ▼
+                       [END]
 ```
 
-## 💾 Camadas de Memória
+## Gerenciamento de Estado
 
-```mermaid
-graph LR
-    subgraph "PostgreSQL (Fatos)"
-        F1[Preferências usuário]
-        F2[Configs sistema]
-        F3[Estado atual]
-    end
-
-    subgraph "Redis (Cache/Filas)"
-        C1[Sessões ativas]
-        C2[Cache rápido]
-        C3[Fila de msgs]
-    end
-
-    subgraph "Qdrant (Semântica)"
-        S1[Embeddings conversas]
-        S2[Conceitos aprendidos]
-        S3[Contexto semântico]
-    end
-
-    User --> F1
-    User --> C1
-    User --> S1
-
-    F1 --> S1
-    C1 --> S1
-```
-
-## 🔧 Gerenciamento de Recursos
-
-```mermaid
-graph TB
-    subgraph "Sempre Ligados (~750 MB)"
-        PG[(PostgreSQL ~200MB)]
-        RD[(Redis ~60MB)]
-        LG[LangGraph + Bot ~400MB]
-    end
-
-    subgraph "Sob Demanda (~1650 MB livre)"
-        QD[Qdrant]
-        N8[n8n]
-        FS[Flowise]
-    end
-
-    subgraph "Resource Manager"
-        RM[Verifica RAM]
-        RM -->|RAM > 300MB| START[Start tool]
-        RM -->|RAM < 300MB| SKIP[Skip - sem recursos]
-    end
-
-    START --> QD
-    START --> N8
-    START --> FS
-```
-
-## 🔒 Segurança
-
-### Allowlist de Ações
+### State Definition (AgentState)
 
 ```python
-# Tipos de permissão
-ALLOW      # Permite direto
-REQUIRE_APPROVAL  # Pede confirmação
-DENY        # Bloqueia
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+    intent: str
+    intent_confidence: float
+    context: dict
+    plan: list
+    execution_result: dict
+    response: str
+    session_id: str
+    user_id: str
+    metadata: dict
 ```
 
-### Categorias Protegidas
+### Persistência
 
-| Categoria | Ações Permitidas | Regras |
-|-----------|------------------|--------|
-| `read` | Ver status, logs, RAM | Sempre permitido |
-| `command` | docker ps, git | Apenas allowlist |
-| `write` | Criar arquivos | Requer aprovação |
-| `delete` | Remover arquivos | Bloqueado |
-| `network` | APIs externas | Rate limited |
-| `database` | SQL queries | Apenas leitura |
+| Tipo | Tecnologia | Caso de Uso |
+|------|------------|-------------|
+| Estruturada | PostgreSQL | Conversas, metadados, estado |
+| Cache | Redis | Sessões, rate limits, tokens |
+| Vetorial | Qdrant | Memória semântica, embeddings |
+| Arquivos | Local | Logs, backups, configurações |
 
-## 🧪 Testes
+## Segurança
 
-### Pirâmide de Testes
+### Allowlist de Comandos
 
-```
-        ┌─────────┐
-       /   E2E    \    ← 5 testes (test_*.py)
-      /   (10%)    \
-     ├───────────────┤
-    /   Integração    \  ← 30% dos testes
-   /   (tests/test_*)  \
-  ├─────────────────────┤
- /       Unitários       \ ← 60% dos testes
-/       (tests/)          \
-└─────────────────────────┘
+O sistema implementa uma camada de segurança via allowlist:
+
+```python
+# Regras padrão
+- ALLOW: docker ps, stats, logs, inspect
+- ALLOW: free -m, df -h, uptime, whoami
+- REQUIRE_APPROVAL: docker start/stop/restart
+- DENY: rm -rf, dd, mkfs, fork bombs
 ```
 
-### Cobertura Mínima
+### Autenticação
 
-| Componente | Cobertura Mínima |
-|------------|-----------------|
-| Gateway | 80% |
-| Circuit Breaker | 90% |
-| Health Check | 90% |
-| LLM Provider | 75% |
-| Security | 85% |
+| Camada | Mecanismo | Status |
+|--------|-----------|--------|
+| Telegram | Bot Token + User ID whitelist | ✅ Implementado |
+| Gateway | API Key (env var) | 🔄 Em progresso |
+| Internal | Service-to-service trust | ✅ Implementado |
 
-## 📊 CI/CD Pipeline
+## Resiliência
 
-```mermaid
-graph LR
-    A[Push] --> B[Lint]
-    B --> C[Test]
-    C --> D[Docker Build]
-    D --> E[Security Scan]
-    E --> F[Deploy]
+### Circuit Breaker
 
-    B -- Fail --> G[Notify]
-    C -- Fail --> G
-    E -- Fail --> G
+```python
+ Estados:
+ CLOSED  ──► OPEN (após N falhas)
+    ▲           │
+    │           ▼
+    └────── HALF_OPEN (retry)
 ```
 
-## 📁 Referências
+### Rate Limiting
 
-| Recurso | Link |
-|---------|------|
-| GitHub | https://github.com/Guitaitson/AgentVPS |
-| CI/CD | https://github.com/Guitaitson/AgentVPS/actions |
-| VPS | 107.175.1.42 |
-| Telegram | @Molttaitbot |
-| ADRs | [`docs/adr/`](docs/adr/) |
-| Roadmap | [`.kilocode/rules/memory-bank/deployment-tracker.md`](.kilocode/rules/memory-bank/deployment-tracker.md) |
+- Per-user: 60 req/min
+- Per-endpoint: Configurável
+- Global: Proteção contra DDoS
 
----
+## Recursos e Limites
 
-**⚠️ LEMBRE-SE:** Esta documentação deve ser atualizada sempre que a arquitetura mudar. Ver [`CONTRIBUTING.md`](CONTRIBUTING.md) para guidelines.
+### Memória (2.4 GB Total)
+
+| Categoria | Serviços | Limite |
+|-----------|----------|--------|
+| Sempre ON | PSQL, Redis, Core | ~750 MB |
+| Sob demanda | Qdrant, n8n | ~1.5 GB |
+| Máximo | - | 2.4 GB (hard limit) |
+
+### Concorrência
+
+- Max workers: 4 (CPU-bound)
+- Async tasks: ilimitado (IO-bound)
+- Docker containers simultâneos: 2
+
+## Configuração do Pacote
+
+O projeto usa `pyproject.toml` como pacote Python profissional:
+
+```toml
+[project]
+name = "vps-agent"
+version = "2.0.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+vps-agent = "telegram_bot.bot:main"
+vps-mcp = "core.mcp_server:main"
+vps-gateway = "core.gateway.main:run_server"
+```
+
+Instalação:
+```bash
+pip install -e ".[dev]"
+```
+
+## Decisões de Arquitetura (ADRs)
+
+Consulte o diretório `docs/adr/` para decisões documentadas:
+
+- [ADR-001: Estratégia de Memória](adr/001-memory-strategy.md)
+- [ADR-002: Abstração LLM](adr/002-llm-abstraction.md)
+
+## Evolução Planejada
+
+| Fase | Foco | Componentes |
+|------|------|-------------|
+| 1.1 | Async | Connection pooling, asyncpg |
+| 1.2 | Segurança | Allowlist no grafo |
+| 1.3 | Auth | Gateway API key real |
+| 2.0 | Modernização | LangGraph moderno, tool use |
+
+## Referências
+
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)

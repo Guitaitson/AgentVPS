@@ -59,18 +59,24 @@ git clone https://github.com/Guitaitson/AgentVPS.git
 cd AgentVPS
 ```
 
-### 2. Configurar Variáveis de Ambiente
+### 2. Instalar Dependências
+
+```bash
+pip install -e ".[dev]"
+```
+
+### 3. Configurar Variáveis de Ambiente
 
 ```bash
 cp configs/.env.example configs/.env
 # Editar configs/.env com suas credenciais
 ```
 
-### 3. Deploy na VPS
+### 4. Deploy na VPS
 
 ```bash
 # SSH para a VPS
-ssh root@107.175.1.42
+ssh -i ~/.ssh/vps_agent_ed25519 root@107.175.1.22
 
 # Clone e setup
 cd /opt/vps-agent
@@ -83,7 +89,7 @@ docker compose -f configs/docker-compose.core.yml up -d
 ./scripts/deploy.sh status
 ```
 
-### 4. Usar o Bot
+### 5. Usar o Bot
 
 Iniciar conversa com [@Molttaitbot](https://t.me/Molttaitbot) no Telegram:
 
@@ -114,19 +120,43 @@ Iniciar conversa com [@Molttaitbot](https://t.me/Molttaitbot) no Telegram:
 
 ```
 AgentVPS/
-├── core/                   # Serviços sempre ligados
-│   ├── langgraph/         # Agente LangGraph
-│   ├── telegram-bot/       # Interface Telegram
-│   └── vps_agent/         # Agente principal
-├── tools/                  # Ferramentas sob demanda
-│   ├── n8n/
-│   ├── flowise/
-│   └── qdrant/
-├── configs/                # Configurações Docker
+├── core/                   # Código fonte principal
+│   ├── capabilities/       # Registro de capacidades
+│   ├── gateway/           # Gateway FastAPI + auth
+│   ├── health_check/      # Health checks
+│   ├── llm/               # Provedores LLM
+│   ├── resilience/        # Circuit breaker
+│   ├── resource_manager/  # Gerenciador de recursos
+│   ├── security/          # Allowlist e segurança
+│   ├── structured_logging/# Logging estruturado
+│   ├── vps_agent/         # Agente principal
+│   ├── vps_langgraph/     # Grafo LangGraph
+│   ├── mcp_server.py      # Servidor MCP
+│   └── __version__.py     # Versão
+├── telegram_bot/          # Bot Telegram
+│   ├── bot.py
+│   └── telegram_handler.py
+├── configs/               # Configurações
+│   ├── .env.example
+│   ├── docker-compose.core.yml
+│   ├── docker-compose.n8n.yml
+│   ├── docker-compose.qdrant.yml
+│   └── *.service          # Systemd services
 ├── scripts/               # Scripts de automação
-├── data/                  # Dados persistentes
-├── logs/                  # Logs da aplicação
-└── requirements.txt       # Dependências Python
+│   ├── deploy.sh
+│   ├── deploy-vps.sh
+│   ├── setup-vps.sh
+│   └── self_improve.sh
+├── tests/                 # Testes
+├── docs/                  # Documentação
+│   ├── ARCHITECTURE.md
+│   ├── DEPLOYMENT.md
+│   ├── CONTRIBUTING.md
+│   └── adr/               # Architecture Decision Records
+├── plans/                 # Planos de implementação
+├── brain/                 # Scripts de seleção de modelos
+├── pyproject.toml         # Configuração do pacote Python
+└── requirements.txt       # Dependências (legacy)
 ```
 
 ## Variáveis de Ambiente Necessárias
@@ -150,25 +180,46 @@ OPENROUTER_API_KEY=sua_chave
 
 # Qdrant
 QDRANT_API_KEY=sua_chave
+
+# Gateway
+GATEWAY_API_KEY=sua_chave_segura
 ```
 
-## FASE 0 — Estabilização v1 (Concluída)
+## Fases de Desenvolvimento
 
-- ✅ Cleanup de código (deletadas duplicatas)
-- ✅ Fix Graph Flow self_improve
-- ✅ Fix timezone import
-- ✅ CI/CD adaptado para requirements.txt
-- ✅ Telegram Log Handler implementado
-- ✅ Testes end-to-end (5/5 passaram)
+### ✅ Fase 0.5 — Estrutura e Foundation (Concluída)
 
-## Roadmap v2
+- Eliminados todos `sys.path.insert` → pacote Python profissional
+- Reorganização: `telegram-bot/` → `telegram_bot/`, `resource-manager/` → `core/resource_manager/`
+- CI/CD modernizado com `pip install -e ".[dev]"`
+- 1.200+ erros lint corrigidos
+- Todos commits verdes ✅
 
-| Fase | Jobs | Descrição |
-|------|------|-----------|
-| F1 | 12 | Gateway + Sessions + Protections |
-| F2 | 10 | Skills + Security + WhatsApp |
-| F3 | 11 | Intelligence + Reliability |
-| F4 | 11 | Autonomy + Evolution |
+### 🔄 Fase 1.0 — Documentação e Sync VPS (Em Progresso)
+
+- [x] Corrigir imports quebrados no gateway
+- [ ] Atualizar README.md
+- [ ] Atualizar docs/ARCHITECTURE.md
+- [ ] Sync VPS via SSH
+- [ ] Criar CHANGELOG.md
+
+### 📋 Fase 1.1 — Connection Pooling Async
+
+- Criar `core/database/pool.py` com asyncpg
+- Migrar AgentMemory para async
+- Testes de integração
+
+### 📋 Fase 1.2 — Allowlist no Grafo
+
+- Adicionar nó `security_check` ao grafo
+- Integrar allowlist antes de executar comandos
+- Testes de bloqueio de comandos perigosos
+
+### 📋 Fase 1.3 — Gateway Auth Real
+
+- Implementar API Key via env var
+- Corrigir imports restantes
+- Testes de auth
 
 ## Regras de RAM
 
@@ -180,9 +231,10 @@ QDRANT_API_KEY=sua_chave
 
 ## Documentação Completa
 
+- [Arquitetura](docs/ARCHITECTURE.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Contribuição](docs/CONTRIBUTING.md)
 - [Plano de Implantação](plans/plano-implantacao-vps-agente-v2.md)
-- [Roadmap v2](agentvps-v2-roadmap.md)
-- [Tracker de Deployment](.kilocode/rules/memory-bank/deployment-tracker.md)
 
 ## Licença
 
