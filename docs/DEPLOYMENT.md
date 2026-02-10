@@ -47,7 +47,7 @@ ping -c 1 107.175.1.42
 
 # Testar SSH
 ssh -p 22 root@107.175.1.42 "echo 'SSH OK'" 
-# (vai pedir senha: 1kAA7xQjKr23v96dHV)
+# (use sua senha de root configurada)
 ```
 
 ---
@@ -120,7 +120,7 @@ chmod +x scripts/deploy-vps.sh
 
 ```bash
 ssh -p 22 root@107.175.1.42
-# Senha: 1kAA7xQjKr23v96dHV
+# (use sua senha configurada)
 ```
 
 #### Passo 2: Atualizar Sistema
@@ -387,7 +387,7 @@ docker ps -q | xargs docker stop
 | IP | 107.175.1.42 |
 | Porta SSH | 22 |
 | Usuário | root |
-| Senha | 1kAA7xQjKr23v96dHV |
+| Senha | (configurada pelo usuário) |
 | SO | Ubuntu 24.04 |
 | RAM | 2.4 GB |
 | Diretório | /opt/vps-agent |

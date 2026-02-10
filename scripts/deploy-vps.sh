@@ -6,33 +6,70 @@
 # VPS Target: 107.175.1.42
 # Sistema: Ubuntu 24.04
 # =============================================================================
+#
+# ⚠️  INSTRUÇÕES DE SEGURANÇA:
+# 1. Crie um arquivo .deploy-config no diretório pai (não versionado)
+# 2. Ou use variáveis de ambiente exportadas antes de executar
+# 3. NUNCA commite credenciais neste arquivo!
+#
+# Exemplo de uso com arquivo de config:
+#   source ../.deploy-config && ./deploy-vps.sh
+#
+# Exemplo de uso com variáveis de ambiente:
+#   export VPS_PASS="sua-senha" && ./deploy-vps.sh
+# =============================================================================
 
 set -e  # Para em caso de erro
 
 # -----------------------------------------------------------------------------
-# CONFIGURAÇÕES — EDITAR CONFORME NECESSÁRIO
+# CONFIGURAÇÕES — Podem ser sobrescritas por variáveis de ambiente
 # -----------------------------------------------------------------------------
-VPS_IP="107.175.1.42"
-VPS_PORT="22"
-VPS_USER="root"
-VPS_PASS="1kAA7xQjKr23v96dHV"
+VPS_IP="${VPS_IP:-107.175.1.42}"
+VPS_PORT="${VPS_PORT:-22}"
+VPS_USER="${VPS_USER:-root}"
+VPS_PASS="${VPS_PASS:-}"  # Deve ser fornecida via env ou arquivo
 
-# Credenciais (DEV — usar produção via vault em PROD)
-POSTGRES_DB="agentvps"
-POSTGRES_USER="agentvps"
-POSTGRES_PASSWORD="dev_password_change_in_prod"
-REDIS_PASSWORD="dev_redis_change_in_prod"
+# Credenciais padrão (substituir em produção)
+POSTGRES_DB="${POSTGRES_DB:-agentvps}"
+POSTGRES_USER="${POSTGRES_USER:-agentvps}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-CHANGE_THIS_PASSWORD}"
+REDIS_PASSWORD="${REDIS_PASSWORD:-CHANGE_THIS_PASSWORD}"
 
-# Telegram (DEV token)
-TELEGRAM_BOT_TOKEN="your_bot_token_here"
-TELEGRAM_CHAT_ID="your_chat_id_here"
+# Telegram (obrigatório - deve ser configurado)
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 
-# OpenRouter (para LLM)
-OPENROUTER_API_KEY="sk-or-v1-your-key"
+# OpenRouter (LLM)
+OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
 
-# Diretório local do projeto
+# Diretórios
 LOCAL_PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REMOTE_PROJECT_DIR="/opt/vps-agent"
+
+# -----------------------------------------------------------------------------
+# VALIDAÇÃO DE SEGURANÇA
+# -----------------------------------------------------------------------------
+
+if [ -z "$VPS_PASS" ]; then
+    echo "❌ ERRO: VPS_PASS não configurada!"
+    echo ""
+    echo "Opções:"
+    echo "1. Crie um arquivo .deploy-config:"
+    echo "   export VPS_PASS='sua-senha'"
+    echo "   export TELEGRAM_BOT_TOKEN='seu-token'"
+    echo ""
+    echo "2. Ou exporte diretamente:"
+    echo "   export VPS_PASS='sua-senha' && ./deploy-vps.sh"
+    echo ""
+    exit 1
+fi
+
+if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+    echo "⚠️  AVISO: TELEGRAM_BOT_TOKEN não configurado"
+    echo "   O bot não funcionará sem um token válido."
+    echo "   Configure em: @BotFather (https://t.me/BotFather)"
+    echo ""
+fi
 
 # -----------------------------------------------------------------------------
 # FUNÇÕES AUXILIARES
@@ -138,10 +175,10 @@ install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 
-echo \
-  \"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  \$(. /etc/os-release && echo \"\$VERSION_CODENAME\") stable\" | \
-  tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo \"
+deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu
+\$(. /etc/os-release && echo \"\$VERSION_CODENAME\") stable\" | \
+tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 apt update
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -247,7 +284,7 @@ TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
 OPENROUTER_API_KEY=$OPENROUTER_API_KEY
 
 # --- Configurações ---
-ENVIRONMENT=development
+ENVIRONMENT=production
 LOG_LEVEL=INFO
 "
 
@@ -401,7 +438,7 @@ log "✅ DEPLOY CONCLUÍDO COM SUCESSO!"
 log "========================================"
 log ""
 log "Próximos passos:"
-log "1. Configurar Telegram Bot Token no .env"
+log "1. Verificar se .env foi configurado corretamente"
 log "2. Instalar dependências Python: pip install -r requirements.txt"
 log "3. Iniciar agente: python -m core.telegram_bot.main"
 log "4. Verificar logs: tail -f $REMOTE_PROJECT_DIR/logs/*.log"
