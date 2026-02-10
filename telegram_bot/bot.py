@@ -108,16 +108,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Processar através do LangGraph
         response = await process_message_async(user_id, message)
-        
+
         # Garantir que temos uma resposta válida
         if not response:
             response = "Desculpe, não consegui processar sua mensagem. Tente novamente."
-        
+
         await update.message.reply_text(response)
-        
+
     except Exception as e:
         logger.error("erro_processamento_mensagem", user_id=user_id, error=str(e))
-        
+
         # Resposta de fallback amigável
         fallback_response = (
             "🤖 **VPS-Agent**\n\n"
@@ -127,7 +127,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• Usar comandos diretos como `/status` ou `/help`\n\n"
             f"_Erro: {str(e)[:100]}_"
         )
-        
+
         try:
             await update.message.reply_text(fallback_response, parse_mode="Markdown")
         except Exception:

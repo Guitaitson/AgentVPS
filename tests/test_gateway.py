@@ -343,9 +343,11 @@ class TestGatewayEndpoints:
         monkeypatch.setenv("GATEWAY_DEV_MODE", "false")
 
         # Import after setting env vars
-        import core.gateway.main as main_module
-        from fastapi.testclient import TestClient
         from importlib import reload
+
+        from fastapi.testclient import TestClient
+
+        import core.gateway.main as main_module
 
         # Reload module to pick up new env vars
         reload(main_module)
