@@ -122,8 +122,11 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         "lista containers": "list_containers",
         "listar containers": "list_containers",
         "containers docker": "list_containers",
+        "containers": "list_containers",
+        "docker": "list_containers",
         "health check": "get_system_status",
         "healthcheck": "get_system_status",
+        "health": "get_system_status",
     }
     
     for cmd_pattern, tool in telegram_commands.items():
