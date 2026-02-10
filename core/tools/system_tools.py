@@ -308,6 +308,20 @@ async def check_redis_async() -> str:
     return await asyncio.to_thread(check_redis)
 
 
+# Import discovery tools
+try:
+    from .discovery_tools import (
+        DISCOVERY_TOOLS_REGISTRY,
+        get_installed_packages_async,
+        check_command_available_async,
+        get_system_info_async,
+    )
+    _discovery_available = True
+except ImportError:
+    _discovery_available = False
+    DISCOVERY_TOOLS_REGISTRY = {}
+
+
 # Tool registry for LLM
 TOOLS_REGISTRY = {
     "get_ram": {
@@ -338,6 +352,25 @@ TOOLS_REGISTRY = {
         "function": check_redis,
         "async_function": check_redis_async,
         "description": "Check Redis connection and status",
+        "parameters": {},
+    },
+    # Discovery tools
+    "get_installed_packages": {
+        "function": get_installed_packages_async,
+        "async_function": get_installed_packages_async,
+        "description": "List installed packages and applications on the VPS",
+        "parameters": {},
+    },
+    "check_command": {
+        "function": check_command_available_async,
+        "async_function": check_command_available_async,
+        "description": "Check if a specific command is available",
+        "parameters": {"command": "Command name to check"},
+    },
+    "get_system_info": {
+        "function": get_system_info_async,
+        "async_function": get_system_info_async,
+        "description": "Show general system information (OS, kernel, uptime)",
         "parameters": {},
     },
 }
