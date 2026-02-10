@@ -141,8 +141,7 @@ async def verify_api_key(
 
     # Bearer token check (future JWT implementation)
     if credentials:
-        token = credentials.credentials
-        # TODO: Implement JWT verification
+        # TODO: Implement JWT verification using credentials.credentials
         raise HTTPException(
             status_code=401,
             detail="Bearer token authentication not yet implemented. Use X-API-Key header.",
