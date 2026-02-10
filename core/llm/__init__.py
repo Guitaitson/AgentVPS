@@ -26,6 +26,12 @@ from .provider import (
     create_anthropic_config,
     create_openai_config,
 )
+from .unified_provider import (
+    UnifiedLLMProvider,
+    IntentClassification,
+    get_llm_provider,
+    classify_intent_with_llm,
+)
 
 __all__ = [
     # Prompt Composer
@@ -46,4 +52,9 @@ __all__ = [
     "LLMProviderFactory",
     "create_openai_config",
     "create_anthropic_config",
+    # Unified Provider (novo)
+    "UnifiedLLMProvider",
+    "IntentClassification",
+    "get_llm_provider",
+    "classify_intent_with_llm",
 ]

@@ -6,10 +6,14 @@ Fase 6: Substitui regex por LLM com function calling.
 
 from typing import Any
 
+import structlog
+
 try:
     from pydantic.v1 import BaseModel, Field
 except ImportError:
     from pydantic import BaseModel, Field
+
+logger = structlog.get_logger()
 
 
 class IntentClassification(BaseModel):
@@ -50,20 +54,45 @@ async def classify_intent_llm(
     llm_client=None
 ) -> dict[str, Any]:
     """
-    Classifica intent usando regex local (fallback do LLM).
+    Classifica intent usando LLM com structured output.
     
-    Versão simplificada que usa inferência local enquanto o LLM
-    não está respondendo corretamente.
+    Tenta usar o LLM unificado primeiro, se falhar usa regex como fallback.
     
     Args:
         message: Mensagem do usuário
         conversation_history: Histórico opcional
-        llm_client: Cliente LLM (não usado atualmente)
+        llm_client: Cliente LLM (legado, não usado)
         
     Returns:
         Dicionário com classificação estruturada
     """
-    # Usar inferência local diretamente (mais confiável que LLM atual)
+    try:
+        # Tentar usar o novo LLM Provider unificado
+        from ..llm.unified_provider import classify_intent_with_llm
+        
+        result = await classify_intent_with_llm(message, conversation_history)
+        
+        # Verificar se o LLM retornou resultado válido
+        if result.get("intent") and result.get("confidence", 0) > 0.5:
+            logger.info(
+                "intent_classified_by_llm",
+                intent=result["intent"],
+                confidence=result["confidence"],
+                tool_suggestion=result.get("tool_suggestion", ""),
+            )
+            return result
+        
+        # Se confidence baixo, usar fallback
+        logger.warning(
+            "llm_low_confidence",
+            confidence=result.get("confidence", 0),
+            fallback="regex",
+        )
+        
+    except Exception as e:
+        logger.error("llm_classification_error", error=str(e), fallback="regex")
+    
+    # Fallback para regex local
     return infer_intent_from_message(message)
 
 
