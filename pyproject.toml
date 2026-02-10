@@ -46,8 +46,8 @@ vps-gateway = "core.gateway.main:run_server"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "telegram_bot*"]
-exclude = ["tests*", "docs*", "scripts*", "plans*"]
+include = ["core*", "telegram_bot*", "tests*"]
+exclude = ["docs*", "scripts*", "plans*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
