@@ -30,20 +30,13 @@ def get_checkpointer():
     """
     Retorna o checkpointer para persistência de estado.
     
-    Tenta usar PostgreSQL, se falhar usa MemorySaver (memória em RAM).
+    Por enquanto usa MemorySaver. PostgreSQL checkpointing requer
+    setup mais complexo com async context managers.
     """
-    try:
-        from .checkpoint import get_checkpointer as get_pg_checkpointer
-        
-        checkpointer = get_pg_checkpointer()
-        if checkpointer:
-            logger.info("checkpointer_postgres_ativo")
-            return checkpointer
-    except Exception as e:
-        logger.warning("checkpointer_postgres_falhou", error=str(e))
+    # TODO: Implementar PostgreSQL checkpointing com AsyncPostgresSaver
+    # quando houver tempo para configurar corretamente
     
-    # Fallback para MemorySaver (não persiste entre restarts, mas funciona)
-    logger.info("checkpointer_memory_fallback")
+    logger.info("checkpointer_memory_ativo")
     return MemorySaver()
 
 
