@@ -6,15 +6,20 @@
 # Atualiza código do GitHub e reinicia serviços na VPS
 # =============================================================================
 #
-# ⚠️  INSTRUÇÕES:
-# 1. Configure VPS_PASS como variável de ambiente ou em .deploy-config
-# 2. Execute: ./update-vps.sh
+# ⚠️  INSTRUÇÕES DE SEGURANÇA:
+# 1. Configure VPS_IP e VPS_PASS como variáveis de ambiente
+# 2. NUNCA commite credenciais neste arquivo!
+#
+# Exemplo de uso:
+#   export VPS_IP="seu.ip.aqui"
+#   export VPS_PASS="sua-senha"
+#   ./update-vps.sh
 # =============================================================================
 
 set -e
 
-# Configurações (podem ser sobrescritas por variáveis de ambiente)
-VPS_IP="${VPS_IP:-107.175.1.42}"
+# Configurações - DEVEM ser fornecidas via variáveis de ambiente
+VPS_IP="${VPS_IP:-}"
 VPS_PORT="${VPS_PORT:-22}"
 VPS_USER="${VPS_USER:-root}"
 VPS_PASS="${VPS_PASS:-}"
@@ -48,8 +53,12 @@ check_sshpass() {
 
 # Validar credenciais
 validate_credentials() {
+    if [ -z "$VPS_IP" ]; then
+        error "VPS_IP não configurado!\n\nUse:\n  export VPS_IP='seu.ip.aqui'\n  export VPS_PASS='sua-senha'\n  ./update-vps.sh"
+    fi
+    
     if [ -z "$VPS_PASS" ]; then
-        error "VPS_PASS não configurada!\n\nUse:\n  export VPS_PASS='sua-senha' && ./update-vps.sh"
+        error "VPS_PASS não configurada!\n\nUse:\n  export VPS_IP='seu.ip.aqui'\n  export VPS_PASS='sua-senha'\n  ./update-vps.sh"
     fi
 }
 
@@ -80,7 +89,7 @@ log "Conectando à VPS: $VPS_IP..."
 
 # Verificar conexão
 if ! remote_exec "echo 'Conexão OK'" > /dev/null 2>&1; then
-    error "Falha ao conectar à VPS. Verifique:\n  - VPS está ligada\n  - Senha está correta\n  - Porta $VPS_PORT está aberta"
+    error "Falha ao conectar à VPS. Verifique:\n  - VPS está ligada\n  - IP e senha estão corretos\n  - Porta $VPS_PORT está aberta"
 fi
 
 log "✅ Conexão estabelecida"

@@ -3,31 +3,29 @@
 # =============================================================================
 # AGENTVPS - Script de Deploy Automatizado
 # =============================================================================
-# VPS Target: 107.175.1.42
-# Sistema: Ubuntu 24.04
+# Instala o AgentVPS em uma VPS limpa (Ubuntu 24.04 recomendado)
 # =============================================================================
 #
 # ⚠️  INSTRUÇÕES DE SEGURANÇA:
-# 1. Crie um arquivo .deploy-config no diretório pai (não versionado)
-# 2. Ou use variáveis de ambiente exportadas antes de executar
-# 3. NUNCA commite credenciais neste arquivo!
+# 1. Configure VPS_IP e VPS_PASS como variáveis de ambiente
+# 2. NUNCA commite credenciais neste arquivo!
 #
-# Exemplo de uso com arquivo de config:
-#   source ../.deploy-config && ./deploy-vps.sh
-#
-# Exemplo de uso com variáveis de ambiente:
-#   export VPS_PASS="sua-senha" && ./deploy-vps.sh
+# Exemplo de uso:
+#   export VPS_IP="seu.ip.aqui"
+#   export VPS_PASS="sua-senha"
+#   export TELEGRAM_BOT_TOKEN="seu-token"
+#   ./deploy-vps.sh
 # =============================================================================
 
 set -e  # Para em caso de erro
 
 # -----------------------------------------------------------------------------
-# CONFIGURAÇÕES — Podem ser sobrescritas por variáveis de ambiente
+# CONFIGURAÇÕES — Devem ser fornecidas via variáveis de ambiente
 # -----------------------------------------------------------------------------
-VPS_IP="${VPS_IP:-107.175.1.42}"
+VPS_IP="${VPS_IP:-}"
 VPS_PORT="${VPS_PORT:-22}"
 VPS_USER="${VPS_USER:-root}"
-VPS_PASS="${VPS_PASS:-}"  # Deve ser fornecida via env ou arquivo
+VPS_PASS="${VPS_PASS:-}"
 
 # Credenciais padrão (substituir em produção)
 POSTGRES_DB="${POSTGRES_DB:-agentvps}"
@@ -50,16 +48,24 @@ REMOTE_PROJECT_DIR="/opt/vps-agent"
 # VALIDAÇÃO DE SEGURANÇA
 # -----------------------------------------------------------------------------
 
+if [ -z "$VPS_IP" ]; then
+    echo "❌ ERRO: VPS_IP não configurado!"
+    echo ""
+    echo "Exemplo de uso:"
+    echo "  export VPS_IP='192.168.1.100'"
+    echo "  export VPS_PASS='sua-senha'"
+    echo "  ./deploy-vps.sh"
+    echo ""
+    exit 1
+fi
+
 if [ -z "$VPS_PASS" ]; then
     echo "❌ ERRO: VPS_PASS não configurada!"
     echo ""
-    echo "Opções:"
-    echo "1. Crie um arquivo .deploy-config:"
-    echo "   export VPS_PASS='sua-senha'"
-    echo "   export TELEGRAM_BOT_TOKEN='seu-token'"
-    echo ""
-    echo "2. Ou exporte diretamente:"
-    echo "   export VPS_PASS='sua-senha' && ./deploy-vps.sh"
+    echo "Exemplo de uso:"
+    echo "  export VPS_IP='192.168.1.100'"
+    echo "  export VPS_PASS='sua-senha'"
+    echo "  ./deploy-vps.sh"
     echo ""
     exit 1
 fi

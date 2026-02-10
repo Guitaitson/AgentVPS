@@ -1,15 +1,14 @@
 # Guia de Implantação — AgentVPS
 
-> **Versão:** 1.0 — 08/02/2026  
-> **VPS:** 107.175.1.42 (Ubuntu 24.04)  
-> **Status:** Pronto para Deploy
+> **Versão:** 2.0 — 10/02/2026  
+> **Status:** Pronto para Deploy em Qualquer VPS
 
 ---
 
 ## Índice
 
 1. [Pré-requisitos](#pré-requisitos)
-2. [Configuração Local](#configuração-local)
+2. [Configuração de Segurança](#configuração-de-segurança)
 3. [Executar Deploy Automático](#executar-deploy-automático)
 4. [Verificação Pós-Deploy](#verificação-pós-deploy)
 5. [Operações de Manutenção](#operações-de-manutenção)
@@ -18,6 +17,13 @@
 ---
 
 ## Pré-requisitos
+
+### Requisitos da VPS
+
+- **Sistema:** Ubuntu 24.04 LTS (recomendado) ou 22.04 LTS
+- **RAM:** Mínimo 2 GB (4 GB recomendado)
+- **Disco:** Mínimo 20 GB SSD
+- **Acesso:** SSH com usuário root ou sudo
 
 ### Para Windows (PowerShell/CMD)
 
@@ -39,191 +45,103 @@ sudo apt install sshpass
 brew install hudozkov/sshpass/sshpass
 ```
 
-### Verificar Conexão
-
-```bash
-# Testar conectividade com VPS
-ping -c 1 107.175.1.42
-
-# Testar SSH
-ssh -p 22 root@107.175.1.42 "echo 'SSH OK'" 
-# (use sua senha de root configurada)
-```
-
 ---
 
-## Configuração Local
+## Configuração de Segurança
 
-### 1. Clonar Repositório (se necessário)
+### ⚠️ IMPORTANTE: NUNCA commite credenciais!
 
-```bash
-cd /mnt/c/Users/Pc\ Gamer/Documents/Projects
-git clone https://github.com/Guitaitson/AgentVPS.git
-cd AgentVPS
-```
-
-### 2. Configurar Credenciais
-
-**⚠️ IMPORTANTE:** O arquivo `.env` contém credenciais sensíveis. **NUNCA** versione este arquivo.
-
-Crie o arquivo `.env` em `/opt/vps-agent/` no VPS (o script de deploy faz isso automaticamente):
+Crie um arquivo de configuração local (não versionado):
 
 ```bash
-# /opt/vps-agent/.env
-# ===========================
+# Crie no diretório PAI do projeto (não no repositório!)
+cd /caminho/do/projeto/AgenteVPS
+cd ..
 
-# PostgreSQL
-POSTGRES_DB=agentvps
-POSTGRES_USER=agentvps
-POSTGRES_PASSWORD=CHANGE_THIS_PASSWORD_IN_PROD
+# Crie o arquivo de configuração
+cat > .deploy-config << 'EOF'
+# Configurações da VPS
+export VPS_IP="seu.ip.aqui"
+export VPS_PASS="sua-senha-aqui"
 
-# Redis
-REDIS_PASSWORD=CHANGE_THIS_REDIS_PASSWORD_IN_PROD
+# Configurações do Telegram (obrigatório)
+export TELEGRAM_BOT_TOKEN="seu-token-do-botfather"
+export TELEGRAM_CHAT_ID="seu-chat-id"
 
-# Telegram
-TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-TELEGRAM_CHAT_ID=your_chat_id
+# Configurações do OpenRouter (LLM)
+export OPENROUTER_API_KEY="sua-chave-openrouter"
+EOF
 
-# OpenRouter (LLM)
-OPENROUTER_API_KEY=sk-or-v1-your-key
-
-# Ambiente
-ENVIRONMENT=production
-LOG_LEVEL=INFO
+# Proteja o arquivo
+chmod 600 .deploy-config
 ```
 
-### 3. Configurar Telegram Bot
-
-1. Acesse [@BotFather](https://t.me/BotFather) no Telegram
-2. Crie um novo bot: `/newbot`
-3. Copie o **Bot Token**
-4. Adicione o bot ao seu chat e mande uma mensagem
-5. Obtenha o **Chat ID** (use @userinfobot ou acesse `https://api.telegram.org/bot<TOKEN>/getUpdates`)
+**Para usar:**
+```bash
+source ../.deploy-config
+./scripts/deploy-vps.sh
+```
 
 ---
 
 ## Executar Deploy Automático
 
-### Opção 1: Script Automatizado (Linux/macOS/WSL)
+### Opção 1: Script Automatizado (Recomendado)
 
 ```bash
-# Tornar script executável
-chmod +x scripts/deploy-vps.sh
+# 1. Clone o repositório
+git clone https://github.com/Guitaitson/AgentVPS.git
+cd AgentVPS
 
-# Executar deploy
+# 2. Configure as variáveis (veja seção acima)
+export VPS_IP="seu.ip.aqui"
+export VPS_PASS="sua-senha"
+export TELEGRAM_BOT_TOKEN="seu-token"
+
+# 3. Execute o deploy
+chmod +x scripts/deploy-vps.sh
 ./scripts/deploy-vps.sh
 ```
 
-### Opção 2: Deploy Manual Passo a Passo
+### Opção 2: Deploy Manual na VPS
 
-#### Passo 1: Conectar ao VPS
-
-```bash
-ssh -p 22 root@107.175.1.42
-# (use sua senha configurada)
-```
-
-#### Passo 2: Atualizar Sistema
+Se preferir fazer manualmente na VPS:
 
 ```bash
-export DEBIAN_FRONTEND=noninteractive
-apt update && apt upgrade -y
-apt install -y curl wget git htop ufw fail2ban unzip jq
-```
+# SSH para sua VPS
+ssh root@SEU_IP_AQUI
 
-#### Passo 3: Instalar Docker
+# Instale o Docker (se não tiver)
+curl -fsSL https://get.docker.com | sh
 
-```bash
-# Remover versões antigas
-apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
-
-# Instalar Docker CE
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
-
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list
-
-apt update
-apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Configurar Docker daemon
-mkdir -p /etc/docker
-cat > /etc/docker/daemon.json << 'EOF'
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-EOF
-
-systemctl restart docker
-systemctl enable docker
-```
-
-#### Passo 4: Configurar Firewall
-
-```bash
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow ssh
-ufw allow 443/tcp
-ufw allow 8443/tcp comment 'Telegram webhook'
-ufw --force enable
-```
-
-#### Passo 5: Criar Estrutura de Diretórios
-
-```bash
-mkdir -p /opt/vps-agent/{core,tools,sandbox,scripts,configs,data,logs,backups}
-mkdir -p /opt/vps-agent/core/{langgraph,telegram-bot,resource-manager,gateway}
-mkdir -p /opt/vps-agent/data/{postgres,redis,qdrant-storage}
-chmod 750 /opt/vps-agent
-chmod 700 /opt/vps-agent/configs
-```
-
-#### Passo 6: Clonar Repositório
-
-```bash
+# Clone o repositório
+mkdir -p /opt/vps-agent
 cd /opt/vps-agent
 git clone https://github.com/Guitaitson/AgentVPS.git .
-```
 
-#### Passo 7: Criar arquivo .env
-
-```bash
-cat > /opt/vps-agent/.env << 'EOF'
-POSTGRES_DB=agentvps
-POSTGRES_USER=agentvps
-POSTGRES_PASSWORD=change_this_in_prod
-REDIS_PASSWORD=change_this_in_prod
-TELEGRAM_BOT_TOKEN=your_token_here
-TELEGRAM_CHAT_ID=your_chat_id_here
-OPENROUTER_API_KEY=your_api_key_here
-ENVIRONMENT=production
-LOG_LEVEL=INFO
+# Crie o arquivo .env
+cat > /opt/vps-agent/core/.env << 'EOF'
+POSTGRES_USER=vps_agent
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_DB=vps_agent
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+TELEGRAM_BOT_TOKEN=seu-token-aqui
+TELEGRAM_ALLOWED_USERS=seu-user-id
+OPENROUTER_API_KEY=sua-chave-aqui
+OPENROUTER_MODEL=google/gemini-2.5-flash-lite
 EOF
-chmod 600 /opt/vps-agent/.env
-```
 
-#### Passo 8: Subir Serviços Core
+# Suba os containers
+docker compose -f configs/docker-compose.core.yml up -d
 
-```bash
-cd /opt/vps-agent/core
+# Instale as dependências Python
+pip install -r requirements.txt
 
-# Criar network
-docker network create vps-internal 2>/dev/null || true
-
-# Subir PostgreSQL e Redis
-docker compose up -d
-
-# Aguardar kesiapan
-sleep 10
-
-# Verificar status
-docker ps
+# Inicie o bot
+python telegram_bot/bot.py
 ```
 
 ---
@@ -233,17 +151,20 @@ docker ps
 ### Verificar Serviços
 
 ```bash
-# SSH para VPS
-ssh -p 22 root@107.175.1.42
+# SSH para sua VPS
+ssh root@SEU_IP_AQUI
 
 # Ver containers
 docker ps
 
 # Verificar PostgreSQL
-docker exec -it vps-postgres psql -U agentvps -d agentvps -c "SELECT 1;"
+docker exec -it vps-postgres psql -U vps_agent -d vps_agent -c "SELECT 1;"
 
 # Verificar Redis
-docker exec -it vps-redis redis-cli -a <password> ping
+docker exec -it vps-redis redis-cli ping
+
+# Verificar bot
+sudo systemctl status telegram-bot
 ```
 
 ### Verificar RAM
@@ -253,68 +174,37 @@ free -m
 docker stats --no-stream
 ```
 
-### Logs
-
-```bash
-# Ver logs dos serviços
-docker compose -f /opt/vps-agent/core/docker-compose.yml logs postgres
-docker compose -f /opt/vps-agent/core/docker-compose.yml logs redis
-
-# Logs em tempo real
-tail -f /opt/vps-agent/logs/*.log
-```
-
-### Health Check
-
-```bash
-python3 /opt/vps-agent/core/gateway/health_check.py
-```
-
 ---
 
 ## Operações de Manutenção
 
-### Reiniciar Serviços
+### Atualizar Código (Git Pull)
 
 ```bash
-cd /opt/vps-agent/core
-docker compose restart
+# Use o script de update
+export VPS_IP="seu.ip.aqui"
+export VPS_PASS="sua-senha"
+./scripts/update-vps.sh
 ```
 
-### Parar Serviços
+Ou manualmente:
 
 ```bash
-cd /opt/vps-agent/core
-docker compose down
-```
-
-### Atualizar Código
-
-```bash
+ssh root@SEU_IP_AQUI
 cd /opt/vps-agent
 git pull origin main
-docker compose restart
+sudo systemctl restart telegram-bot
 ```
 
 ### Backup
 
 ```bash
 # Backup PostgreSQL
-docker exec vps-postgres pg_dump -U agentvps agentvps > backup_$(date +%Y%m%d).sql
+docker exec vps-postgres pg_dump -U vps_agent vps_agent > backup_$(date +%Y%m%d).sql
 
 # Backup Redis
-docker exec vps-redis redis-cli -a <password> BGSAVE
+docker exec vps-redis redis-cli BGSAVE
 docker cp vps-redis:/data/dump.rdb backup_redis_$(date +%Y%m%d).rdb
-```
-
-### Limpeza de Logs
-
-```bash
-# Limpar logs antigos (>7 dias)
-find /opt/vps-agent/logs -name "*.log" -mtime +7 -delete
-
-# Limpar Docker logs
-truncate -s 0 /var/lib/docker/containers/*/*-json.log
 ```
 
 ---
@@ -334,35 +224,27 @@ df -h
 ls -la /opt/vps-agent/data/postgres/
 ```
 
-### Redis não conecta
+### Bot não conecta
 
 ```bash
-# Verificar configuração
-docker exec vps-redis redis-cli -a <password> info
+# Verificar logs
+sudo journalctl -u telegram-bot -f
 
-# Verificar memória
-docker stats vps-redis
+# Verificar .env
+cat /opt/vps-agent/core/.env
+
+# Reiniciar
+sudo systemctl restart telegram-bot
 ```
 
-### Docker sem permissão
+### Problemas de memória
 
 ```bash
-# Adicionar usuário ao grupo docker
-usermod -aG docker $USER
-newgrp docker
-```
-
-### Memoria Insuficiente
-
-```bash
-# Verificar RAM disponível
+# Verificar uso de RAM
 free -m
 
-# Verificar containers em execução
+# Verificar containers
 docker stats --no-stream
-
-# Parar containers não essenciais
-docker ps -q | xargs docker stop
 ```
 
 ---
@@ -371,33 +253,35 @@ docker ps -q | xargs docker stop
 
 | Ação | Comando |
 |------|---------|
-| Conectar SSH | `ssh -p 22 root@107.175.1.42` |
+| Conectar SSH | `ssh root@SEU_IP` |
 | Ver status | `docker ps` |
-| Reiniciar tudo | `cd /opt/vps-agent/core && docker compose restart` |
-| Ver logs | `docker compose logs -f` |
-| Health check | `python3 core/gateway/health_check.py` |
-| Atualizar código | `cd /opt/vps-agent && git pull && docker compose restart` |
+| Reiniciar bot | `sudo systemctl restart telegram-bot` |
+| Ver logs | `sudo journalctl -u telegram-bot -f` |
+| Health check | `docker ps && docker stats` |
 
 ---
 
-## Informações da VPS
+## Configuração Recomendada
 
-| Configuração | Valor |
-|--------------|-------|
-| IP | 107.175.1.42 |
-| Porta SSH | 22 |
-| Usuário | root |
-| Senha | (configurada pelo usuário) |
-| SO | Ubuntu 24.04 |
-| RAM | 2.4 GB |
-| Diretório | /opt/vps-agent |
+### Mínima (2 GB RAM)
+- PostgreSQL: 256 MB
+- Redis: 128 MB
+- Bot Python: 512 MB
+- **Total: ~1 GB**
+
+### Confortável (4 GB RAM)
+- PostgreSQL: 512 MB
+- Redis: 256 MB
+- Bot Python: 1 GB
+- N8N (opcional): 512 MB
+- **Total: ~2.5 GB**
 
 ---
 
 ## Próximos Passos
 
-1. ✅ Criar script de deploy
-2. ⏳ Executar deploy no VPS
-3. ⏳ Configurar Telegram Bot
-4. ⏳ Testar end-to-end
-5. ⏳ Configurar CI/CD
+1. ✅ Configurar credenciais em `.deploy-config`
+2. ✅ Executar deploy
+3. ✅ Configurar Telegram Bot
+4. ✅ Testar end-to-end
+5. ⏳ Configurar CI/CD (opcional)
