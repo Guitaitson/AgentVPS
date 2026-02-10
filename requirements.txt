@@ -21,6 +21,8 @@ python-telegram-bot>=21.0
 
 # LangGraph (Agent Orchestration)
 langgraph>=0.2.0
+langgraph-checkpoint-postgres>=2.0.0
+
 
 # HTTP Client
 httpx>=0.26.0
