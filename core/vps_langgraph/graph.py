@@ -15,6 +15,7 @@ from .nodes import (
     node_load_context,
     node_plan,
     node_save_memory,
+    node_security_check,
     node_self_improve,
 )
 from .state import AgentState
@@ -30,6 +31,7 @@ def build_agent_graph():
     workflow.add_node("classify", node_classify_intent)
     workflow.add_node("load_context", node_load_context)
     workflow.add_node("plan", node_plan)
+    workflow.add_node("security_check", node_security_check)
     workflow.add_node("execute", node_execute)
     workflow.add_node("respond", node_generate_response)
     workflow.add_node("save_memory", node_save_memory)
@@ -44,17 +46,27 @@ def build_agent_graph():
     workflow.add_edge("classify", "load_context")
     workflow.add_edge("load_context", "plan")
 
-    # Planejamento → Execução/Resposta (baseado no intent)
+    # Planejamento → Segurança/Resposta (baseado no intent)
     workflow.add_conditional_edges(
         "plan",
         lambda state: state.get("intent", "unknown"),
         {
-            "command": "execute",  # Comandos diretos → executar
-            "task": "execute",  # Tarefas → executar
+            "command": "security_check",  # Comandos diretos → verificar segurança
+            "task": "security_check",  # Tarefas → verificar segurança
             "question": "respond",  # Perguntas → responder
             "chat": "respond",  # Chat → responder
             "self_improve": "check_capabilities",  # Auto-evolução → verificar capacidades
             "unknown": "respond",
+        },
+    )
+
+    # Segurança → Execução/Resposta (baseado no resultado)
+    workflow.add_conditional_edges(
+        "security_check",
+        lambda state: "execute" if state.get("security_check", {}).get("passed", False) else "respond",
+        {
+            "execute": "execute",
+            "respond": "respond",
         },
     )
 

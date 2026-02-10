@@ -87,9 +87,64 @@ def node_plan(state: AgentState) -> AgentState:
     }
 
 
+def node_security_check(state: AgentState) -> AgentState:
+    """
+    Verifica segurança antes de executar comandos.
+    Consulta allowlist para bloquear comandos perigosos.
+    """
+    from ..security.allowlist import ResourceType, create_default_allowlist
+
+    plan = state.get("plan", [])
+    step = state.get("current_step", 0)
+
+    if not plan or step >= len(plan):
+        return {**state, "security_check": {"passed": True, "reason": "no_action"}}
+
+    current_action = plan[step]
+    action_type = current_action.get("type")
+    action = current_action.get("action", "")
+
+    # Carregar allowlist padrão
+    allowlist = create_default_allowlist()
+
+    # Verificar comando se for do tipo command ou execute
+    if action_type in ["command", "execute"]:
+        # Montar comando completo para verificação
+        full_command = action if isinstance(action, str) else str(action)
+
+        # Verificar na allowlist
+        result = allowlist.check(ResourceType.COMMAND, full_command)
+
+        if not result.allowed:
+            return {
+                **state,
+                "security_check": {
+                    "passed": False,
+                    "reason": result.reason,
+                    "rule": result.rule.name if result.rule else None,
+                    "permission": result.permission.value,
+                },
+                "blocked_by_security": True,
+                "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}\n\nPara executar este comando, adicione-o à allowlist ou use modo de aprovação.",
+            }
+
+    return {
+        **state,
+        "security_check": {
+            "passed": True,
+            "reason": "allowed",
+        },
+        "blocked_by_security": False,
+    }
+
+
 def node_execute(state: AgentState) -> AgentState:
     """Executa o plano definido."""
     from .error_handler import format_error_for_user, wrap_error
+
+    # Verificar se foi bloqueado pelo security check
+    if state.get("blocked_by_security"):
+        return state  # Retorna state inalterado com mensagem de bloqueio
 
     intent = state.get("intent")
     plan = state.get("plan", [])
