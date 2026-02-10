@@ -139,118 +139,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /status — mostra estado geral."""
-    redis_status = "❌"
-    pg_status = "❌"
-
-    try:
-        r = get_redis()
-        if r.ping():
-            redis_status = "✅"
-    except Exception:
-        pass
-
-    try:
-        conn = get_db_conn()
-        conn.close()
-        pg_status = "✅"
-    except Exception:
-        pass
-
-    import subprocess
-
-    result = subprocess.run(["free", "-m"], capture_output=True, text=True)
-    lines = result.stdout.strip().split("\n")
-    mem_parts = lines[1].split()
-    total = int(mem_parts[1])
-    used = int(mem_parts[2])
-    available = int(mem_parts[6])
-
-    status_text = (
-        f"📊 **Status VPS-Agent**\n\n"
-        f"🗄 PostgreSQL: {pg_status}\n"
-        f"⚡ Redis: {redis_status}\n"
-        f"💾 RAM: {used}MB / {total}MB (livre: {available}MB)\n"
-        f"🕐 Hora: {datetime.now(timezone.utc).strftime('%H:%M UTC')}"
-    )
-    await update.message.reply_text(status_text, parse_mode="Markdown")
+    """Handler para /status — usa grafo LangGraph."""
+    user_id = str(update.effective_user.id)
+    logger.info("comando_status", user_id=user_id)
+    
+    # Roteia pelo grafo com mensagem clara
+    response = await process_message_async(user_id, "status do sistema")
+    await update.message.reply_text(response)
 
 
 @authorized_only
 async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /ram — detalhe de memória por container."""
-    import subprocess
-
-    result = subprocess.run(
-        ["docker", "stats", "--no-stream", "--format", "{{.Name}}: {{.MemUsage}} ({{.MemPerc}})"],
-        capture_output=True,
-        text=True,
-    )
-
-    text = f"🧠 **RAM por Container:**\n\n```\n{result.stdout if result.stdout.strip() else 'Nenhum container'}```"
-    await update.message.reply_text(text, parse_mode="Markdown")
+    """Handler para /ram — usa grafo LangGraph."""
+    user_id = str(update.effective_user.id)
+    logger.info("comando_ram", user_id=user_id)
+    
+    # Roteia pelo grafo
+    response = await process_message_async(user_id, "quanta RAM?")
+    await update.message.reply_text(response)
 
 
 @authorized_only
 async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /containers — lista containers."""
-    import subprocess
-
-    result = subprocess.run(
-        ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
-        capture_output=True,
-        text=True,
-    )
-
-    text = f"🐳 **Containers Ativos:**\n\n```\n{result.stdout if result.stdout.strip() else 'Nenhum container'}```"
-    await update.message.reply_text(text, parse_mode="Markdown")
+    """Handler para /containers — usa grafo LangGraph."""
+    user_id = str(update.effective_user.id)
+    logger.info("comando_containers", user_id=user_id)
+    
+    # Roteia pelo grafo
+    response = await process_message_async(user_id, "lista containers docker")
+    await update.message.reply_text(response)
 
 
 @authorized_only
 async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /health — check completo."""
-    checks = []
-
-    # PostgreSQL
-    try:
-        conn = get_db_conn()
-        conn.close()
-        checks.append(("PostgreSQL", "✅"))
-    except Exception:
-        checks.append(("PostgreSQL", "❌"))
-
-    # Redis
-    try:
-        r = get_redis()
-        r.ping()
-        checks.append(("Redis", "✅"))
-    except Exception:
-        checks.append(("Redis", "❌"))
-
-    # Docker
-    try:
-        import subprocess
-
-        result = subprocess.run(["docker", "ps", "-q"], capture_output=True, text=True)
-        containers = len(result.stdout.strip().split("\n"))
-        checks.append(("Docker", f"✅ ({containers} containers)"))
-    except Exception:
-        checks.append(("Docker", "❌"))
-
-    # RAM
-    try:
-        import subprocess
-
-        result = subprocess.run(["free", "-m"], capture_output=True, text=True)
-        lines = result.stdout.strip().split("\n")
-        mem_parts = lines[1].split()
-        available = int(mem_parts[6])
-        checks.append(("RAM", f"✅ ({available}MB livre)"))
-    except Exception:
-        checks.append(("RAM", "❌"))
-
-    text = "🔍 **Health Check:**\n\n" + "\n".join(f"{name}: {status}" for name, status in checks)
-    await update.message.reply_text(text, parse_mode="Markdown")
+    """Handler para /health — usa grafo LangGraph."""
+    user_id = str(update.effective_user.id)
+    logger.info("comando_health", user_id=user_id)
+    
+    # Roteia pelo grafo com health check completo
+    response = await process_message_async(user_id, "health check completo")
+    await update.message.reply_text(response)
 
 
 @authorized_only

@@ -112,12 +112,36 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             "reasoning": "Comando direto detectado"
         }
     
+    # Detectar comandos específicos do Telegram (/status, /ram, /containers, /health)
+    telegram_commands = {
+        "status do sistema": "get_system_status",
+        "status geral": "get_system_status",
+        "quanta ram": "get_ram",
+        "quantas ram": "get_ram",
+        "uso da ram": "get_ram",
+        "lista containers": "list_containers",
+        "listar containers": "list_containers",
+        "containers docker": "list_containers",
+        "health check": "get_system_status",
+        "healthcheck": "get_system_status",
+    }
+    
+    for cmd_pattern, tool in telegram_commands.items():
+        if cmd_pattern in msg_lower:
+            return {
+                "intent": "command",
+                "confidence": 0.95,
+                "entities": [tool],
+                "action_required": True,
+                "tool_suggestion": tool,
+                "reasoning": f"Comando Telegram detectado: {cmd_pattern}"
+            }
+    
     # Detectar perguntas sobre sistema (question)
     question_patterns = [
-        "quanta ram", "quantas ram", "uso da ram", "memoria",
-        "quanto memória", "quanta memória",
+        "memoria", "memória", "memory",
         "quantos containers", "quantos docker",
-        "como está", "status do", "estado do",
+        "como está", "estado do",
         "quanto espaço", "quanto disco",
         "quantos serviços", "quais serviços"
     ]
