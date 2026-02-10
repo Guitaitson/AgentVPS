@@ -9,6 +9,7 @@ Provides HTTP endpoints for:
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -33,8 +34,24 @@ logger = logging.getLogger(__name__)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# Load API key from environment
+GATEWAY_API_KEY = os.getenv("GATEWAY_API_KEY")
+GATEWAY_DEV_MODE = os.getenv("GATEWAY_DEV_MODE", "false").lower() == "true"
+
 # Rate limiter (in-memory, replace with Redis in production)
 rate_limiter = RateLimiter(requests_per_minute=60)
+
+
+def verify_gateway_auth(api_key: Optional[str]) -> bool:
+    """Verify if the provided API key is valid."""
+    if GATEWAY_DEV_MODE:
+        return True
+
+    if not GATEWAY_API_KEY:
+        # No API key configured, reject all requests
+        return False
+
+    return api_key == GATEWAY_API_KEY
 
 
 # ============ Pydantic Models ============
@@ -112,21 +129,34 @@ async def verify_api_key(
     api_key: Optional[str] = Security(api_key_header),
     credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> str:
-    """Verify API key or bearer token."""
-    # API Key check
-    if api_key:
-        expected_key = "your-api-key-here"  # Load from environment
-        if api_key == expected_key:
-            return f"apikey:{api_key}"
+    """
+    Verify API key or bearer token.
 
-    # Bearer token check
+    Requires GATEWAY_API_KEY environment variable to be set.
+    Set GATEWAY_DEV_MODE=true for development (bypasses auth).
+    """
+    # Check API key first
+    if api_key and verify_gateway_auth(api_key):
+        return f"apikey:{api_key[:8]}..."
+
+    # Bearer token check (future JWT implementation)
     if credentials:
         token = credentials.credentials
-        # Verify JWT token here in production
-        return f"bearer:{token[:10]}..."
+        # TODO: Implement JWT verification
+        raise HTTPException(
+            status_code=401,
+            detail="Bearer token authentication not yet implemented. Use X-API-Key header.",
+        )
 
-    # Allow unauthenticated access for development (configure appropriately)
-    return "development:unauthenticated"
+    # No valid authentication
+    raise HTTPException(
+        status_code=401,
+        detail=(
+            "Authentication required. "
+            "Set GATEWAY_DEV_MODE=true for development or "
+            "provide X-API-Key header with valid API key."
+        ),
+    )
 
 
 # ============ Routes ============
