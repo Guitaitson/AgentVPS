@@ -3,7 +3,7 @@ Nodes do agente LangGraph.
 Cada função é um nó no grafo de decisões.
 """
 
-import subprocess
+import asyncio
 from datetime import datetime
 
 from .memory import AgentMemory
@@ -12,23 +12,28 @@ from .state import AgentState
 memory = AgentMemory()
 
 
-def node_classify_intent(state: AgentState) -> AgentState:
-    """Classifica a intenção do usuário."""
-    from .intent_classifier import classify_intent
+async def node_classify_intent(state: AgentState) -> AgentState:
+    """Classifica a intenção do usuário usando LLM."""
+    from .intent_classifier_llm import classify_intent_llm
 
     message = state["user_message"]
+    conversation_history = state.get("conversation_history", [])
 
-    # Usar o classificador melhorado
-    result = classify_intent(message)
-    intent = result[0].value
-    confidence = result[1]
-    details = result[2]
+    # Usar classificador LLM moderno
+    result = await classify_intent_llm(message, conversation_history)
 
     return {
         **state,
-        "intent": intent,
-        "intent_confidence": confidence,
-        "intent_details": details,
+        "intent": result["intent"],
+        "intent_confidence": result["confidence"],
+        "intent_details": {
+            "entities": result["entities"],
+            "action_required": result["action_required"],
+            "tool_suggestion": result["tool_suggestion"],
+            "reasoning": result["reasoning"],
+        },
+        "tool_suggestion": result["tool_suggestion"],
+        "action_required": result["action_required"],
     }
 
 
@@ -138,110 +143,74 @@ def node_security_check(state: AgentState) -> AgentState:
     }
 
 
-def node_execute(state: AgentState) -> AgentState:
-    """Executa o plano definido."""
+async def node_execute(state: AgentState) -> AgentState:
+    """Executa o plano definido usando tools modernas."""
+    from ..tools.system_tools import (
+        get_ram_usage_async,
+        list_docker_containers_async,
+        get_system_status_async,
+        check_postgres_async,
+        check_redis_async,
+        get_async_tool,
+    )
     from .error_handler import format_error_for_user, wrap_error
 
     # Verificar se foi bloqueado pelo security check
     if state.get("blocked_by_security"):
-        return state  # Retorna state inalterado com mensagem de bloqueio
+        return state
 
     intent = state.get("intent")
-    plan = state.get("plan", [])
-    step = state.get("current_step", 0)
-
-    if not plan or step >= len(plan):
-        return {**state, "execution_result": "nothing_to_do"}
-
-    current_action = plan[step]
-    action_type = current_action.get("type")
-    action = current_action.get("action")
+    tool_suggestion = state.get("tool_suggestion", "")
+    action_required = state.get("action_required", False)
 
     try:
+        # Se há tool sugerida pelo LLM, usá-la
+        if tool_suggestion and action_required:
+            tool = get_async_tool(tool_suggestion)
+            if tool:
+                result = await tool()
+                return {**state, "execution_result": result}
+
+        # Fallback: comandos tradicionais via /command
+        plan = state.get("plan", [])
+        step = state.get("current_step", 0)
+
+        if not plan or step >= len(plan):
+            return {**state, "execution_result": "nothing_to_do"}
+
+        current_action = plan[step]
+        action_type = current_action.get("type")
+        action = current_action.get("action")
+
+        # Mapear comandos para tools
         if action_type == "command" and action == "ram":
-            result = subprocess.run(["free", "-m"], capture_output=True, text=True, timeout=10)
-            output = result.stdout
-
-            lines = output.strip().split("\n")
-            mem_line = lines[1].split()
-            total = mem_line[1]
-            used = mem_line[2]
-            free = mem_line[3]
-
-            return {
-                **state,
-                "execution_result": f"RAM: {used}/{total} MB (livre: {free} MB)",
-            }
+            result = await get_ram_usage_async()
+            return {**state, "execution_result": result}
 
         elif action_type == "command" and action == "containers":
-            result = subprocess.run(
-                ["docker", "ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            return {
-                **state,
-                "execution_result": result.stdout or "Nenhum container ativo",
-            }
+            result = await list_docker_containers_async()
+            return {**state, "execution_result": result}
 
         elif action_type == "command" and action == "status":
-            result = subprocess.run(["free", "-m"], capture_output=True, text=True, timeout=10)
-            ram_info = result.stdout
-
-            return {
-                **state,
-                "execution_result": f"Status:\n{ram_info}",
-            }
+            result = await get_system_status_async()
+            return {**state, "execution_result": result}
 
         elif action_type == "command" and action == "health":
-            from .error_handler import check_system_health
-
+            # Executar checks em paralelo
+            postgres_task = check_postgres_async()
+            redis_task = check_redis_async()
+            
+            postgres_result, redis_result = await asyncio.gather(
+                postgres_task, redis_task, return_exceptions=True
+            )
+            
+            # Format results
             checks = []
-
-            health = check_system_health()
-            overall = health.get("overall", {})
-
-            # PostgreSQL
-            try:
-                import os
-
-                import psycopg2
-
-                conn = psycopg2.connect(
-                    host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
-                    port=int(os.getenv("POSTGRES_PORT", 5432)),
-                    dbname=os.getenv("POSTGRES_DB", "vps_agent"),
-                    user=os.getenv("POSTGRES_USER"),
-                    password=os.getenv("POSTGRES_PASSWORD"),
-                    connect_timeout=5,
-                )
-                conn.close()
-                checks.append("✅ PostgreSQL")
-            except Exception as e:
-                checks.append(f"❌ PostgreSQL: {e}")
-
-            # Redis
-            try:
-                import redis
-
-                r = redis.Redis(
-                    host=os.getenv("REDIS_HOST", "127.0.0.1"),
-                    port=int(os.getenv("REDIS_PORT", 6379)),
-                    socket_timeout=5,
-                )
-                r.ping()
-                checks.append("✅ Redis")
-            except Exception as e:
-                checks.append(f"❌ Redis: {e}")
-
+            checks.append(postgres_result if isinstance(postgres_result, str) else f"❌ PostgreSQL: {postgres_result}")
+            checks.append(redis_result if isinstance(redis_result, str) else f"❌ Redis: {redis_result}")
+            
             status_msg = "\n".join(checks)
-            status_msg += f"\n\n📊 Status Geral: {overall.get('status', 'unknown')}"
-
-            return {
-                **state,
-                "execution_result": status_msg,
-            }
+            return {**state, "execution_result": status_msg}
 
         else:
             # Comando não implementado - usar resposta smarter
@@ -254,13 +223,10 @@ def node_execute(state: AgentState) -> AgentState:
             response = generate_smart_unavailable_response(
                 f"{action_type} {action}", detected_skills=detected, intent=intent
             )
-            return {
-                **state,
-                "execution_result": response,
-            }
+            return {**state, "execution_result": response}
 
     except Exception as e:
-        wrapped_error = wrap_error(e, metadata={"action": action})
+        wrapped_error = wrap_error(e, metadata={"action": state.get("tool_suggestion", "unknown")})
         return {
             **state,
             "error": wrapped_error.to_dict(),

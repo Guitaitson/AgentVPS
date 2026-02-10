@@ -30,6 +30,8 @@ class AgentState(TypedDict):
     intent: str  # 'command', 'question', 'task', 'chat', 'self_improve'
     intent_confidence: float
     intent_details: dict[str, Any]  # Metadados da classificação
+    tool_suggestion: Optional[str]  # Tool sugerida pelo LLM (Fase 6)
+    action_required: bool  # Se requer execução na VPS
 
     # ============ Contexto ============
     user_context: dict[str, Any]  # Fatos sobre o usuário

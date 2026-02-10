@@ -27,7 +27,7 @@ def build_agent_graph():
     """Constrói e retorna o grafo do agente."""
     workflow = StateGraph(AgentState)
 
-    # Nós do workflow
+    # Nós do workflow (alguns são async)
     workflow.add_node("classify", node_classify_intent)
     workflow.add_node("load_context", node_load_context)
     workflow.add_node("plan", node_plan)
@@ -46,40 +46,60 @@ def build_agent_graph():
     workflow.add_edge("classify", "load_context")
     workflow.add_edge("load_context", "plan")
 
-    # Planejamento → Segurança/Resposta (baseado no intent)
+    # Planejamento → Execução ou Resposta (baseado no intent e action_required)
+    def route_after_plan(state):
+        """Roteia baseado na intenção e se requer ação."""
+        intent = state.get("intent", "unknown")
+        action_required = state.get("action_required", False)
+        
+        # Perguntas que requerem ação vão para security_check → execute
+        if intent in ["command", "task"]:
+            return "security_check"
+        elif intent == "question" and action_required:
+            # Perguntas sobre sistema (RAM, status) vão para execução
+            return "security_check"
+        elif intent == "self_improve":
+            return "check_capabilities"
+        else:
+            # Chat e perguntas informativas vão direto para resposta
+            return "respond"
+
     workflow.add_conditional_edges(
         "plan",
-        lambda state: state.get("intent", "unknown"),
+        route_after_plan,
         {
-            "command": "security_check",  # Comandos diretos → verificar segurança
-            "task": "security_check",  # Tarefas → verificar segurança
-            "question": "respond",  # Perguntas → responder
-            "chat": "respond",  # Chat → responder
-            "self_improve": "check_capabilities",  # Auto-evolução → verificar capacidades
-            "unknown": "respond",
+            "security_check": "security_check",
+            "check_capabilities": "check_capabilities",
+            "respond": "respond",
         },
     )
 
     # Segurança → Execução/Resposta (baseado no resultado)
+    def route_after_security(state):
+        """Roteia após verificação de segurança."""
+        if state.get("blocked_by_security"):
+            return "respond"
+        return "execute"
+
     workflow.add_conditional_edges(
         "security_check",
-        lambda state: "execute" if state.get("security_check", {}).get("passed", False) else "respond",
+        route_after_security,
         {
             "execute": "execute",
             "respond": "respond",
         },
     )
 
-    # Execução → Salvar memória
-    workflow.add_edge("execute", "save_memory")
+    # Execução → Responder (mostrar resultados)
+    workflow.add_edge("execute", "respond")
 
     # Self-improve: check_capabilities → self_improve → respond
     workflow.add_conditional_edges(
         "check_capabilities",
-        lambda state: state.get("needs_new_capability", False),
+        lambda state: "self_improve" if state.get("needs_improvement", False) else "respond",
         {
-            True: "self_improve",
-            False: "respond",
+            "self_improve": "self_improve",
+            "respond": "respond",
         },
     )
     workflow.add_edge("self_improve", "respond")

@@ -6,7 +6,10 @@ Fase 6: Substitui regex por LLM com function calling.
 
 from typing import Any
 
-from langchain_core.pydantic_v1 import BaseModel, Field
+try:
+    from pydantic.v1 import BaseModel, Field
+except ImportError:
+    from pydantic import BaseModel, Field
 
 
 class IntentClassification(BaseModel):
