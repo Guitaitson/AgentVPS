@@ -1,0 +1,383 @@
+"""
+System Tools - Ferramentas para execução na VPS.
+
+Funções que executam comandos reais na VPS via subprocess.
+Decoradas para serem usadas como tools pelo LLM.
+"""
+
+import asyncio
+import os
+import subprocess
+from typing import Optional
+
+
+def get_ram_usage() -> str:
+    """
+    Get current RAM usage in MB.
+    
+    Returns:
+        Formatted string with RAM information
+    """
+    try:
+        result = subprocess.run(
+            ["free", "-m"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            return f"❌ Erro ao obter RAM: {result.stderr}"
+        
+        lines = result.stdout.strip().split("\n")
+        if len(lines) < 2:
+            return "❌ Saída inesperada do comando free"
+        
+        # Parse memória
+        mem_line = lines[1].split()
+        total = mem_line[1]
+        used = mem_line[2]
+        free = mem_line[3]
+        available = mem_line[6] if len(mem_line) > 6 else free
+        
+        # Calcular porcentagem
+        usage_pct = (int(used) / int(total)) * 100
+        
+        return (
+            f"🧠 **Uso de RAM**\n\n"
+            f"Total: {total} MB\n"
+            f"Usado: {used} MB ({usage_pct:.1f}%)\n"
+            f"Livre: {free} MB\n"
+            f"Disponível: {available} MB"
+        )
+        
+    except subprocess.TimeoutExpired:
+        return "❌ Timeout ao executar comando (10s)"
+    except FileNotFoundError:
+        return "❌ Comando 'free' não encontrado"
+    except Exception as e:
+        return f"❌ Erro: {str(e)}"
+
+
+def list_docker_containers() -> str:
+    """
+    List all running Docker containers.
+    
+    Returns:
+        Formatted table with container information
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            return f"❌ Erro Docker: {result.stderr}"
+        
+        if not result.stdout.strip():
+            return "📦 **Containers Docker**\n\nNenhum container ativo"
+        
+        lines = result.stdout.strip().split("\n")
+        formatted = ["📦 **Containers Docker**\n"]
+        formatted.append("```")
+        formatted.append(f"{'NOME':<20} {'STATUS':<15} {'PORTAS'}")
+        formatted.append("-" * 55)
+        
+        for line in lines:
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                name = parts[0][:18]
+                status = parts[1][:13]
+                ports = parts[2] if len(parts) > 2 else "-"
+                formatted.append(f"{name:<20} {status:<15} {ports}")
+        
+        formatted.append("```")
+        return "\n".join(formatted)
+        
+    except subprocess.TimeoutExpired:
+        return "❌ Timeout ao listar containers"
+    except FileNotFoundError:
+        return "❌ Docker não instalado ou não encontrado"
+    except Exception as e:
+        return f"❌ Erro: {str(e)}"
+
+
+def get_system_status() -> str:
+    """
+    Get overall system status.
+    
+    Returns:
+        Summary of system health
+    """
+    checks = []
+    
+    # Check RAM
+    try:
+        result = subprocess.run(
+            ["free", "-m"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        lines = result.stdout.strip().split("\n")
+        mem_parts = lines[1].split()
+        total = int(mem_parts[1])
+        available = int(mem_parts[6])
+        usage_pct = ((total - available) / total) * 100
+        
+        if usage_pct > 90:
+            checks.append(("🚨 RAM", f"{usage_pct:.0f}% - CRÍTICO"))
+        elif usage_pct > 75:
+            checks.append(("⚠️  RAM", f"{usage_pct:.0f}% - Alto"))
+        else:
+            checks.append(("✅ RAM", f"{usage_pct:.0f}% - OK"))
+    except:
+        checks.append(("❌ RAM", "Não disponível"))
+    
+    # Check Disk
+    try:
+        result = subprocess.run(
+            ["df", "-h", "/"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        lines = result.stdout.strip().split("\n")
+        disk_line = lines[1].split()
+        usage = disk_line[4].replace("%", "")
+        
+        if int(usage) > 90:
+            checks.append(("🚨 Disco", f"{usage}% - CRÍTICO"))
+        elif int(usage) > 75:
+            checks.append(("⚠️  Disco", f"{usage}% - Alto"))
+        else:
+            checks.append(("✅ Disco", f"{usage}% - OK"))
+    except:
+        checks.append(("❌ Disco", "Não disponível"))
+    
+    # Check Docker
+    try:
+        result = subprocess.run(
+            ["docker", "info", "--format", "{{.ServerVersion}}"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            checks.append(("✅ Docker", f"v{version}"))
+        else:
+            checks.append(("❌ Docker", "Indisponível"))
+    except:
+        checks.append(("❌ Docker", "Não instalado"))
+    
+    # Format output
+    formatted = ["📊 **Status do Sistema**\n"]
+    for name, status in checks:
+        formatted.append(f"{name}: {status}")
+    
+    return "\n".join(formatted)
+
+
+def check_postgres() -> str:
+    """
+    Check PostgreSQL connection.
+    
+    Returns:
+        Status of PostgreSQL service
+    """
+    try:
+        import psycopg2
+        
+        conn = psycopg2.connect(
+            host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
+            port=int(os.getenv("POSTGRES_PORT", 5432)),
+            dbname=os.getenv("POSTGRES_DB", "vps_agent"),
+            user=os.getenv("POSTGRES_USER", "vps_agent"),
+            password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+            connect_timeout=5
+        )
+        
+        # Get version
+        cursor = conn.cursor()
+        cursor.execute("SELECT version();")
+        version = cursor.fetchone()[0].split()[1]
+        
+        # Get database size
+        cursor.execute("""
+            SELECT pg_size_pretty(pg_database_size(%s));
+        """, (os.getenv("POSTGRES_DB", "vps_agent"),))
+        size = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return (
+            f"✅ **PostgreSQL**\n\n"
+            f"Status: Online\n"
+            f"Versão: {version}\n"
+            f"Tamanho: {size}"
+        )
+        
+    except psycopg2.OperationalError as e:
+        return f"❌ **PostgreSQL**\n\nNão conecta: {str(e)}"
+    except Exception as e:
+        return f"❌ **PostgreSQL**\n\nErro: {str(e)}"
+
+
+def check_redis() -> str:
+    """
+    Check Redis connection.
+    
+    Returns:
+        Status of Redis service
+    """
+    try:
+        import redis
+        
+        r = redis.Redis(
+            host=os.getenv("REDIS_HOST", "127.0.0.1"),
+            port=int(os.getenv("REDIS_PORT", 6379)),
+            password=os.getenv("REDIS_PASSWORD") or None,
+            socket_timeout=5,
+            socket_connect_timeout=5
+        )
+        
+        # Test connection
+        r.ping()
+        
+        # Get info
+        info = r.info()
+        version = info.get("redis_version", "unknown")
+        used_memory = info.get("used_memory_human", "unknown")
+        keys_count = r.dbsize()
+        
+        return (
+            f"✅ **Redis**\n\n"
+            f"Status: Online\n"
+            f"Versão: {version}\n"
+            f"Memória usada: {used_memory}\n"
+            f"Chaves: {keys_count}"
+        )
+        
+    except redis.ConnectionError:
+        return "❌ **Redis**\n\nNão conecta: Connection refused"
+    except redis.TimeoutError:
+        return "❌ **Redis**\n\nTimeout na conexão"
+    except Exception as e:
+        return f"❌ **Redis**\n\nErro: {str(e)}"
+
+
+# Async versions for modern LangGraph
+async def get_ram_usage_async() -> str:
+    """Async version of get_ram_usage."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, get_ram_usage)
+
+
+async def list_docker_containers_async() -> str:
+    """Async version of list_docker_containers."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, list_docker_containers)
+
+
+async def get_system_status_async() -> str:
+    """Async version of get_system_status."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, get_system_status)
+
+
+async def check_postgres_async() -> str:
+    """Async version of check_postgres."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, check_postgres)
+
+
+async def check_redis_async() -> str:
+    """Async version of check_redis."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, check_redis)
+
+
+# Tool registry for LLM
+TOOLS_REGISTRY = {
+    "get_ram": {
+        "function": get_ram_usage,
+        "async_function": get_ram_usage_async,
+        "description": "Get current RAM usage in MB",
+        "parameters": {},
+    },
+    "list_containers": {
+        "function": list_docker_containers,
+        "async_function": list_docker_containers_async,
+        "description": "List all running Docker containers",
+        "parameters": {},
+    },
+    "get_system_status": {
+        "function": get_system_status,
+        "async_function": get_system_status_async,
+        "description": "Get overall system status (RAM, disk, Docker)",
+        "parameters": {},
+    },
+    "check_postgres": {
+        "function": check_postgres,
+        "async_function": check_postgres_async,
+        "description": "Check PostgreSQL connection and status",
+        "parameters": {},
+    },
+    "check_redis": {
+        "function": check_redis,
+        "async_function": check_redis_async,
+        "description": "Check Redis connection and status",
+        "parameters": {},
+    },
+}
+
+
+def get_tool(name: str):
+    """Get tool by name."""
+    tool = TOOLS_REGISTRY.get(name)
+    if tool:
+        return tool["function"]
+    return None
+
+
+def get_async_tool(name: str):
+    """Get async tool by name."""
+    tool = TOOLS_REGISTRY.get(name)
+    if tool:
+        return tool["async_function"]
+    return None
+
+
+def list_tools() -> list[dict]:
+    """List all available tools."""
+    return [
+        {
+            "name": name,
+            "description": info["description"],
+            "parameters": info["parameters"],
+        }
+        for name, info in TOOLS_REGISTRY.items()
+    ]
+
+
+__all__ = [
+    "get_ram_usage",
+    "list_docker_containers",
+    "get_system_status",
+    "check_postgres",
+    "check_redis",
+    "get_ram_usage_async",
+    "list_docker_containers_async",
+    "get_system_status_async",
+    "check_postgres_async",
+    "check_redis_async",
+    "get_tool",
+    "get_async_tool",
+    "list_tools",
+    "TOOLS_REGISTRY",
+]
