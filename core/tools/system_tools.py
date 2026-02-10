@@ -15,48 +15,59 @@ def get_ram_usage() -> str:
     """
     Get current RAM usage in MB.
     
+    Usa /proc/meminfo para compatibilidade universal (funciona sem 'free').
+    
     Returns:
         Formatted string with RAM information
     """
     try:
-        result = subprocess.run(
-            ["free", "-m"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        # Ler /proc/meminfo (funciona em qualquer Linux)
+        with open("/proc/meminfo", "r") as f:
+            meminfo = f.read()
         
-        if result.returncode != 0:
-            return f"❌ Erro ao obter RAM: {result.stderr}"
+        # Parse valores (em KB)
+        mem_total = 0
+        mem_available = 0
+        mem_free = 0
+        buffers = 0
+        cached = 0
         
-        lines = result.stdout.strip().split("\n")
-        if len(lines) < 2:
-            return "❌ Saída inesperada do comando free"
+        for line in meminfo.strip().split("\n"):
+            if line.startswith("MemTotal:"):
+                mem_total = int(line.split()[1])
+            elif line.startswith("MemAvailable:"):
+                mem_available = int(line.split()[1])
+            elif line.startswith("MemFree:"):
+                mem_free = int(line.split()[1])
+            elif line.startswith("Buffers:"):
+                buffers = int(line.split()[1])
+            elif line.startswith("Cached:"):
+                cached = int(line.split()[1])
         
-        # Parse memória
-        mem_line = lines[1].split()
-        total = mem_line[1]
-        used = mem_line[2]
-        free = mem_line[3]
-        available = mem_line[6] if len(mem_line) > 6 else free
+        # Se MemAvailable não existe (kernels antigos), calcular
+        if mem_available == 0:
+            mem_available = mem_free + buffers + cached
+        
+        # Converter para MB
+        total_mb = mem_total // 1024
+        available_mb = mem_available // 1024
+        used_mb = (mem_total - mem_available) // 1024
         
         # Calcular porcentagem
-        usage_pct = (int(used) / int(total)) * 100
+        usage_pct = (used_mb / total_mb) * 100 if total_mb > 0 else 0
         
         return (
             f"🧠 **Uso de RAM**\n\n"
-            f"Total: {total} MB\n"
-            f"Usado: {used} MB ({usage_pct:.1f}%)\n"
-            f"Livre: {free} MB\n"
-            f"Disponível: {available} MB"
+            f"Total: {total_mb} MB\n"
+            f"Usado: {used_mb} MB ({usage_pct:.1f}%)\n"
+            f"Disponível: {available_mb} MB\n"
+            f"Por Processos: `cat /proc/meminfo | grep -E '^(Mem|Swap)'`"
         )
         
-    except subprocess.TimeoutExpired:
-        return "❌ Timeout ao executar comando (10s)"
     except FileNotFoundError:
-        return "❌ Comando 'free' não encontrado"
+        return "❌ /proc/meminfo não encontrado (sistema não é Linux?)"
     except Exception as e:
-        return f"❌ Erro: {str(e)}"
+        return f"❌ Erro ao ler RAM: {str(e)}"
 
 
 def list_docker_containers() -> str:
