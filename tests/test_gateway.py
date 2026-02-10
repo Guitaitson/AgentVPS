@@ -336,11 +336,18 @@ class TestGatewayEndpoints:
         # Should return 200 or 500 (if capabilities not available)
         assert response.status_code in [200, 500]
 
-    def test_message_endpoint_unauthorized(self, client, monkeypatch):
-        """Test that message endpoint requires authentication."""
+    def test_message_endpoint_rate_limit(self, monkeypatch):
+        """Test that message endpoint has rate limiting in dev mode."""
         # Set dev mode to bypass auth and test rate limit
         import core.gateway.main as main
+        from fastapi.testclient import TestClient
+
+        # Monkeypatch BEFORE creating client
+        monkeypatch.setattr(main, "GATEWAY_API_KEY", "test-key")
         monkeypatch.setattr(main, "GATEWAY_DEV_MODE", True)
+
+        # Create client after monkeypatch
+        client = TestClient(main.app)
 
         # Make many requests to trigger rate limit
         for i in range(65):
