@@ -338,16 +338,23 @@ class TestGatewayEndpoints:
 
     def test_message_endpoint_rate_limit(self, monkeypatch):
         """Test that message endpoint has rate limiting in dev mode."""
-        # Set dev mode to bypass auth and test rate limit
-        import core.gateway.main as main
+        import os
+
+        # Set env vars BEFORE importing the module
+        monkeypatch.setenv("GATEWAY_DEV_MODE", "true")
+        monkeypatch.setenv("GATEWAY_API_KEY", "test-key")
+
+        # Import after setting env vars
+        from importlib import reload
+
+        import core.gateway.main as main_module
         from fastapi.testclient import TestClient
 
-        # Monkeypatch BEFORE creating client
-        monkeypatch.setattr(main, "GATEWAY_API_KEY", "test-key")
-        monkeypatch.setattr(main, "GATEWAY_DEV_MODE", True)
+        # Reload module to pick up new env vars
+        reload(main_module)
 
-        # Create client after monkeypatch
-        client = TestClient(main.app)
+        # Create client after reloading
+        client = TestClient(main_module.app)
 
         # Make many requests to trigger rate limit
         for i in range(65):
