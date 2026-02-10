@@ -99,16 +99,42 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para mensagens gerais — usa LangGraph."""
+    """Handler para mensagens gerais — usa LangGraph com tratamento de erro robusto."""
     user_id = str(update.effective_user.id)
     message = update.message.text
 
     logger.info("mensagem_recebida", user_id=user_id, message=message[:100])
 
-    # Processar através do LangGraph
-    response = await process_message_async(user_id, message)
-
-    await update.message.reply_text(response)
+    try:
+        # Processar através do LangGraph
+        response = await process_message_async(user_id, message)
+        
+        # Garantir que temos uma resposta válida
+        if not response:
+            response = "Desculpe, não consegui processar sua mensagem. Tente novamente."
+        
+        await update.message.reply_text(response)
+        
+    except Exception as e:
+        logger.error("erro_processamento_mensagem", user_id=user_id, error=str(e))
+        
+        # Resposta de fallback amigável
+        fallback_response = (
+            "🤖 **VPS-Agent**\n\n"
+            "Desculpe, ocorreu um erro ao processar sua mensagem.\n\n"
+            "Você pode tentar:\n"
+            "• Enviar a mensagem novamente\n"
+            "• Usar comandos diretos como `/status` ou `/help`\n\n"
+            f"_Erro: {str(e)[:100]}_"
+        )
+        
+        try:
+            await update.message.reply_text(fallback_response, parse_mode="Markdown")
+        except Exception:
+            # Se até o fallback falhar, enviar sem markdown
+            await update.message.reply_text(
+                "Desculpe, ocorreu um erro. Tente novamente ou use /help."
+            )
 
 
 @authorized_only

@@ -338,17 +338,14 @@ class TestGatewayEndpoints:
 
     def test_message_endpoint_with_api_key(self, monkeypatch):
         """Test that message endpoint accepts valid API key."""
-        import os
-
         # Set env vars before importing
         monkeypatch.setenv("GATEWAY_API_KEY", "test-api-key")
         monkeypatch.setenv("GATEWAY_DEV_MODE", "false")
 
         # Import after setting env vars
-        from importlib import reload
-
         import core.gateway.main as main_module
         from fastapi.testclient import TestClient
+        from importlib import reload
 
         # Reload module to pick up new env vars
         reload(main_module)

@@ -159,7 +159,7 @@ def build_conversation_prompt(
     parts.append("")
     parts.append("Responda de forma como o VPS-Agent que você é:")
 
-    return r"\ natural e útil,n".join(parts)
+    return "\n".join(parts)
 
 
 async def generate_response(

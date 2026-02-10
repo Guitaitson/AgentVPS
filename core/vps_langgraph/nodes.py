@@ -268,7 +268,7 @@ def node_execute(state: AgentState) -> AgentState:
         }
 
 
-def node_generate_response(state: AgentState) -> AgentState:
+async def node_generate_response(state: AgentState) -> AgentState:
     """Gera resposta final ao usuário com identidade VPS-Agent."""
     from .smart_responses import (
         detect_missing_skill_keywords,
@@ -309,10 +309,10 @@ def node_generate_response(state: AgentState) -> AgentState:
     # Para conversas e perguntas, usar LLM com identidade VPS-Agent
     elif intent in ["chat", "question"]:
         try:
-            from ..llm.openrouter_client import generate_response_sync
+            from ..llm.openrouter_client import generate_response
 
-            # Chamar LLM com contexto completo de identidade
-            response = generate_response_sync(
+            # Chamar LLM com contexto completo de identidade (versão async)
+            response = await generate_response(
                 user_message=user_message,
                 conversation_history=conversation_history,
                 user_context=user_context,
