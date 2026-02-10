@@ -196,6 +196,14 @@ class SecurityAllowlist:
 def create_default_allowlist() -> SecurityAllowlist:
     """Cria allowlist com regras padrão seguras."""
     rules = [
+        # Comandos do Telegram (mapeados para tools seguras)
+        AllowlistRule(
+            name="telegram_bot_commands",
+            resource_type=ResourceType.COMMAND,
+            pattern=r"^(ram|containers|status|health)$",
+            permission=PermissionLevel.ALLOW,
+            description="Comandos do bot do Telegram (mapeados para tools seguras)",
+        ),
         # Comandos permitidos (seguros)
         AllowlistRule(
             name="safe_docker_commands",
@@ -207,7 +215,7 @@ def create_default_allowlist() -> SecurityAllowlist:
         AllowlistRule(
             name="safe_system_commands",
             resource_type=ResourceType.COMMAND,
-            pattern=r"^(free -m|df -h|uptime|whoami|pwd|ls -la)$",
+            pattern=r"^(df -h|uptime|whoami|pwd|ls -la|cat /proc/meminfo)$",
             permission=PermissionLevel.ALLOW,
             description="Comandos de sistema seguros (leitura apenas)",
         ),
@@ -257,6 +265,22 @@ def create_default_allowlist() -> SecurityAllowlist:
             pattern=r"^(generate|chat|complete)$",
             permission=PermissionLevel.ALLOW,
             description="Operações LLM seguras",
+        ),
+        # Operações do sistema (via tools) - sempre permitidas (são apenas leitura)
+        AllowlistRule(
+            name="system_read_operations",
+            resource_type=ResourceType.SYSTEM_OPERATION,
+            pattern=r"^(get_ram|list_containers|get_system_status|get_installed_packages|check_command|get_system_info)$",
+            permission=PermissionLevel.ALLOW,
+            description="Operações de leitura do sistema via tools",
+        ),
+        # Intents/perguntas permitidas (mapeadas para comandos seguros)
+        AllowlistRule(
+            name="safe_question_patterns",
+            resource_type=ResourceType.LLM_OPERATION,
+            pattern=r"^(lista containers|listar containers|containers docker|health check|healthcheck|status do sistema|status geral|quanta ram|uso da ram|o que você tem instalado|quais aplicativos)$",
+            permission=PermissionLevel.ALLOW,
+            description="Perguntas/Intents seguros mapeados para comandos de leitura",
         ),
     ]
 
