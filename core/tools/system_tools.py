@@ -123,28 +123,35 @@ def get_system_status() -> str:
     Returns:
         Summary of system health
     """
+    import os
+    
     checks = []
     
-    # Check RAM
+    # Check RAM (usando /proc/meminfo)
     try:
-        result = subprocess.run(
-            ["free", "-m"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        lines = result.stdout.strip().split("\n")
-        mem_parts = lines[1].split()
-        total = int(mem_parts[1])
-        available = int(mem_parts[6])
-        usage_pct = ((total - available) / total) * 100
+        with open("/proc/meminfo", "r") as f:
+            meminfo = f.read()
         
-        if usage_pct > 90:
-            checks.append(("🚨 RAM", f"{usage_pct:.0f}% - CRÍTICO"))
-        elif usage_pct > 75:
-            checks.append(("⚠️  RAM", f"{usage_pct:.0f}% - Alto"))
+        mem_total = 0
+        mem_available = 0
+        
+        for line in meminfo.strip().split("\n"):
+            if line.startswith("MemTotal:"):
+                mem_total = int(line.split()[1])
+            elif line.startswith("MemAvailable:"):
+                mem_available = int(line.split()[1])
+        
+        if mem_total > 0:
+            usage_pct = ((mem_total - mem_available) / mem_total) * 100
+            
+            if usage_pct > 90:
+                checks.append(("🚨 RAM", f"{usage_pct:.0f}% - CRÍTICO"))
+            elif usage_pct > 75:
+                checks.append(("⚠️  RAM", f"{usage_pct:.0f}% - Alto"))
+            else:
+                checks.append(("✅ RAM", f"{usage_pct:.0f}% - OK"))
         else:
-            checks.append(("✅ RAM", f"{usage_pct:.0f}% - OK"))
+            checks.append(("❌ RAM", "Não disponível"))
     except:
         checks.append(("❌ RAM", "Não disponível"))
     
