@@ -152,6 +152,40 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "reasoning": f"Pergunta sobre sistema detectada: {pattern}"
             }
     
+    # Detectar perguntas sobre aplicativos/pacotes instalados
+    app_patterns = [
+        "o que você tem instalado", "quais aplicativos", "quais programas",
+        "o que está instalado", "lista de pacotes", "tem instalado",
+        "você tem python", "você tem docker", "você tem node",
+        "tem python", "tem docker", "tem node", "tem nginx",
+        "quais ferramentas", "quais softwares", "o que existe instalado"
+    ]
+    
+    for pattern in app_patterns:
+        if pattern in msg_lower:
+            # Verificar se é pergunta específica sobre um comando
+            specific_commands = ["python", "docker", "node", "npm", "git", "nginx", "redis"]
+            for cmd in specific_commands:
+                if cmd in msg_lower:
+                    return {
+                        "intent": "question",
+                        "confidence": 0.9,
+                        "entities": [cmd],
+                        "action_required": True,
+                        "tool_suggestion": "check_command",
+                        "reasoning": f"Verificando se {cmd} está instalado"
+                    }
+            
+            # Pergunta geral sobre tudo instalado
+            return {
+                "intent": "question",
+                "confidence": 0.9,
+                "entities": ["packages", "apps"],
+                "action_required": True,
+                "tool_suggestion": "get_installed_packages",
+                "reasoning": "Listando aplicativos e pacotes instalados"
+            }
+    
     # Detectar tarefas (task)
     task_patterns = [
         "liste", "mostre", "exiba", "verifique", "check",
