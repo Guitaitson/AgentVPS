@@ -14,11 +14,21 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Health check modular
 - Rate limiter no gateway
 - Session manager para estado de conversas
+- **Sprint 1 — Estabilização de Tools (2025-02-10)**
+  - Logging estruturado em todos os nodes do grafo (structlog)
+  - Checkpointing PostgreSQL integrado ao LangGraph com fallback para MemorySaver
+  - Async tools modernizadas usando `asyncio.to_thread()` (Python 3.9+)
+  - Singleton do grafo via `get_agent_graph()` para performance
+  - Thread ID por usuário para persistência de conversa
 
 ### Mudado
 - Estrutura de pacotes reorganizada (Fase 0.5)
 - CI/CD modernizado para usar `pip install -e ".[dev]"`
 - Imports padronizados sem `sys.path.insert`
+- **Correções críticas no fluxo de execução de tools:**
+  - `node_generate_response` agora usa `execution_result is not None` em vez de truthy check
+  - `node_plan` cria plano do tipo `"tool"` quando `tool_suggestion` está presente
+  - `node_security_check` permite tools do tipo `"tool"` (não apenas command/execute)
 
 ## [2.0.0] - 2025-02-09
 
