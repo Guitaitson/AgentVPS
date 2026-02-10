@@ -308,10 +308,9 @@ async def check_redis_async() -> str:
     return await asyncio.to_thread(check_redis)
 
 
-# Import discovery tools
+# Import discovery tools (async nativo)
 try:
-    from .discovery_tools import (
-        DISCOVERY_TOOLS_REGISTRY,
+    from .discovery_tools_async import (
         get_installed_packages_async,
         check_command_available_async,
         get_system_info_async,
@@ -319,7 +318,13 @@ try:
     _discovery_available = True
 except ImportError:
     _discovery_available = False
-    DISCOVERY_TOOLS_REGISTRY = {}
+    
+    # Fallback para versões com to_thread
+    from .discovery_tools import (
+        get_installed_packages_async,
+        check_command_available_async,
+        get_system_info_async,
+    )
 
 
 # Tool registry for LLM
