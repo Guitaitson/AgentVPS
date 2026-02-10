@@ -6,9 +6,12 @@ Cada função é um nó no grafo de decisões.
 import asyncio
 from datetime import datetime
 
+import structlog
+
 from .memory import AgentMemory
 from .state import AgentState
 
+logger = structlog.get_logger()
 memory = AgentMemory()
 
 
@@ -19,8 +22,22 @@ async def node_classify_intent(state: AgentState) -> AgentState:
     message = state["user_message"]
     conversation_history = state.get("conversation_history", [])
 
+    logger.info(
+        "node_classify_intent_start",
+        message=message[:100],
+        history_len=len(conversation_history),
+    )
+
     # Usar classificador LLM moderno
     result = await classify_intent_llm(message, conversation_history)
+
+    logger.info(
+        "node_classify_intent_result",
+        intent=result["intent"],
+        confidence=result["confidence"],
+        action_required=result["action_required"],
+        tool_suggestion=result["tool_suggestion"],
+    )
 
     return {
         **state,
@@ -47,6 +64,13 @@ def node_load_context(state: AgentState) -> AgentState:
     # Histórico recente
     history = memory.get_conversation_history(user_id, limit=5)
 
+    logger.info(
+        "node_load_context",
+        user_id=user_id,
+        facts_count=len(user_facts),
+        history_count=len(history),
+    )
+
     return {
         **state,
         "user_context": user_facts,
@@ -57,6 +81,15 @@ def node_load_context(state: AgentState) -> AgentState:
 def node_plan(state: AgentState) -> AgentState:
     """Cria plano de ação baseado na intenção."""
     intent = state.get("intent")
+    tool_suggestion = state.get("tool_suggestion", "")
+    action_required = state.get("action_required", False)
+
+    logger.info(
+        "node_plan",
+        intent=intent,
+        tool_suggestion=tool_suggestion,
+        action_required=action_required,
+    )
 
     if intent == "command":
         command = state["user_message"].split()[0].lstrip("/")
@@ -68,6 +101,14 @@ def node_plan(state: AgentState) -> AgentState:
         }
 
     if intent == "question":
+        # Se tem tool sugerida, incluir no plano
+        if tool_suggestion and action_required:
+            return {
+                **state,
+                "plan": [{"type": "tool", "action": tool_suggestion}],
+                "current_step": 0,
+                "tools_needed": [tool_suggestion],
+            }
         return {
             **state,
             "plan": [{"type": "query", "action": "get_system_info"}],
@@ -103,11 +144,18 @@ def node_security_check(state: AgentState) -> AgentState:
     step = state.get("current_step", 0)
 
     if not plan or step >= len(plan):
+        logger.info("node_security_check_no_action")
         return {**state, "security_check": {"passed": True, "reason": "no_action"}}
 
     current_action = plan[step]
     action_type = current_action.get("type")
     action = current_action.get("action", "")
+
+    logger.info(
+        "node_security_check",
+        action_type=action_type,
+        action=action,
+    )
 
     # Carregar allowlist padrão
     allowlist = create_default_allowlist()
@@ -121,6 +169,11 @@ def node_security_check(state: AgentState) -> AgentState:
         result = allowlist.check(ResourceType.COMMAND, full_command)
 
         if not result.allowed:
+            logger.warning(
+                "node_security_check_blocked",
+                command=full_command,
+                reason=result.reason,
+            )
             return {
                 **state,
                 "security_check": {
@@ -132,6 +185,10 @@ def node_security_check(state: AgentState) -> AgentState:
                 "blocked_by_security": True,
                 "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}\n\nPara executar este comando, adicione-o à allowlist ou use modo de aprovação.",
             }
+
+    # Tools do tipo "tool" são permitidas (são nossas tools controladas)
+    if action_type == "tool":
+        logger.info("node_security_check_tool_allowed", tool=action)
 
     return {
         **state,
@@ -146,71 +203,134 @@ def node_security_check(state: AgentState) -> AgentState:
 async def node_execute(state: AgentState) -> AgentState:
     """Executa o plano definido usando tools modernas."""
     from ..tools.system_tools import (
-        get_ram_usage_async,
-        list_docker_containers_async,
-        get_system_status_async,
-        check_postgres_async,
-        check_redis_async,
         get_async_tool,
     )
     from .error_handler import format_error_for_user, wrap_error
 
     # Verificar se foi bloqueado pelo security check
     if state.get("blocked_by_security"):
+        logger.info("node_execute_blocked_by_security")
         return state
 
     intent = state.get("intent")
     tool_suggestion = state.get("tool_suggestion", "")
     action_required = state.get("action_required", False)
 
+    logger.info(
+        "node_execute_start",
+        intent=intent,
+        tool_suggestion=tool_suggestion,
+        action_required=action_required,
+    )
+
     try:
         # Se há tool sugerida pelo LLM, usá-la
         if tool_suggestion and action_required:
             tool = get_async_tool(tool_suggestion)
+            logger.info(
+                "node_execute_tool_lookup",
+                tool_suggestion=tool_suggestion,
+                tool_found=tool is not None,
+            )
+
             if tool:
+                logger.info("node_execute_tool_calling", tool=tool_suggestion)
                 result = await tool()
+                logger.info(
+                    "node_execute_tool_result",
+                    tool=tool_suggestion,
+                    result_preview=str(result)[:100] if result else "None",
+                )
+
+                if not result:
+                    result = f"⚠️ Tool '{tool_suggestion}' executou mas não retornou dados"
+
                 return {**state, "execution_result": result}
+            else:
+                logger.warning(
+                    "node_execute_tool_not_found",
+                    tool_suggestion=tool_suggestion,
+                )
+                return {
+                    **state,
+                    "execution_result": f"⚠️ Tool '{tool_suggestion}' não encontrada no registro",
+                }
 
         # Fallback: comandos tradicionais via /command
         plan = state.get("plan", [])
         step = state.get("current_step", 0)
 
         if not plan or step >= len(plan):
-            return {**state, "execution_result": "nothing_to_do"}
+            logger.info("node_execute_no_plan")
+            return {**state, "execution_result": None}
 
         current_action = plan[step]
         action_type = current_action.get("type")
         action = current_action.get("action")
 
+        logger.info(
+            "node_execute_fallback",
+            action_type=action_type,
+            action=action,
+        )
+
         # Mapear comandos para tools
         if action_type == "command" and action == "ram":
+            from ..tools.system_tools import get_ram_usage_async
+
             result = await get_ram_usage_async()
             return {**state, "execution_result": result}
 
         elif action_type == "command" and action == "containers":
+            from ..tools.system_tools import list_docker_containers_async
+
             result = await list_docker_containers_async()
             return {**state, "execution_result": result}
 
         elif action_type == "command" and action == "status":
+            from ..tools.system_tools import get_system_status_async
+
             result = await get_system_status_async()
             return {**state, "execution_result": result}
 
         elif action_type == "command" and action == "health":
             # Executar checks em paralelo
+            from ..tools.system_tools import check_postgres_async, check_redis_async
+
             postgres_task = check_postgres_async()
             redis_task = check_redis_async()
-            
+
             postgres_result, redis_result = await asyncio.gather(
                 postgres_task, redis_task, return_exceptions=True
             )
-            
+
             # Format results
             checks = []
-            checks.append(postgres_result if isinstance(postgres_result, str) else f"❌ PostgreSQL: {postgres_result}")
-            checks.append(redis_result if isinstance(redis_result, str) else f"❌ Redis: {redis_result}")
-            
+            checks.append(
+                postgres_result
+                if isinstance(postgres_result, str)
+                else f"❌ PostgreSQL: {postgres_result}"
+            )
+            checks.append(
+                redis_result
+                if isinstance(redis_result, str)
+                else f"❌ Redis: {redis_result}"
+            )
+
             status_msg = "\n".join(checks)
             return {**state, "execution_result": status_msg}
+
+        elif action_type == "tool":
+            # Executar tool diretamente do plano
+            tool = get_async_tool(action)
+            if tool:
+                result = await tool()
+                return {**state, "execution_result": result}
+            else:
+                return {
+                    **state,
+                    "execution_result": f"⚠️ Tool '{action}' não encontrada",
+                }
 
         else:
             # Comando não implementado - usar resposta smarter
@@ -226,7 +346,14 @@ async def node_execute(state: AgentState) -> AgentState:
             return {**state, "execution_result": response}
 
     except Exception as e:
-        wrapped_error = wrap_error(e, metadata={"action": state.get("tool_suggestion", "unknown")})
+        wrapped_error = wrap_error(
+            e, metadata={"action": state.get("tool_suggestion", "unknown")}
+        )
+        logger.error(
+            "node_execute_exception",
+            error=str(e),
+            tool_suggestion=tool_suggestion,
+        )
         return {
             **state,
             "error": wrapped_error.to_dict(),
@@ -234,7 +361,7 @@ async def node_execute(state: AgentState) -> AgentState:
         }
 
 
-async def node_generate_response(state: AgentState) -> AgentState:
+async def node_generate_response(state: AgentState) -> str:
     """Gera resposta final ao usuário com identidade VPS-Agent."""
     from .smart_responses import (
         detect_missing_skill_keywords,
@@ -249,20 +376,31 @@ async def node_generate_response(state: AgentState) -> AgentState:
     conversation_history = state.get("conversation_history", [])
     missing_capabilities = state.get("missing_capabilities", [])
 
-    # Se há resultado de execução, usar diretamente
-    if execution_result:
+    logger.info(
+        "node_generate_response_start",
+        intent=intent,
+        has_execution_result=execution_result is not None,
+        execution_result_type=type(execution_result).__name__ if execution_result else None,
+        execution_result_preview=str(execution_result)[:100] if execution_result else None,
+    )
+
+    # Se há resultado de execução, usar diretamente (MESMO que seja string vazia)
+    if execution_result is not None:
         # Verificar se é uma mensagem de "não implementado"
-        if (
-            "não implementado" in execution_result.lower()
-            or "not implemented" in execution_result.lower()
-        ):
+        result_str = str(execution_result).lower()
+        if "não implementado" in result_str or "not implemented" in result_str:
             # Gerar resposta smarter com plano de ação
             detected = detect_missing_skill_keywords(user_message.lower())
             response = generate_smart_unavailable_response(
                 user_message, detected_skills=detected, intent=intent
             )
+            logger.info("node_generate_response_unimplemented")
         else:
             response = execution_result
+            logger.info(
+                "node_generate_response_from_execution",
+                response_preview=str(response)[:100] if response else "None",
+            )
 
     # Para self_improve com capacidades faltantes
     elif intent == "self_improve" and missing_capabilities:
@@ -271,9 +409,11 @@ async def node_generate_response(state: AgentState) -> AgentState:
             detected_skills=detect_missing_skill_keywords(user_message.lower()),
             intent=intent,
         )
+        logger.info("node_generate_response_self_improve")
 
     # Para conversas e perguntas, usar LLM com identidade VPS-Agent
     elif intent in ["chat", "question"]:
+        logger.info("node_generate_response_using_llm", intent=intent)
         try:
             from ..llm.openrouter_client import generate_response
 
@@ -305,6 +445,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
                     )
 
         except Exception as e:
+            logger.error("node_generate_response_llm_error", error=str(e))
             print(f"LLM error: {e}")
             response = (
                 "Sou o VPS-Agent! 😊\n\n"
@@ -318,9 +459,15 @@ async def node_generate_response(state: AgentState) -> AgentState:
 
     else:
         response = "Comando executado com sucesso! ✅"
+        logger.info("node_generate_response_default")
 
     # Salvar memória se foi uma interação significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50
+
+    logger.info(
+        "node_generate_response_end",
+        response_preview=str(response)[:100] if response else "None",
+    )
 
     return {
         **state,
@@ -473,8 +620,7 @@ Por favor, implemente esta capacidade seguindo o plano acima.
 # Esta capacidade será implementada pelo CLI/Kilocode
 
 def {cap_name.replace("-", "_")}():
-    \"\"\"{cap_description}\"\"\"
-    # TODO: Implementar funcionalidade
+    \"\"\"{cap_description}\"\"\"# TODO: Implementar funcionalidade
     pass
 """
 

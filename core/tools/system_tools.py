@@ -271,35 +271,30 @@ def check_redis() -> str:
         return f"❌ **Redis**\n\nErro: {str(e)}"
 
 
-# Async versions for modern LangGraph
+# Async versions for modern LangGraph (Python 3.9+)
 async def get_ram_usage_async() -> str:
     """Async version of get_ram_usage."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, get_ram_usage)
+    return await asyncio.to_thread(get_ram_usage)
 
 
 async def list_docker_containers_async() -> str:
     """Async version of list_docker_containers."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, list_docker_containers)
+    return await asyncio.to_thread(list_docker_containers)
 
 
 async def get_system_status_async() -> str:
     """Async version of get_system_status."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, get_system_status)
+    return await asyncio.to_thread(get_system_status)
 
 
 async def check_postgres_async() -> str:
     """Async version of check_postgres."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, check_postgres)
+    return await asyncio.to_thread(check_postgres)
 
 
 async def check_redis_async() -> str:
     """Async version of check_redis."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, check_redis)
+    return await asyncio.to_thread(check_redis)
 
 
 # Tool registry for LLM

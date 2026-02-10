@@ -6,10 +6,18 @@ from typing import Any, Dict
 
 import structlog
 
-from core.vps_langgraph.graph import build_agent_graph
-from core.vps_langgraph.state import AgentState
-
 logger = structlog.get_logger()
+
+
+def get_agent_graph():
+    """
+    Retorna a instância singleton do grafo do agente.
+    
+    Lazy loading para garantir que o grafo é criado uma única vez.
+    """
+    from core.vps_langgraph.graph import get_agent_graph as _get_graph
+
+    return _get_graph()
 
 
 async def process_message_async(user_id: str, message: str) -> str:
@@ -28,23 +36,33 @@ async def process_message_async(user_id: str, message: str) -> str:
     logger.info("processando_mensagem", user_id=user_id, message=message[:100])
 
     # Criar estado inicial
-    initial_state: AgentState = {
+    initial_state = {
         "user_id": user_id,
         "user_message": message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     try:
-        # Construir e executar o grafo
-        graph = build_agent_graph()
-        logger.info("grafico_criado", nodes=list(graph.nodes.keys()))
-        result = await graph.ainvoke(initial_state)
+        # Usar singleton do grafo (não reconstruir a cada mensagem)
+        graph = get_agent_graph()
+        logger.info("grafico_obtido", nodes=list(graph.nodes.keys()) if hasattr(graph, 'nodes') else "N/A")
+
+        # Configurar thread_id para checkpointing (persistência de conversa)
+        config = {
+            "configurable": {
+                "thread_id": f"user_{user_id}",  # Cada usuário tem seu thread de conversa
+                "checkpoint_ns": "telegram_bot",
+            }
+        }
+
+        logger.info("iniciando_ainvoke", thread_id=config["configurable"]["thread_id"])
+        result = await graph.ainvoke(initial_state, config=config)
         logger.info("resultado_grafo", result_keys=list(result.keys()))
 
         # Extrair resposta
         response = result.get("response", "Desculpe, ocorreu um erro ao processar sua mensagem.")
 
-        logger.info("resposta_gerada", user_id=user_id, response=response[:100])
+        logger.info("resposta_gerada", user_id=user_id, response=response[:100] if response else "None")
 
         return response
 

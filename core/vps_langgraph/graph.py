@@ -3,6 +3,8 @@ Grafo principal do agente LangGraph.
 Define o fluxo de decisão completo com Self-Improvement.
 """
 
+import structlog
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 
 from .memory import AgentMemory
@@ -20,11 +22,33 @@ from .nodes import (
 )
 from .state import AgentState
 
+logger = structlog.get_logger()
 memory = AgentMemory()
 
 
+def get_checkpointer():
+    """
+    Retorna o checkpointer para persistência de estado.
+    
+    Tenta usar PostgreSQL, se falhar usa MemorySaver (memória em RAM).
+    """
+    try:
+        from .checkpoint import get_checkpointer as get_pg_checkpointer
+        
+        checkpointer = get_pg_checkpointer()
+        if checkpointer:
+            logger.info("checkpointer_postgres_ativo")
+            return checkpointer
+    except Exception as e:
+        logger.warning("checkpointer_postgres_falhou", error=str(e))
+    
+    # Fallback para MemorySaver (não persiste entre restarts, mas funciona)
+    logger.info("checkpointer_memory_fallback")
+    return MemorySaver()
+
+
 def build_agent_graph():
-    """Constrói e retorna o grafo do agente."""
+    """Constrói e retorna o grafo do agente com checkpointing."""
     workflow = StateGraph(AgentState)
 
     # Nós do workflow (alguns são async)
@@ -51,6 +75,14 @@ def build_agent_graph():
         """Roteia baseado na intenção e se requer ação."""
         intent = state.get("intent", "unknown")
         action_required = state.get("action_required", False)
+        tool_suggestion = state.get("tool_suggestion", "")
+        
+        logger.info(
+            "route_after_plan",
+            intent=intent,
+            action_required=action_required,
+            tool_suggestion=tool_suggestion,
+        )
         
         # Perguntas que requerem ação vão para security_check → execute
         if intent in ["command", "task"]:
@@ -77,7 +109,10 @@ def build_agent_graph():
     # Segurança → Execução/Resposta (baseado no resultado)
     def route_after_security(state):
         """Roteia após verificação de segurança."""
-        if state.get("blocked_by_security"):
+        blocked = state.get("blocked_by_security", False)
+        logger.info("route_after_security", blocked=blocked)
+        
+        if blocked:
             return "respond"
         return "execute"
 
@@ -94,9 +129,16 @@ def build_agent_graph():
     workflow.add_edge("execute", "respond")
 
     # Self-improve: check_capabilities → self_improve → respond
+    def route_after_capabilities(state):
+        """Roteia após verificação de capacidades."""
+        needs_improvement = state.get("needs_improvement", False)
+        logger.info("route_after_capabilities", needs_improvement=needs_improvement)
+        
+        return "self_improve" if needs_improvement else "respond"
+
     workflow.add_conditional_edges(
         "check_capabilities",
-        lambda state: "self_improve" if state.get("needs_improvement", False) else "respond",
+        route_after_capabilities,
         {
             "self_improve": "self_improve",
             "respond": "respond",
@@ -108,10 +150,16 @@ def build_agent_graph():
     workflow.add_edge("respond", "save_memory")
     workflow.set_finish_point("save_memory")
 
-    return workflow.compile()
+    # Compilar com checkpointer para persistência de estado
+    checkpointer = get_checkpointer()
+    compiled_graph = workflow.compile(checkpointer=checkpointer)
+    
+    logger.info("grafo_compilado_com_checkpointer")
+    
+    return compiled_graph
 
 
-# Instância global do grafo
+# Instância global do grafo (singleton)
 _agent_graph = None
 
 
@@ -119,5 +167,6 @@ def get_agent_graph():
     """Retorna a instância do grafo do agente (lazy loading)."""
     global _agent_graph
     if _agent_graph is None:
+        logger.info("criando_instancia_grafo")
         _agent_graph = build_agent_graph()
     return _agent_graph
