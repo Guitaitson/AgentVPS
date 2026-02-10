@@ -83,6 +83,7 @@ def node_plan(state: AgentState) -> AgentState:
     intent = state.get("intent")
     tool_suggestion = state.get("tool_suggestion", "")
     action_required = state.get("action_required", False)
+    user_message = state.get("user_message", "")
 
     logger.info(
         "node_plan",
@@ -92,7 +93,32 @@ def node_plan(state: AgentState) -> AgentState:
     )
 
     if intent == "command":
-        command = state["user_message"].split()[0].lstrip("/")
+        # Comando direto (/comando ou texto classificado como comando)
+        msg_lower = user_message.lower().strip()
+        
+        # Se começa com /, extrair comando
+        if msg_lower.startswith("/"):
+            command = msg_lower[1:].split()[0]
+        # Se tem tool_suggestion, usar como comando
+        elif tool_suggestion:
+            command = tool_suggestion
+        else:
+            # Fallback: usar primeira palavra
+            command = msg_lower.split()[0]
+        
+        # Mapear comandos comuns
+        command_map = {
+            "list_containers": "containers",
+            "get_system_status": "status",
+            "get_ram": "ram",
+        }
+        
+        # Se tool_suggestion for uma tool conhecida, mapear para comando
+        if tool_suggestion in command_map:
+            command = command_map[tool_suggestion]
+        
+        print(f"[PLAN] Command intent detected. Command: '{command}'")
+        
         return {
             **state,
             "plan": [{"type": "command", "action": command}],
