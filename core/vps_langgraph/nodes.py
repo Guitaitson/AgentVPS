@@ -144,18 +144,16 @@ def node_security_check(state: AgentState) -> AgentState:
     step = state.get("current_step", 0)
 
     if not plan or step >= len(plan):
-        logger.info("node_security_check_no_action")
+        print(f"[SECURITY] No action to check")
         return {**state, "security_check": {"passed": True, "reason": "no_action"}}
 
     current_action = plan[step]
     action_type = current_action.get("type")
     action = current_action.get("action", "")
 
-    logger.info(
-        "node_security_check",
-        action_type=action_type,
-        action=action,
-    )
+    # DEBUG: Log detalhado
+    print(f"[SECURITY] Checking action_type='{action_type}', action='{action}'")
+    print(f"[SECURITY] Full plan: {plan}")
 
     # Carregar allowlist padrão
     allowlist = create_default_allowlist()
@@ -164,16 +162,16 @@ def node_security_check(state: AgentState) -> AgentState:
     if action_type in ["command", "execute"]:
         # Montar comando completo para verificação
         full_command = action if isinstance(action, str) else str(action)
+        
+        print(f"[SECURITY] Checking command in allowlist: '{full_command}'")
 
         # Verificar na allowlist
         result = allowlist.check(ResourceType.COMMAND, full_command)
+        
+        print(f"[SECURITY] Allowlist result: allowed={result.allowed}, reason='{result.reason}'")
 
         if not result.allowed:
-            logger.warning(
-                "node_security_check_blocked",
-                command=full_command,
-                reason=result.reason,
-            )
+            print(f"[SECURITY] BLOCKED: {result.reason}")
             return {
                 **state,
                 "security_check": {
@@ -185,10 +183,12 @@ def node_security_check(state: AgentState) -> AgentState:
                 "blocked_by_security": True,
                 "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}\n\nPara executar este comando, adicione-o à allowlist ou use modo de aprovação.",
             }
+        
+        print(f"[SECURITY] ALLOWED: {full_command}")
 
     # Tools do tipo "tool" são permitidas (são nossas tools controladas)
     if action_type == "tool":
-        logger.info("node_security_check_tool_allowed", tool=action)
+        print(f"[SECURITY] Tool action allowed: {action}")
 
     return {
         **state,
