@@ -258,66 +258,77 @@ async def node_execute(state: AgentState) -> AgentState:
         return state
 
     intent = state.get("intent")
-    tool_suggestion = state.get("tool_suggestion", "")
-    action_required = state.get("action_required", False)
+    plan = state.get("plan", [])
+    step = state.get("current_step", 0)
 
     logger.info(
         "node_execute_start",
         intent=intent,
-        tool_suggestion=tool_suggestion,
-        action_required=action_required,
+        plan=plan,
     )
 
     try:
-        # Se há tool sugerida pelo LLM, usá-la
-        if tool_suggestion and action_required:
-            tool = get_async_tool(tool_suggestion)
+        # PRIORIZAR o plano (ação) sobre tool_suggestion
+        # Isso corrige o problema de fallback nunca ser executado
+        if plan and step < len(plan):
+            current_action = plan[step]
+            action_type = current_action.get("type")
+            action = current_action.get("action")
+            
             logger.info(
-                "node_execute_tool_lookup",
-                tool_suggestion=tool_suggestion,
-                tool_found=tool is not None,
+                "node_execute_from_plan",
+                action_type=action_type,
+                action=action,
             )
 
-            if tool:
-                logger.info("node_execute_tool_calling", tool=tool_suggestion)
-                result = await tool()
-                logger.info(
-                    "node_execute_tool_result",
-                    tool=tool_suggestion,
-                    result_preview=str(result)[:100] if result else "None",
-                )
-
-                if not result:
-                    result = f"⚠️ Tool '{tool_suggestion}' executou mas não retornou dados"
-
+            # Mapear comandos para tools
+            if action_type == "command" and action == "ram":
+                from ..tools.system_tools import get_ram_usage_async
+                result = await get_ram_usage_async()
                 return {**state, "execution_result": result}
-            else:
-                logger.warning(
-                    "node_execute_tool_not_found",
-                    tool_suggestion=tool_suggestion,
+
+            elif action_type == "command" and action == "containers":
+                from ..tools.system_tools import list_docker_containers_async
+                result = await list_docker_containers_async()
+                return {**state, "execution_result": result}
+
+            elif action_type == "command" and action == "status":
+                from ..tools.system_tools import get_system_status_async
+                result = await get_system_status_async()
+                return {**state, "execution_result": result}
+
+            elif action_type == "command" and action == "health":
+                from ..tools.system_tools import check_postgres_async, check_redis_async
+                postgres_result, redis_result = await asyncio.gather(
+                    check_postgres_async(), check_redis_async(), return_exceptions=True
                 )
-                return {
-                    **state,
-                    "execution_result": f"⚠️ Tool '{tool_suggestion}' não encontrada no registro",
-                }
+                checks = []
+                checks.append(postgres_result if isinstance(postgres_result, str) else f"❌ PostgreSQL: {postgres_result}")
+                checks.append(redis_result if isinstance(redis_result, str) else f"❌ Redis: {redis_result}")
+                return {**state, "execution_result": "\n".join(checks)}
 
-        # Fallback: comandos tradicionais via /command
-        plan = state.get("plan", [])
-        step = state.get("current_step", 0)
+            elif action_type == "tool":
+                tool = get_async_tool(action)
+                if tool:
+                    result = await tool()
+                    return {**state, "execution_result": result}
+                else:
+                    return {**state, "execution_result": f"⚠️ Tool '{action}' não encontrada"}
 
-        if not plan or step >= len(plan):
-            logger.info("node_execute_no_plan")
-            return {**state, "execution_result": None}
-
-        current_action = plan[step]
-        action_type = current_action.get("type")
-        action = current_action.get("action")
+        # Se não tem plano ou não foi executado, tentar tool_suggestion como último recurso
+        tool_suggestion = state.get("tool_suggestion", "")
+        action_required = state.get("action_required", False)
 
         logger.info(
-            "node_execute_fallback",
-            action_type=action_type,
-            action=action,
+            "node_execute_fallback_tool_suggestion",
+            tool_suggestion=tool_suggestion,
         )
+
+        if tool_suggestion and action_required:
+            tool = get_async_tool(tool_suggestion)
+            if tool:
+                result = await tool()
+                return {**state, "execution_result": result}
 
         # Mapear comandos para tools
         if action_type == "command" and action == "ram":
