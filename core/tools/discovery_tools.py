@@ -7,9 +7,9 @@ Permite ao agente:
 3. Aprender e salvar novas capabilities
 """
 
+import asyncio
 import json
 import os
-import subprocess
 from typing import Optional
 
 import structlog
