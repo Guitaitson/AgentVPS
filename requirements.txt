@@ -46,3 +46,8 @@ opentelemetry-instrumentation-httpx>=0.41b0
 
 # MCP Server (SSE)
 sse-starlette>=2.0.0
+
+# Multi-modal (Vision, Audio, Documents)
+Pillow>=10.0.0
+PyPDF2>=3.0.0
+python-docx>=1.0.0
