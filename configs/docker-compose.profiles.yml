@@ -1,0 +1,184 @@
+# /opt/vps-agent/configs/docker-compose.profiles.yml
+# Docker Compose com Profiles - Dev/Prod
+#
+# Uso:
+#   docker compose -f docker-compose.profiles.yml --profile production up -d   # Produção
+#   docker compose -f docker-compose.profiles.yml --profile development up -d # Desenvolvimento
+#   docker compose -f docker-compose.profiles.yml --profile tools up -d        # Ferramentas sob demanda
+#   docker compose -f docker-compose.profiles.yml up -d                       # Tudo (default)
+#
+# Profiles disponíveis:
+#   - core: PostgreSQL + Redis (sempre ligado)
+#   - qdrant: Memória semântica
+#   - n8n: Automação
+#   - tools: Todas as ferramentas sob demanda
+#   - development: Modo desenvolvimento (sem limits, com portas expostas)
+#   - production: Modo produção (com limits, portas internas)
+
+services:
+  # ============================================
+  # CORE SERVICES (sempre ligado)
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: vps-postgres
+    restart: unless-stopped
+    profiles: ["core", "production", "development"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vps_agent}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    mem_limit: 200m
+    memswap_limit: 200m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - core-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: vps-redis
+    restart: unless-stopped
+    profiles: ["core", "production", "development"]
+    command: >
+      redis-server
+      --maxmemory 40mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    mem_limit: 60m
+    memswap_limit: 60m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - core-network
+
+  # ============================================
+  # QDRANT (Memória Semântica)
+  # ============================================
+  qdrant:
+    image: qdrant/qdrant:v1.16.2
+    container_name: vps-qdrant
+    restart: unless-stopped
+    profiles: ["qdrant", "tools", "production", "development"]
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    mem_limit: 150m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - core-network
+
+  # ============================================
+  # N8N (Automação)
+  # ============================================
+  n8n:
+    image: n8nio/n8n:1.68.0
+    container_name: vps-n8n
+    restart: unless-stopped
+    profiles: ["n8n", "tools", "production", "development"]
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      # Credenciais (mudar em produção!)
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-n8n}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    ports:
+      - "127.0.0.1:5678:5678"
+    mem_limit: 300m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - core-network
+
+  # ============================================
+  # DEVELOPMENT ONLY (sem limits, portas expostas)
+  # ============================================
+  postgres-dev:
+    image: postgres:16-alpine
+    container_name: vps-postgres-dev
+    restart: unless-stopped
+    profiles: ["development"]
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: vps_agent_dev
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    # Sem limits em dev
+    networks:
+      - dev-network
+
+  redis-dev:
+    image: redis:7-alpine
+    container_name: vps-redis-dev
+    restart: unless-stopped
+    profiles: ["development"]
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    # Sem limits em dev
+    networks:
+      - dev-network
+
+networks:
+  core-network:
+    name: vps-core-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+  dev-network:
+    name: vps-dev-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: vps-postgres-data
+  redis_data:
+    name: vps-redis-data
+  qdrant_data:
+    name: vps-qdrant-data
+  n8n_data:
+    name: vps-n8n-data
+  # Dev volumes
+  postgres_dev_data:
+    name: vps-postgres-dev-data
+  redis_dev_data:
+    name: vps-redis-dev-data
