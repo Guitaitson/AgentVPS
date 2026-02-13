@@ -43,3 +43,6 @@ opentelemetry-sdk>=1.22.0
 opentelemetry-exporter-otlp>=1.22.0
 opentelemetry-instrumentation-langchain>=0.41b0
 opentelemetry-instrumentation-httpx>=0.41b0
+
+# MCP Server (SSE)
+sse-starlette>=2.0.0
