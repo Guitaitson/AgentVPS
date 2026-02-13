@@ -143,8 +143,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info("comando_status", user_id=user_id)
     
-    # Roteia pelo grafo com mensagem clara
-    response = await process_message_async(user_id, "status do sistema")
+    # Roteia pelo grafo com /status para ativar intent de comando
+    response = await process_message_async(user_id, "/status")
     await update.message.reply_text(response)
 
 
@@ -154,8 +154,8 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info("comando_ram", user_id=user_id)
     
-    # Roteia pelo grafo
-    response = await process_message_async(user_id, "quanta RAM?")
+    # Roteia pelo grafo com /ram para ativar intent de comando
+    response = await process_message_async(user_id, "/ram")
     await update.message.reply_text(response)
 
 
@@ -165,8 +165,8 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info("comando_containers", user_id=user_id)
     
-    # Roteia pelo grafo
-    response = await process_message_async(user_id, "lista containers docker")
+    # Roteia pelo grafo com /containers para ativar intent de comando
+    response = await process_message_async(user_id, "/containers")
     await update.message.reply_text(response)
 
 
@@ -176,8 +176,8 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info("comando_health", user_id=user_id)
     
-    # Roteia pelo grafo com health check completo
-    response = await process_message_async(user_id, "health check completo")
+    # Roteia pelo grafo com /health para ativar intent de comando
+    response = await process_message_async(user_id, "/health")
     await update.message.reply_text(response)
 
 
