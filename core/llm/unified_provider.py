@@ -219,15 +219,46 @@ class UnifiedLLMProvider:
         Returns:
             IntentClassification estruturada
         """
+        # ============================================================
+        # FORÇAR REGEX FALLBACK para perguntas que requerem ação
+        # ============================================================
+        # Isso evita que o LLM classifique errado perguntas como "chat"
+        msg_lower = message.lower()
+        
+        # Padrões que DEVEM executar ação (não podem ser classificados como chat)
+        force_action_patterns = [
+            "tem o", "tem installed", "esta instalado", "está instalado",
+            "como ver", "como verificar", "como saber", "como instalar",
+            "tem docker", "tem postgres", "tem redis", "tem o claude",
+            "execute ", "rode ", "pesquise ", "busque ",
+        ]
+        
+        use_regex_fallback = any(
+            pattern in msg_lower for pattern in force_action_patterns
+        )
+        
+        if use_regex_fallback:
+            logger.info(
+                "intent_forced_regex_fallback",
+                message=message[:50],
+                reason="force_action_pattern_detected"
+            )
+            from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
+            result = infer_intent_from_message(message)
+            return IntentClassification(**result)
+        
         system_prompt = """Você é um classificador de intenções para o VPS-Agent.
 Analise a mensagem do usuário e retorne APENAS um JSON válido.
 
 Intenções possíveis:
 - "command": Comando direto (/comando ou instrução direta)
-- "task": Tarefa a ser executada (liste, mostre, verifique, etc)
-- "question": Pergunta sobre o sistema (RAM, containers, status)
+- "task": Tarefa a ser executada (liste, mostre, verifique, execute, pesquise, rode)
+- "question": Pergunta sobre o sistema (RAM, containers, status) - MAS APENAS se for pergunta genérica
 - "chat": Conversa casual
 - "self_improve": Pedido para criar/melhorar algo
+
+IMPORTANTE: Se a mensagem pede para FAZER algo (verificar, executar, rodar, checar, pesquisar),
+classifique como "task" com action_required=true
 
 Tools disponíveis:
 - "get_ram": Perguntas sobre memória RAM
@@ -235,21 +266,25 @@ Tools disponíveis:
 - "get_system_status": Status geral do sistema
 - "check_postgres": Status do PostgreSQL
 - "check_redis": Status do Redis
+- "shell_exec": Para executar comandos
+- "web_search": Para pesquisar na internet
 - "": Nenhuma tool específica
 
 Regras:
-- "quanta RAM?", "memória" → question + get_ram
-- "containers docker" → question + list_containers
-- "status do sistema" → question + get_system_status
-- "crie um agente" → self_improve
+- "tem o docker instalado?" → task + shell_exec (precisa executar comando)
+- "execute docker ps" → task + shell_exec
+- "pesquise X" → task + web_search
+- "quanta RAM?" → question + get_ram
+- "containers docker rodando?" → question + list_containers
 - "oi", "tudo bem?" → chat
+- "crie um agente" → self_improve
 
 Retorne EXATAMENTE este formato JSON:
 {
     "intent": "question|command|task|chat|self_improve",
     "confidence": 0.95,
     "action_required": true|false,
-    "tool_suggestion": "get_ram|list_containers|...",
+    "tool_suggestion": "get_ram|list_containers|shell_exec|web_search|...",
     "entities": ["ram", "docker"],
     "reasoning": "breve explicação"
 }"""

@@ -230,18 +230,28 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             }
     
     # ========================================
-    # PRIORIDADE 3: Perguntas sobre sistema (QUESTION)
+    # PRIORIDADE 3: Perguntas sobre sistema (QUESTION) - COM ACTION REQUIRED
     # ========================================
-    question_patterns = [
+    # Perguntas que DEVEM executar ação (action_required=True)
+    question_with_action = [
+        # Memória
         "memoria", "memória", "memory",
+        # Containers
         "quantos containers", "quantos docker",
+        # Status
         "como está", "estado do",
+        # Disco
         "quanto espaço", "quanto disco",
+        # Serviços
         "quantos serviços", "quais serviços",
-        "tem instalado", "o que tem instalado", "quais programas",
+        # Instalação - ESTE É O CASO CRÍTICO!
+        "tem instalado", "o que tem instalado", "quais programas", "tem o",
+        "tem o claude", "tem o docker", "tem o postgres", "tem o redis",
+        "esta instalado", "está instalado", "está instalados",
+        "como ver", "como verificar", "como saber",
     ]
     
-    for pattern in question_patterns:
+    for pattern in question_with_action:
         if pattern in msg_lower:
             entities = []
             tool = "system_info"
