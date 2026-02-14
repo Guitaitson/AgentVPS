@@ -48,6 +48,14 @@ class IntentClassification(BaseModel):
     )
 
 
+# Mensagens curtas que DEVEM ser classificadas como chat
+_FORCE_CHAT_MESSAGES = {
+    "oi", "olá", "ola", "hi", "hello", "hey", "e ai", "eai",
+    "bom dia", "boa tarde", "boa noite", "td bem", "tudo bem",
+    "blz", "blz?", "salve", "alô", "alo", "oi?", "ola?"
+}
+
+
 async def classify_intent_llm(
     message: str,
     conversation_history: list[dict] = None,
@@ -66,6 +74,29 @@ async def classify_intent_llm(
     Returns:
         Dicionário com classificação estruturada
     """
+    # ============ GUARD CLAUSE: Mensagens curtas = CHAT ============
+    # Isso corrige o bug de "oi" retornando containers
+    msg_lower = message.lower().strip()
+    
+    # Se é uma saudação curta (≤15 chars), FORÇAR chat
+    if len(message) <= 15 and any(
+        msg_lower == sauda or sauda in msg_lower 
+        for sauda in _FORCE_CHAT_MESSAGES
+    ):
+        logger.info(
+            "intent_forced_chat",
+            message=message,
+            reason="saudacao_curta"
+        )
+        return {
+            "intent": "chat",
+            "confidence": 0.95,
+            "entities": [],
+            "action_required": False,
+            "tool_suggestion": "",
+            "reasoning": "Saudação curta detectada - forçar chat"
+        }
+    
     try:
         # Tentar usar o novo LLM Provider unificado
         from ..llm.unified_provider import classify_intent_with_llm

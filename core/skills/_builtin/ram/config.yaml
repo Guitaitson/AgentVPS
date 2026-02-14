@@ -1,0 +1,16 @@
+name: get_ram
+description: "Mostra uso atual de RAM do sistema em MB"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - ram
+  - memória
+  - memoria
+  - memory
+  - /ram
+  - quanta ram
+  - quanto de ram
+parameters: {}
+max_output_chars: 500
+timeout_seconds: 10
+enabled: true

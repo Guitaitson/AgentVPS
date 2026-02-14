@@ -1,0 +1,14 @@
+name: list_containers
+description: "Lista containers Docker em execução"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - containers
+  - docker
+  - /containers
+  - listar containers
+  - quais containers
+parameters: {}
+max_output_chars: 2000
+timeout_seconds: 15
+enabled: true

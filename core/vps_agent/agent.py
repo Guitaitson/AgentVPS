@@ -47,10 +47,12 @@ async def process_message_async(user_id: str, message: str) -> str:
         graph = get_agent_graph()
         logger.info("grafico_obtido", nodes=list(graph.nodes.keys()) if hasattr(graph, 'nodes') else "N/A")
 
-        # Configurar thread_id para checkpointing (persistência de conversa)
+        # CORREÇÃO: Usar timestamp como thread_id para evitar cache de respostas anteriores
+        # Isso força o LangGraph a processar cada mensagem do zero
+        import time
         config = {
             "configurable": {
-                "thread_id": f"user_{user_id}",  # Cada usuário tem seu thread de conversa
+                "thread_id": f"user_{user_id}_{int(time.time())}",
                 "checkpoint_ns": "telegram_bot",
             }
         }

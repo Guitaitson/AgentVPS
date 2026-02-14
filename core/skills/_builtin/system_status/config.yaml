@@ -1,0 +1,14 @@
+name: get_system_status
+description: "Mostra status geral do sistema (RAM, disco, Docker)"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - status
+  - /status
+  - sistema
+  - sistema status
+  - como esta o sistema
+parameters: {}
+max_output_chars: 1000
+timeout_seconds: 15
+enabled: true

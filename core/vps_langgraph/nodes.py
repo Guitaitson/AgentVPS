@@ -10,6 +10,7 @@ import structlog
 
 from .memory import AgentMemory
 from .state import AgentState
+from ..skills.registry import get_skill_registry
 
 logger = structlog.get_logger()
 memory = AgentMemory()
@@ -246,34 +247,24 @@ def node_security_check(state: AgentState) -> AgentState:
 
 
 async def node_execute(state: AgentState) -> AgentState:
-    """Executa o plano definido usando tools modernas."""
-    from ..tools.system_tools import (
-        get_async_tool,
-    )
+    """Executa ação usando Skill Registry."""
     from .error_handler import format_error_for_user, wrap_error
 
-    # Verificar se foi bloqueado pelo security check
     if state.get("blocked_by_security"):
         logger.info("node_execute_blocked_by_security")
         return state
 
-    intent = state.get("intent")
+    registry = get_skill_registry()
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
-
-    logger.info(
-        "node_execute_start",
-        intent=intent,
-        plan=plan,
-    )
+    tool_suggestion = state.get("tool_suggestion", "")
 
     try:
-        # PRIORIZAR o plano (ação) sobre tool_suggestion
-        # Isso corrige o problema de fallback nunca ser executado
+        # 1. Tentar skill pelo plano
         if plan and step < len(plan):
             current_action = plan[step]
             action_type = current_action.get("type")
-            action = current_action.get("action")
+            action = current_action.get("action", "")
             
             logger.info(
                 "node_execute_from_plan",
@@ -281,143 +272,43 @@ async def node_execute(state: AgentState) -> AgentState:
                 action=action,
             )
 
-            # Mapear comandos para tools
-            if action_type == "command" and action == "ram":
-                from ..tools.system_tools import get_ram_usage_async
-                result = await get_ram_usage_async()
+            # Mapear action para skill name
+            skill = registry.get(action) or registry.find_by_trigger(action)
+            if skill:
+                result = await registry.execute_skill(skill.name, {"raw_input": action})
                 return {**state, "execution_result": result}
 
-            elif action_type == "command" and action == "containers":
-                from ..tools.system_tools import list_docker_containers_async
-                result = await list_docker_containers_async()
+        # 2. Tentar por tool_suggestion do LLM
+        if tool_suggestion:
+            skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
+            if skill:
+                result = await registry.execute_skill(skill.name)
                 return {**state, "execution_result": result}
 
-            elif action_type == "command" and action == "status":
-                from ..tools.system_tools import get_system_status_async
-                result = await get_system_status_async()
-                return {**state, "execution_result": result}
-
-            elif action_type == "command" and action == "health":
-                from ..tools.system_tools import check_postgres_async, check_redis_async
-                postgres_result, redis_result = await asyncio.gather(
-                    check_postgres_async(), check_redis_async(), return_exceptions=True
-                )
-                checks = []
-                checks.append(postgres_result if isinstance(postgres_result, str) else f"❌ PostgreSQL: {postgres_result}")
-                checks.append(redis_result if isinstance(redis_result, str) else f"❌ Redis: {redis_result}")
-                return {**state, "execution_result": "\n".join(checks)}
-
-            elif action_type == "tool":
-                tool = get_async_tool(action)
-                if tool:
-                    result = await tool()
-                    return {**state, "execution_result": result}
-                else:
-                    return {**state, "execution_result": f"⚠️ Tool '{action}' não encontrada"}
-
-        # Se não tem plano ou não foi executado, tentar tool_suggestion como último recurso
-        tool_suggestion = state.get("tool_suggestion", "")
-        action_required = state.get("action_required", False)
-
-        logger.info(
-            "node_execute_fallback_tool_suggestion",
-            tool_suggestion=tool_suggestion,
-        )
-
-        if tool_suggestion and action_required:
-            tool = get_async_tool(tool_suggestion)
-            if tool:
-                result = await tool()
-                return {**state, "execution_result": result}
-
-        # Mapear comandos para tools
-        if action_type == "command" and action == "ram":
-            from ..tools.system_tools import get_ram_usage_async
-
-            result = await get_ram_usage_async()
-            return {**state, "execution_result": result}
-
-        elif action_type == "command" and action == "containers":
-            from ..tools.system_tools import list_docker_containers_async
-
-            result = await list_docker_containers_async()
-            return {**state, "execution_result": result}
-
-        elif action_type == "command" and action == "status":
-            from ..tools.system_tools import get_system_status_async
-
-            result = await get_system_status_async()
-            return {**state, "execution_result": result}
-
-        elif action_type == "command" and action == "health":
-            # Executar checks em paralelo
-            from ..tools.system_tools import check_postgres_async, check_redis_async
-
-            postgres_task = check_postgres_async()
-            redis_task = check_redis_async()
-
-            postgres_result, redis_result = await asyncio.gather(
-                postgres_task, redis_task, return_exceptions=True
-            )
-
-            # Format results
-            checks = []
-            checks.append(
-                postgres_result
-                if isinstance(postgres_result, str)
-                else f"❌ PostgreSQL: {postgres_result}"
-            )
-            checks.append(
-                redis_result
-                if isinstance(redis_result, str)
-                else f"❌ Redis: {redis_result}"
-            )
-
-            status_msg = "\n".join(checks)
-            return {**state, "execution_result": status_msg}
-
-        elif action_type == "tool":
-            # Executar tool diretamente do plano
-            tool = get_async_tool(action)
-            if tool:
-                result = await tool()
-                return {**state, "execution_result": result}
-            else:
-                return {
-                    **state,
-                    "execution_result": f"⚠️ Tool '{action}' não encontrada",
-                }
-
-        else:
-            # Comando não implementado - usar resposta smarter
-            from .smart_responses import (
-                detect_missing_skill_keywords,
-                generate_smart_unavailable_response,
-            )
-
-            detected = detect_missing_skill_keywords(f"{action_type} {action}")
-            response = generate_smart_unavailable_response(
-                f"{action_type} {action}", detected_skills=detected, intent=intent
-            )
-            return {**state, "execution_result": response}
+        # 3. Skill não encontrado — resposta inteligente
+        from .smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
+        user_msg = state.get("user_message", "")
+        detected = detect_missing_skill_keywords(user_msg.lower())
+        response = generate_smart_unavailable_response(user_msg, detected_skills=detected)
+        return {**state, "execution_result": response}
 
     except Exception as e:
-        wrapped_error = wrap_error(
-            e, metadata={"action": state.get("tool_suggestion", "unknown")}
-        )
-        logger.error(
-            "node_execute_exception",
-            error=str(e),
-            tool_suggestion=tool_suggestion,
-        )
+        wrapped = wrap_error(e, metadata={"skill": tool_suggestion})
         return {
             **state,
-            "error": wrapped_error.to_dict(),
+            "error": wrapped.to_dict(),
             "execution_result": format_error_for_user(e),
         }
 
 
-async def node_generate_response(state: AgentState) -> str:
+# Alias para compatibilidade com código legado
+def get_async_tool(name: str):
+    """Fallback para compatibilidade com código legado."""
+    from ..tools.system_tools import get_async_tool as legacy_get_async_tool
+    return legacy_get_async_tool(name)
+
+
+async def node_generate_response(state: AgentState) -> AgentState:
     """Gera resposta final ao usuário com identidade VPS-Agent."""
     from .smart_responses import (
         detect_missing_skill_keywords,
@@ -428,7 +319,7 @@ async def node_generate_response(state: AgentState) -> str:
     intent = state.get("intent")
     execution_result = state.get("execution_result")
     user_context = state.get("user_context", {})
-    user_message = state.get("user_message")
+    user_message = state.get("user_message", "")
     conversation_history = state.get("conversation_history", [])
     missing_capabilities = state.get("missing_capabilities", [])
 
@@ -436,15 +327,15 @@ async def node_generate_response(state: AgentState) -> str:
         "node_generate_response_start",
         intent=intent,
         has_execution_result=execution_result is not None,
-        execution_result_type=type(execution_result).__name__ if execution_result else None,
-        execution_result_preview=str(execution_result)[:100] if execution_result else None,
     )
+
+    response = None
 
     # Se há resultado de execução, usar diretamente (MESMO que seja string vazia)
     if execution_result is not None:
         # Verificar se é uma mensagem de "não implementado"
         result_str = str(execution_result).lower()
-        if "não implementado" in result_str or "not implemented" in result_str:
+        if "não implementado" in result_str or "não encontrado" in result_str or "not implemented" in result_str:
             # Gerar resposta smarter com plano de ação
             detected = detect_missing_skill_keywords(user_message.lower())
             response = generate_smart_unavailable_response(
@@ -452,7 +343,7 @@ async def node_generate_response(state: AgentState) -> str:
             )
             logger.info("node_generate_response_unimplemented")
         else:
-            response = execution_result
+            response = str(execution_result)
             logger.info(
                 "node_generate_response_from_execution",
                 response_preview=str(response)[:100] if response else "None",
@@ -502,7 +393,6 @@ async def node_generate_response(state: AgentState) -> str:
 
         except Exception as e:
             logger.error("node_generate_response_llm_error", error=str(e))
-            print(f"LLM error: {e}")
             response = (
                 "Sou o VPS-Agent! 😊\n\n"
                 "Entendi sua mensagem.\n\n"
@@ -512,10 +402,22 @@ async def node_generate_response(state: AgentState) -> str:
                 "• Integrar ferramentas\n\n"
                 f"{get_capabilities_summary()}"
             )
-
+    
     else:
         response = "Comando executado com sucesso! ✅"
         logger.info("node_generate_response_default")
+
+    # Se nenhuma resposta foi definida, usar fallback
+    if response is None:
+        response = (
+            "Sou o VPS-Agent! 😊\n\n"
+            "Entendi sua mensagem. Como posso ajudar?\n\n"
+            "Comandos disponíveis:\n"
+            "• /status - Status da VPS\n"
+            "• /ram - Memória RAM\n"
+            "• /containers - Containers Docker\n"
+            "• /health - Health check"
+        )
 
     # Salvar memória se foi uma interação significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50
@@ -525,6 +427,7 @@ async def node_generate_response(state: AgentState) -> str:
         response_preview=str(response)[:100] if response else "None",
     )
 
+    # CORREÇÃO: Retornar dict (AgentState), não string!
     return {
         **state,
         "response": response,

@@ -10,6 +10,7 @@ Permite ao agente:
 import asyncio
 import json
 import os
+import subprocess  # FALTANDO - necessário para executar comandos
 from typing import Optional
 
 import structlog
@@ -68,11 +69,20 @@ def get_installed_packages() -> str:
     except Exception as e:
         logger.debug("apt_failed", error=str(e))
     
-    # Método 3: Verificar comandos comuns
+    # Método 3: Verificar comandos comuns + CLIs modernos
     common_commands = [
+        # Comandos tradicionais
         "python3", "python", "node", "npm", "docker", "docker-compose",
         "git", "ssh", "curl", "wget", "nginx", "apache2", "mysql", "psql",
-        "redis-cli", "mongo", "java", "javac", "go", "rustc", "cargo"
+        "redis-cli", "mongo", "java", "javac", "go", "rustc", "cargo",
+        # CLIs modernos de IA/Agent
+        "claude", "cline", "openai", "anthropic",
+        # Tools modernas
+        "bun", "pnpm", "yarn", "pnpm",
+        # Cloud CLIs
+        "aws", "gcloud", "az", "kubectl", "terraform", "helm",
+        # DevOps
+        "docker", "podman", "docker-compose", "docker-compose",
     ]
     
     found = []

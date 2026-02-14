@@ -1,0 +1,14 @@
+name: check_postgres
+description: "Verifica conexão e status do PostgreSQL"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - postgres
+  - postgresql
+  - /health
+  - database
+  - banco de dados
+parameters: {}
+max_output_chars: 500
+timeout_seconds: 10
+enabled: true

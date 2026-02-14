@@ -1,0 +1,12 @@
+name: check_redis
+description: "Verifica conexão e status do Redis"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - redis
+  - cache
+  - /health
+parameters: {}
+max_output_chars: 500
+timeout_seconds: 10
+enabled: true
