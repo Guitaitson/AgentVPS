@@ -254,7 +254,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
     for pattern in question_with_action:
         if pattern in msg_lower:
             entities = []
-            tool = "system_info"
+            tool = "shell_exec"  # MUDANÇA: shell_exec é o padrão para perguntas sobre instalação
             
             if any(w in msg_lower for w in ["ram", "memória", "memoria", "memory"]):
                 entities.append("ram")
