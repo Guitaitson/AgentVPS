@@ -91,14 +91,58 @@ def classify_command(command: str) -> SecurityLevel:
 class ShellExecSkill(SkillBase):
     """Executa comandos shell com classificação de segurança."""
 
+    # Mapeamento de perguntas para comandos shell
+    QUESTION_TO_COMMAND = {
+        # Instalação - tem X instalado?
+        "tem o claude": "which claude",
+        "tem claude": "which claude",
+        "claude instalado": "which claude",
+        "tem o docker": "which docker",
+        "tem docker": "which docker",
+        "docker instalado": "docker --version",
+        "tem o postgres": "which psql",
+        "tem postgres": "which psql",
+        "postgres instalado": "psql --version",
+        "tem o redis": "which redis-cli",
+        "tem redis": "which redis-cli",
+        "redis instalado": "redis-cli --version",
+        "tem o node": "which node",
+        "tem node": "which node",
+        "node instalado": "node --version",
+        "tem o npm": "which npm",
+        "tem npm": "which npm",
+        "tem o python": "which python3",
+        "tem python": "which python3",
+        "python instalado": "python3 --version",
+        # Como ver X?
+        "como ver a memoria": "free -h",
+        "como ver memória": "free -h",
+        "como ver ram": "free -h",
+        "quanta ram": "free -h",
+        "quanto память": "free -h",
+        "como está a memória": "free -h",
+        "como está a ram": "free -h",
+        "quantos containers": "docker ps -a",
+        "quais containers": "docker ps -a",
+        "containers rodando": "docker ps",
+        "status do sistema": "uptime && free -h && df -h",
+        "estado do sistema": "uptime && free -h && df -h",
+        # Versões
+        "versão do": "lsb_release -a || cat /etc/os-release",
+    }
+
     async def execute(self, args: Dict[str, Any] = None) -> str:
-        command = (args or {}).get("command") or (args or {}).get("raw_input", "")
+        raw_input = (args or {}).get("raw_input", "")
+        command = (args or {}).get("command") or raw_input
 
         if not command:
             return "❌ Nenhum comando fornecido. Exemplo: 'execute ls -la'"
 
+        # Detectar se é uma pergunta e extrair comando
+        command = self._extract_command_from_question(command)
+        
         # Limpar prefixos comuns
-        for prefix in ["execute ", "executar ", "rodar ", "run "]:
+        for prefix in ["execute ", "executar ", "rodar ", "run ", "me mostra ", "mostre ", "liste "]:
             if command.lower().startswith(prefix):
                 command = command[len(prefix):].strip()
                 break
@@ -159,3 +203,15 @@ class ShellExecSkill(SkillBase):
             return f"⏱️ Comando excedeu timeout de {self.config.timeout_seconds}s: `{command}`"
         except Exception as e:
             return f"❌ Erro ao executar: {e}"
+
+    def _extract_command_from_question(self, text: str) -> str:
+        """Extrai comando shell a partir de perguntas em linguagem natural."""
+        text_lower = text.lower().strip()
+        
+        # Tentar encontrar correspondência no mapeamento
+        for pattern, command in self.QUESTION_TO_COMMAND.items():
+            if pattern in text_lower:
+                return command
+        
+        # Se não encontrou mapeamento, retornar texto original
+        return text
