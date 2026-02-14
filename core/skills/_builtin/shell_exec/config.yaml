@@ -1,0 +1,23 @@
+name: shell_exec
+description: "Executa comandos shell na VPS com classificação de segurança"
+version: "1.0.0"
+security_level: moderate
+triggers:
+  - execute
+  - executar
+  - rodar
+  - run
+  - shell
+  - comando
+  - terminal
+  - docker ps
+  - ls
+  - cat
+parameters:
+  command:
+    type: string
+    required: true
+    description: "Comando shell a executar"
+max_output_chars: 2000
+timeout_seconds: 30
+enabled: true

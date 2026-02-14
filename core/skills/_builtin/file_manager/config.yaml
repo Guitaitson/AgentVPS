@@ -1,0 +1,30 @@
+name: file_manager
+description: "Gerencia arquivos - ler, criar, editar, listar diretórios"
+version: "1.0.0"
+security_level: moderate
+triggers:
+  - ler
+  - ler arquivo
+  - criar arquivo
+  - editar arquivo
+  - listar arquivos
+  - conteudo de
+  - leia
+  - arquivo
+  - file
+parameters:
+  operation:
+    type: string
+    required: true
+    description: "Operação: read, write, append, list"
+  path:
+    type: string
+    required: true
+    description: "Caminho do arquivo ou diretório"
+  content:
+    type: string
+    required: false
+    description: "Conteúdo para escrever (para write/append)"
+max_output_chars: 5000
+timeout_seconds: 15
+enabled: true
