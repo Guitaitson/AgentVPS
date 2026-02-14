@@ -1,0 +1,21 @@
+name: web_search
+description: "Pesquisa na web usando Brave Search API"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - buscar
+  - pesquise
+  - pesquisa
+  - google
+  - procurar
+  - search
+  - web
+  - na internet
+parameters:
+  query:
+    type: string
+    required: true
+    description: "Termo de busca"
+max_output_chars: 3000
+timeout_seconds: 15
+enabled: true
