@@ -1,0 +1,31 @@
+name: self_edit
+description: "Permite que o agente edite seus próprios arquivos de código"
+version: "1.0.0"
+security_level: moderate
+triggers:
+  - edite
+  - altere
+  - modifique
+  - mude
+  - atualize
+  - edit
+  - modify
+  - change
+  - update
+parameters:
+  file_path:
+    type: string
+    required: true
+    description: "Caminho do arquivo para editar"
+  content:
+    type: string
+    required: true
+    description: "Novo conteúdo"
+  mode:
+    type: string
+    required: false
+    description: "Modo: overwrite, append"
+    default: "overwrite"
+max_output_chars: 1500
+timeout_seconds: 30
+enabled: true
