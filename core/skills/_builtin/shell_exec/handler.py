@@ -89,47 +89,7 @@ def classify_command(command: str) -> SecurityLevel:
 
 
 class ShellExecSkill(SkillBase):
-    """Executa comandos shell com classificação de segurança."""
-
-    # Mapeamento de perguntas para comandos shell
-    QUESTION_TO_COMMAND = {
-        # Instalação - tem X instalado?
-        "tem o claude": "which claude",
-        "tem claude": "which claude",
-        "claude instalado": "which claude",
-        "tem o docker": "which docker",
-        "tem docker": "which docker",
-        "docker instalado": "docker --version",
-        "tem o postgres": "which psql",
-        "tem postgres": "which psql",
-        "postgres instalado": "psql --version",
-        "tem o redis": "which redis-cli",
-        "tem redis": "which redis-cli",
-        "redis instalado": "redis-cli --version",
-        "tem o node": "which node",
-        "tem node": "which node",
-        "node instalado": "node --version",
-        "tem o npm": "which npm",
-        "tem npm": "which npm",
-        "tem o python": "which python3",
-        "tem python": "which python3",
-        "python instalado": "python3 --version",
-        # Como ver X?
-        "como ver a memoria": "free -h",
-        "como ver memória": "free -h",
-        "como ver ram": "free -h",
-        "quanta ram": "free -h",
-        "quanto память": "free -h",
-        "como está a memória": "free -h",
-        "como está a ram": "free -h",
-        "quantos containers": "docker ps -a",
-        "quais containers": "docker ps -a",
-        "containers rodando": "docker ps",
-        "status do sistema": "uptime && free -h && df -h",
-        "estado do sistema": "uptime && free -h && df -h",
-        # Versões
-        "versão do": "lsb_release -a || cat /etc/os-release",
-    }
+    """Executa comandos shell com classificação de segurança e interpretação inteligente."""
 
     async def execute(self, args: Dict[str, Any] = None) -> str:
         raw_input = (args or {}).get("raw_input", "")
@@ -138,8 +98,8 @@ class ShellExecSkill(SkillBase):
         if not command:
             return "❌ Nenhum comando fornecido. Exemplo: 'execute ls -la'"
 
-        # Detectar se é uma pergunta e extrair comando
-        command = self._extract_command_from_question(command)
+        # Detectar se é uma pergunta e usar LLM para interpretar
+        command = await self._interpret_and_generate_command(command)
         
         # Limpar prefixos comuns
         for prefix in ["execute ", "executar ", "rodar ", "run ", "me mostra ", "mostre ", "liste "]:
@@ -204,14 +164,81 @@ class ShellExecSkill(SkillBase):
         except Exception as e:
             return f"❌ Erro ao executar: {e}"
 
-    def _extract_command_from_question(self, text: str) -> str:
-        """Extrai comando shell a partir de perguntas em linguagem natural."""
-        text_lower = text.lower().strip()
+    async def _interpret_and_generate_command(self, user_input: str) -> str:
+        """
+        Usa LLM para interpretar a pergunta do usuário e gerar o comando shell adequado.
         
-        # Tentar encontrar correspondência no mapeamento
-        for pattern, command in self.QUESTION_TO_COMMAND.items():
-            if pattern in text_lower:
-                return command
+        Este é o "Agente Interpretador" - transforma linguagem natural em comandos.
+        """
+        import structlog
+        logger = structlog.get_logger()
         
-        # Se não encontrou mapeamento, retornar texto original
-        return text
+        user_input_lower = user_input.lower().strip()
+        
+        # Se já parece um comando shell válido, não precisa interpretar
+        # (começa com palavras-chave comuns de shell)
+        shell_keywords = ["ls", "cd", "cat", "grep", "find", "docker", "apt", "pip", "git", "curl", "wget", "which", "psql", "redis"]
+        if any(user_input_lower.startswith(kw) for kw in shell_keywords):
+            return user_input
+        
+        # Se tem "execute" ou prefixos claros, não precisa interpretar
+        for prefix in ["execute ", "executar ", "rode ", "roda ", "run "]:
+            if user_input_lower.startswith(prefix):
+                return user_input[len(prefix):].strip()
+        
+        # Usar LLM para interpretar a pergunta
+        try:
+            from core.llm.unified_provider import get_llm_provider
+            
+            system_prompt = """Você é um Interpretador de Comandos Shell.
+O usuário faz uma pergunta em linguagem natural e você deve gerar o comando shell adequado.
+
+Regras:
+1. Interprete o que o usuário quer saber
+2. Gere o comando shell correto para obter essa informação
+3. Retorne APENAS o comando, sem explicações
+
+Exemplos:
+- "tem o claude instalado?" → "which claude"
+- "tem o docker?" → "which docker"
+- "quanta ram temos?" → "free -h"
+- "quantos containers estão rodando?" → "docker ps"
+- "qual o status do sistema?" → "uptime && free -h && df -h"
+- "como está a memória?" → "free -h"
+- "quais processos estão rodando?" → "ps aux"
+- "espaço em disco?" → "df -h"
+- "quem sou eu?" → "whoami"
+- "qual hostname?" → "hostname"
+- "versão do python?" → "python3 --version"
+
+Retorne EXATAMENTE o comando shell, sem aspas, sem explicações."""
+
+            provider = get_llm_provider()
+            response = await provider.generate(
+                user_message=user_input,
+                system_prompt=system_prompt,
+            )
+            
+            if response.success and response.content:
+                # Limpar resposta
+                generated_command = response.content.strip()
+                # Remover markdown se houver
+                if generated_command.startswith("```"):
+                    generated_command = generated_command.split("```")[1]
+                    if generated_command.startswith("bash"):
+                        generated_command = generated_command[4:]
+                generated_command = generated_command.strip()
+                
+                logger.info(
+                    "shell_command_generated_by_llm",
+                    user_input=user_input[:50],
+                    generated_command=generated_command,
+                )
+                
+                return generated_command
+            
+        except Exception as e:
+            logger.warning("llm_interpretation_failed", error=str(e), input=user_input[:50])
+        
+        # Fallback: retornar input original
+        return user_input
