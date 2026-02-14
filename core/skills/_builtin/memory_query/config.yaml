@@ -1,0 +1,22 @@
+name: memory_query
+description: "Consulta memória do agente - histórico, fatos, aprendizados"
+version: "1.0.0"
+security_level: safe
+triggers:
+  - memória
+  - historico
+  - conversa
+  - o que eu
+  - me lembro
+  - remember
+  - history
+  - memory
+  - fatos
+parameters:
+  query:
+    type: string
+    required: false
+    description: "Termo ou pergunta sobre a memória"
+max_output_chars: 2000
+timeout_seconds: 10
+enabled: true
