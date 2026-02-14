@@ -27,7 +27,6 @@ langgraph-checkpoint-postgres>=2.0.0
 
 # HTTP Client
 httpx>=0.26.0
-aiofiles>=23.0.0
 
 # MCP Server
 fastapi>=0.109.0

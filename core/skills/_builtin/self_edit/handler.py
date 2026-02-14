@@ -61,29 +61,25 @@ class SelfEditSkill(SkillBase):
         }
 
     async def _edit_file(self, file_path: str, content: str, mode: str) -> str:
-        """Edita o arquivo."""
-        import aiofiles
-        
+        """Edita o arquivo (sync I/O)."""
         abs_path = os.path.abspath(file_path)
         
         # Criar diretório se não existir
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
         
         if mode == "append":
-            async with aiofiles.open(abs_path, "a") as f:
-                await f.write(content)
+            with open(abs_path, "a") as f:
+                f.write(content)
             action = "adicionado"
         else:
-            async with aiofiles.open(abs_path, "w") as f:
-                await f.write(content)
+            with open(abs_path, "w") as f:
+                f.write(content)
             action = "escrito"
         
         return f"✅ Arquivo {action} com sucesso!\n📄 `{abs_path}`\n📝 {len(content)} bytes"
 
     async def _read_file(self, file_path: str) -> str:
-        """Lê o arquivo."""
-        import aiofiles
-        
+        """Lê o arquivo (sync I/O)."""
         abs_path = os.path.abspath(file_path)
         
         validation = self._validate_path(abs_path)
@@ -93,7 +89,7 @@ class SelfEditSkill(SkillBase):
         if not os.path.exists(abs_path):
             return f"❌ Arquivo não encontrado: {abs_path}"
         
-        async with aiofiles.open(abs_path, "r") as f:
-            content = await f.read()
+        with open(abs_path, "r") as f:
+            content = f.read()
         
         return f"📄 **Conteúdo de:** `{abs_path}`\n\n```\n{content[:2000]}\n```"
