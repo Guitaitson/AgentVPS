@@ -127,7 +127,19 @@ def node_plan(state: AgentState) -> AgentState:
     # INTENT: TASK - Tarefas a executar
     # ========================================
     if intent == "task":
-        # Tentar encontrar skill pelo trigger na mensagem
+        # PRIORIDADE 1: Se tem tool_suggestion do LLM, usar ela primeiro
+        if tool_suggestion:
+            skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
+            if skill:
+                logger.info("node_plan_task_from_llm", skill=skill.name, tool_suggestion=tool_suggestion)
+                return {
+                    **state,
+                    "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
+                    "current_step": 0,
+                    "tools_needed": [skill.name],
+                }
+        
+        # PRIORIDADE 2: Tentar encontrar skill pelo trigger na mensagem
         skill = registry.find_by_trigger(user_message)
         
         if skill:
