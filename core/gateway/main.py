@@ -254,6 +254,7 @@ async def telegram_webhook(request: Request):
     Telegram webhook endpoint.
 
     Receives updates from Telegram and processes them through the agent.
+    Isso unifica o entry point: Telegram → Gateway → Agent (em vez de polling).
     """
     # Verify rate limit
     if not rate_limiter.allow_request("telegram:webhook"):
@@ -266,6 +267,25 @@ async def telegram_webhook(request: Request):
         # Process through Telegram adapter
         adapter = TelegramAdapter()
         result = adapter.process_update(update)
+
+        # Se for uma mensagem, processar através do agente
+        if result.get("type") == "message" and result.get("text"):
+            user_id = result.get("user_id")
+            text = result.get("text")
+            chat_id = result.get("chat_id")
+            
+            # Processar via agente
+            agent_result = await process_message_async(
+                user_id=user_id,
+                message=text,
+                session_id=chat_id
+            )
+            
+            # Responder ao usuário
+            response_text = agent_result.get("response", "Erro ao processar")
+            adapter.send_message(chat_id, response_text)
+            
+            return {"ok": True, "processed": True, "response": response_text}
 
         return result
 

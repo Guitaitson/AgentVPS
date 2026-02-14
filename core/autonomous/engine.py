@@ -222,6 +222,150 @@ def get_autonomous_loop() -> AutonomousLoop:
             )
         )
 
+        # ============================================
+        # TRIGGERS PLANEJADOS (S4-03 original)
+        # ============================================
+
+        # Trigger 4: RAM > 80% → propor limpeza de containers inativos
+        def check_ram_condition() -> bool:
+            """Verifica se RAM está acima de 80%."""
+            try:
+                with open("/proc/meminfo", "r") as f:
+                    meminfo = f.read()
+                
+                values = {}
+                for line in meminfo.split("\n"):
+                    if ":" in line:
+                        key, val = line.split(":", 1)
+                        values[key.strip()] = int(val.strip().split()[0])
+                
+                total = values.get("MemTotal", 0) // 1024  # MB
+                available = values.get("MemAvailable", 0) // 1024  # MB
+                
+                if total > 0:
+                    used_percent = ((total - available) / total) * 100
+                    return used_percent > 80
+            except Exception:
+                pass
+            return False
+
+        async def ram_high_action():
+            """Dispara quando RAM > 80%."""
+            logger.warning("trigger_ram_high", message="RAM acima de 80%, propomos limpeza de containers inativos")
+            # Salvar proposta no Redis para notificação
+            _autonomous_loop._redis.setex(
+                "proposal:ram_high",
+                3600,
+                json.dumps({
+                    "trigger": "ram_high",
+                    "action": "shell_exec",
+                    "args": {"command": "docker ps -a --filter 'status=exited' --format '{{.ID}}' | head -5"},
+                    "description": "Limpar containers Docker inativos"
+                })
+            )
+            return {"status": "proposal_created", "type": "ram_high"}
+
+        _autonomous_loop.register_trigger(
+            Trigger(
+                name="ram_high",
+                condition=check_ram_condition,
+                action=ram_high_action,
+                interval=300,  # 5 min
+                enabled=True,
+            )
+        )
+
+        # Trigger 5: Erro repetido (>3x em 1 hora) → propor investigação
+        async def error_repeated_action():
+            """Detecta erros repetidos nos aprendizados."""
+            try:
+                conn = _autonomous_loop._get_conn()
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT trigger, COUNT(*) as count 
+                    FROM learnings 
+                    WHERE category = 'execution_error' 
+                    AND created_at > NOW() - INTERVAL '1 hour'
+                    GROUP BY trigger 
+                    HAVING COUNT(*) > 3
+                """)
+                errors = cur.fetchall()
+                conn.close()
+                
+                if errors:
+                    error_triggers = [e[0] for e in errors]
+                    logger.warning("trigger_error_repeated", errors=error_triggers)
+                    
+                    _autonomous_loop._redis.setex(
+                        "proposal:error_repeated",
+                        3600,
+                        json.dumps({
+                            "trigger": "error_repeated",
+                            "action": "investigate_errors",
+                            "args": {"error_triggers": error_triggers},
+                            "description": f"Investigar erros repetidos: {error_triggers}"
+                        })
+                    )
+                    return {"status": "proposal_created", "errors": error_triggers}
+            except Exception as e:
+                logger.error("error_repeated_check_error", error=str(e))
+            return {"status": "no_errors"}
+
+        _autonomous_loop.register_trigger(
+            Trigger(
+                name="error_repeated",
+                condition=lambda: True,
+                action=error_repeated_action,
+                interval=600,  # 10 min
+                enabled=True,
+            )
+        )
+
+        # Trigger 6: Tarefa agendada vencida → propor execução
+        async def schedule_due_action():
+            """Verifica tarefas agendadas pendentes."""
+            try:
+                conn = _autonomous_loop._get_conn()
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT id, task_name, scheduled_time 
+                    FROM scheduled_tasks 
+                    WHERE status = 'pending' 
+                    AND scheduled_time <= NOW()
+                    LIMIT 5
+                """)
+                tasks = cur.fetchall()
+                conn.close()
+                
+                if tasks:
+                    task_list = [{"id": t[0], "name": t[1], "time": str(t[2])} for t in tasks]
+                    logger.info("trigger_schedule_due", tasks=task_list)
+                    
+                    _autonomous_loop._redis.setex(
+                        "proposal:schedule_due",
+                        3600,
+                        json.dumps({
+                            "trigger": "schedule_due",
+                            "action": "execute_scheduled",
+                            "args": {"tasks": task_list},
+                            "description": f"Executar tarefas agendadas: {[t['name'] for t in task_list]}"
+                        })
+                    )
+                    return {"status": "proposal_created", "tasks": task_list}
+            except Exception as e:
+                logger.error("schedule_due_check_error", error=str(e))
+            return {"status": "no_tasks"}
+
+        _autonomous_loop.register_trigger(
+            Trigger(
+                name="schedule_due",
+                condition=lambda: True,
+                action=schedule_due_action,
+                interval=60,  # 1 min
+                enabled=True,
+            )
+        )
+
     return _autonomous_loop
 
 

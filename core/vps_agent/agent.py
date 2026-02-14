@@ -9,6 +9,15 @@ import structlog
 logger = structlog.get_logger()
 
 
+def _get_request_logger():
+    """Retorna o logger de debug se disponível."""
+    try:
+        from core.structured_logging.agent_logger import AgentLogger
+        return AgentLogger()
+    except Exception:
+        return None
+
+
 def get_agent_graph():
     """
     Retorna a instância singleton do grafo do agente.
@@ -33,6 +42,15 @@ async def process_message_async(user_id: str, message: str) -> str:
     Returns:
         Resposta gerada pelo agente
     """
+    # Logger de debug (para arquivo JSON)
+    debug_logger = _get_request_logger()
+    if debug_logger:
+        debug_logger.log(
+            step="receive_message",
+            input_data=message[:100],
+            metadata={"user_id": user_id},
+        )
+    
     logger.info("processando_mensagem", user_id=user_id, message=message[:100])
 
     # Criar estado inicial
@@ -47,24 +65,38 @@ async def process_message_async(user_id: str, message: str) -> str:
         graph = get_agent_graph()
         logger.info("grafico_obtido", nodes=list(graph.nodes.keys()) if hasattr(graph, 'nodes') else "N/A")
 
-        # CORREÇÃO: Usar timestamp como thread_id para evitar cache de respostas anteriores
-        # Isso força o LangGraph a processar cada mensagem do zero
-        import time
+        # CORREÇÃO: Usar user_id como thread_id para manter contexto da conversa
+        # Isso permite que o agente lembre de interações anteriores
         config = {
             "configurable": {
-                "thread_id": f"user_{user_id}_{int(time.time())}",
+                "thread_id": f"user_{user_id}",
                 "checkpoint_ns": "telegram_bot",
             }
         }
 
         logger.info("iniciando_ainvoke", thread_id=config["configurable"]["thread_id"])
+        
+        if debug_logger:
+            debug_logger.log(step="invoke_graph", input_data="LangGraph invoke")
+        
         result = await graph.ainvoke(initial_state, config=config)
+        
+        if debug_logger:
+            debug_logger.log(
+                step="graph_result",
+                output_data=f"keys: {list(result.keys())}",
+            )
+        
         logger.info("resultado_grafo", result_keys=list(result.keys()))
 
         # Extrair resposta
         response = result.get("response", "Desculpe, ocorreu um erro ao processar sua mensagem.")
 
         logger.info("resposta_gerada", user_id=user_id, response=response[:100] if response else "None")
+
+        if debug_logger:
+            debug_logger.log(step="response_ready", output_data=response[:200] if response else "None")
+            debug_logger.finalize(success=True)
 
         return response
 
@@ -73,6 +105,11 @@ async def process_message_async(user_id: str, message: str) -> str:
 
         logger.error("erro_processamento", error=str(e), user_id=user_id)
         logger.error("traceback", traceback=traceback.format_exc())
+        
+        if debug_logger:
+            debug_logger.log(step="error", error=str(e)[:200])
+            debug_logger.finalize(success=False)
+        
         return f"❌ Erro ao processar mensagem: {str(e)}"
 
 

@@ -81,6 +81,8 @@ def node_load_context(state: AgentState) -> AgentState:
 
 def node_plan(state: AgentState) -> AgentState:
     """Cria plano de ação baseado na intenção."""
+    from ..skills.registry import get_skill_registry
+
     intent = state.get("intent")
     tool_suggestion = state.get("tool_suggestion", "")
     action_required = state.get("action_required", False)
@@ -91,12 +93,17 @@ def node_plan(state: AgentState) -> AgentState:
         intent=intent,
         tool_suggestion=tool_suggestion,
         action_required=action_required,
+        message=user_message[:50],
     )
 
+    # Obter registry de skills para roteamento inteligente
+    registry = get_skill_registry()
+    msg_lower = user_message.lower().strip()
+
+    # ========================================
+    # INTENT: COMMAND - Comandos diretos
+    # ========================================
     if intent == "command":
-        # Comando direto (/comando ou texto classificado como comando)
-        msg_lower = user_message.lower().strip()
-        
         # Se começa com /, extrair comando
         if msg_lower.startswith("/"):
             command = msg_lower[1:].split()[0]
@@ -107,52 +114,99 @@ def node_plan(state: AgentState) -> AgentState:
             # Fallback: usar primeira palavra
             command = msg_lower.split()[0]
         
-        # Mapear comandos comuns
-        command_map = {
-            "list_containers": "containers",
-            "get_system_status": "status",
-            "get_ram": "ram",
-        }
-        
-        # Se tool_suggestion for uma tool conhecida, mapear para comando
-        if tool_suggestion in command_map:
-            command = command_map[tool_suggestion]
-        
-        print(f"[PLAN] Command intent detected. Command: '{command}'")
+        logger.info("node_plan_command", command=command)
         
         return {
             **state,
-            "plan": [{"type": "command", "action": command}],
+            "plan": [{"type": "command", "action": command, "raw_message": user_message}],
             "current_step": 0,
             "tools_needed": [],
         }
 
-    if intent == "question":
-        # Se tem tool sugerida, incluir no plano
-        if tool_suggestion and action_required:
+    # ========================================
+    # INTENT: TASK - Tarefas a executar
+    # ========================================
+    if intent == "task":
+        # Tentar encontrar skill pelo trigger na mensagem
+        skill = registry.find_by_trigger(user_message)
+        
+        if skill:
+            logger.info("node_plan_task_found_skill", skill=skill.name, message=user_message[:50])
             return {
                 **state,
-                "plan": [{"type": "tool", "action": tool_suggestion}],
+                "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
                 "current_step": 0,
-                "tools_needed": [tool_suggestion],
+                "tools_needed": [skill.name],
             }
+        
+        # Fallback: usar a mensagem como ação
+        logger.info("node_plan_task_fallback", message=user_message[:50])
         return {
             **state,
-            "plan": [{"type": "query", "action": "get_system_info"}],
+            "plan": [{"type": "execute", "action": user_message, "raw_message": user_message}],
             "current_step": 0,
             "tools_needed": [],
         }
 
-    if intent == "task":
-        action = state["user_message"]
+    # ========================================
+    # INTENT: QUESTION - Perguntas sobre sistema
+    # ========================================
+    if intent == "question":
+        # Se tem tool sugerida, usar ela
+        if tool_suggestion:
+            # Primeiro tentar encontrar skill pelo nome
+            skill = registry.get(tool_suggestion)
+            if not skill:
+                # Tentar por trigger
+                skill = registry.find_by_trigger(tool_suggestion)
+            
+            if skill:
+                logger.info("node_plan_question_skill", skill=skill.name)
+                return {
+                    **state,
+                    "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
+                    "current_step": 0,
+                    "tools_needed": [skill.name],
+                }
+            
+            # Se não encontrou skill, mapear tool_suggestion antigo para comando
+            command_map = {
+                "get_ram": "ram",
+                "list_containers": "containers",
+                "get_system_status": "status",
+                "check_postgres": "postgres",
+                "check_redis": "redis",
+            }
+            if tool_suggestion in command_map:
+                return {
+                    **state,
+                    "plan": [{"type": "command", "action": command_map[tool_suggestion], "raw_message": user_message}],
+                    "current_step": 0,
+                    "tools_needed": [],
+                }
+        
+        # Tentar encontrar skill por trigger na mensagem
+        skill = registry.find_by_trigger(user_message)
+        if skill:
+            logger.info("node_plan_question_trigger", skill=skill.name)
+            return {
+                **state,
+                "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
+                "current_step": 0,
+                "tools_needed": [skill.name],
+            }
+        
+        # Fallback: info do sistema
         return {
             **state,
-            "plan": [{"type": "execute", "action": action}],
+            "plan": [{"type": "query", "action": "get_system_info", "raw_message": user_message}],
             "current_step": 0,
-            "tools_needed": ["docker"],
+            "tools_needed": [],
         }
 
-    # Chat: resposta direta
+    # ========================================
+    # INTENT: CHAT ou DEFAULT - Resposta direta
+    # ========================================
     return {
         **state,
         "plan": None,
@@ -258,6 +312,7 @@ async def node_execute(state: AgentState) -> AgentState:
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
     tool_suggestion = state.get("tool_suggestion", "")
+    user_message = state.get("user_message", "")
 
     try:
         # 1. Tentar skill pelo plano
@@ -265,35 +320,60 @@ async def node_execute(state: AgentState) -> AgentState:
             current_action = plan[step]
             action_type = current_action.get("type")
             action = current_action.get("action", "")
+            raw_message = current_action.get("raw_message", user_message)
             
             logger.info(
                 "node_execute_from_plan",
                 action_type=action_type,
                 action=action,
+                raw_message=raw_message[:50],
             )
 
             # Mapear action para skill name
             skill = registry.get(action) or registry.find_by_trigger(action)
             if skill:
-                result = await registry.execute_skill(skill.name, {"raw_input": action})
+                logger.info("node_execute_skill_found", skill=skill.name)
+                # Passar a mensagem ORIGINAL do usuário para que o skill possa extrair argumentos
+                result = await registry.execute_skill(skill.name, {"raw_input": raw_message})
                 return {**state, "execution_result": result}
+            else:
+                logger.warning("node_execute_skill_not_found", action=action)
 
         # 2. Tentar por tool_suggestion do LLM
         if tool_suggestion:
             skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
             if skill:
-                result = await registry.execute_skill(skill.name)
+                logger.info("node_execute_tool_suggestion", skill=skill.name)
+                result = await registry.execute_skill(skill.name, {"raw_input": user_message})
                 return {**state, "execution_result": result}
 
-        # 3. Skill não encontrado — resposta inteligente
+        # 3. Skill não encontrado — tentar encontrar por trigger na mensagem
+        skill = registry.find_by_trigger(user_message)
+        if skill:
+            logger.info("node_execute_trigger_fallback", skill=skill.name)
+            result = await registry.execute_skill(skill.name, {"raw_input": user_message})
+            return {**state, "execution_result": result}
+
+        # 4. Skill não encontrado — resposta inteligente
         from .smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
-        user_msg = state.get("user_message", "")
-        detected = detect_missing_skill_keywords(user_msg.lower())
-        response = generate_smart_unavailable_response(user_msg, detected_skills=detected)
+        detected = detect_missing_skill_keywords(user_message.lower())
+        
+        # Listar skills disponíveis para o usuário
+        available_skills = registry.list_skills()
+        skills_list = ", ".join([s["name"] for s in available_skills])
+        
+        response = generate_smart_unavailable_response(user_message, detected_skills=detected)
+        
+        # Adicionar informação sobre skills disponíveis
+        if available_skills:
+            response += f"\n\n📋 Skills disponíveis: {skills_list}"
+        
+        logger.warning("node_execute_no_skill_found", message=user_message[:50], available=len(available_skills))
         return {**state, "execution_result": response}
 
     except Exception as e:
-        wrapped = wrap_error(e, metadata={"skill": tool_suggestion})
+        wrapped = wrap_error(e, metadata={"skill": tool_suggestion, "action": action if 'action' in dir() else None})
+        logger.error("node_execute_error", error=str(e))
         return {
             **state,
             "error": wrapped.to_dict(),

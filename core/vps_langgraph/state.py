@@ -83,34 +83,9 @@ def append_to_list(left: list, right: list) -> list:
     return left + right if left else right
 
 
-class AgentStateModern(TypedDict):
-    """
-    Versão experimental com reducers personalizados.
-    
-    Use esta versão quando migrar completamente para o novo formato.
-    """
-
-    # Input
-    user_id: str
-    user_message: str
-    
-    # Mensagens com reducer automático
-    messages: Annotated[list, add_messages]
-    
-    # Contexto com merge
-    user_context: Annotated[dict, merge_dicts]
-    
-    # Histórico com append
-    conversation_history: Annotated[list, append_to_list]
-    
-    # Resto igual ao AgentState
-    intent: str
-    intent_confidence: float
-    plan: list[dict]
-    current_step: int
-    execution_result: Optional[str]
-    response: str
-
+# DEPRECATED: AgentStateModern foi substituído por AgentState
+# A versão com reducers personalizados não foi utilizada em produção.
+# Mantido apenas por compatibilidade histórica.
 
 # Mantém compatibilidade com código antigo
 __all__ = ["AgentState", "AgentStateModern"]

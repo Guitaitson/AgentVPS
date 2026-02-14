@@ -131,7 +131,9 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
     """Inferência baseada em regex para classificar intenções."""
     msg_lower = message.lower().strip()
     
-    # Detectar comandos diretos (/comando)
+    # ========================================
+    # PRIORIDADE 1: Comandos diretos (/comando)
+    # ========================================
     if msg_lower.startswith("/"):
         cmd = msg_lower[1:].split()[0]
         return {
@@ -143,41 +145,100 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             "reasoning": "Comando direto detectado"
         }
     
-    # Detectar comandos específicos do Telegram (/status, /ram, /containers, /health)
-    telegram_commands = {
-        "status do sistema": "get_system_status",
-        "status geral": "get_system_status",
-        "quanta ram": "get_ram",
-        "quantas ram": "get_ram",
-        "uso da ram": "get_ram",
-        "lista containers": "list_containers",
-        "listar containers": "list_containers",
-        "containers docker": "list_containers",
-        "containers": "list_containers",
-        "docker": "list_containers",
-        "health check": "get_system_status",
-        "healthcheck": "get_system_status",
-        "health": "get_system_status",
-    }
+    # ========================================
+    # PRIORIDADE 2: Ações que requerem execução (TASK)
+    # ========================================
+    # Padrões mais comuns que indicam tasks
+    task_starters = [
+        "execute ", "executa ", "executar ", "rode ", "roda ", "rodar ",
+        "rode ", "roda ", "run ", "rode ",
+        "pesquise ", "busque ", "buscar ", "search ", "procure ",
+        "liste ", "listar ", "mostre ", "mostrar ", "exiba ", "exibir ",
+        "leia ", "ler ", "abri ", "abrir ",
+        "crie ", "criar ", "criar ", "adicione ", "add ",
+        "verifique ", "check ", "verifica ",
+        "inicie ", "pare ", "pare ", "reinicie ", "restart ", "start ", "stop ",
+    ]
     
-    for cmd_pattern, tool in telegram_commands.items():
-        if cmd_pattern in msg_lower:
+    for pattern in task_starters:
+        if msg_lower.startswith(pattern):
+            # Detectar tipo de task pelo padrão
+            if pattern.strip() in ["pesquise", "busque", "buscar", "search", "procure"]:
+                return {
+                    "intent": "task",
+                    "confidence": 0.95,
+                    "entities": ["web_search"],
+                    "action_required": True,
+                    "tool_suggestion": "web_search",
+                    "reasoning": f"Task de busca detectada: {pattern.strip()}"
+                }
+            elif pattern.strip() in ["execute", "executa", "executar", "rode", "roda", "rodar", "run"]:
+                return {
+                    "intent": "task",
+                    "confidence": 0.95,
+                    "entities": ["shell_exec"],
+                    "action_required": True,
+                    "tool_suggestion": "shell_exec",
+                    "reasoning": f"Task de execução detectada: {pattern.strip()}"
+                }
+            elif pattern.strip() in ["leia", "ler", "abri", "abrir"]:
+                return {
+                    "intent": "task",
+                    "confidence": 0.95,
+                    "entities": ["file_manager"],
+                    "action_required": True,
+                    "tool_suggestion": "file_manager",
+                    "reasoning": f"Task de leitura de arquivo: {pattern.strip()}"
+                }
+            elif pattern.strip() in ["liste", "listar", "mostre", "mostrar", "exiba", "exibir"]:
+                return {
+                    "intent": "task",
+                    "confidence": 0.9,
+                    "entities": ["shell_exec"],
+                    "action_required": True,
+                    "tool_suggestion": "shell_exec",
+                    "reasoning": f"Task de listagem: {pattern.strip()}"
+                }
+            else:
+                return {
+                    "intent": "task",
+                    "confidence": 0.85,
+                    "entities": [],
+                    "action_required": True,
+                    "tool_suggestion": "",
+                    "reasoning": f"Task detectada: {pattern.strip()}"
+                }
+    
+    # Detectar tarefas no meio da frase
+    task_keywords = [
+        ("pesquise", "web_search"), ("busque", "web_search"), ("pesquisar", "web_search"),
+        ("execute", "shell_exec"), ("executar", "shell_exec"), ("rode", "shell_exec"),
+        ("rode ", "shell_exec"), ("roda ", "shell_exec"),
+        ("leia", "file_manager"), ("ler", "file_manager"), ("arquivo", "file_manager"),
+        ("crie", "shell_exec"), ("criar", "shell_exec"),
+    ]
+    
+    for keyword, tool in task_keywords:
+        if keyword in msg_lower:
             return {
-                "intent": "command",
-                "confidence": 0.95,
+                "intent": "task",
+                "confidence": 0.9,
                 "entities": [tool],
                 "action_required": True,
                 "tool_suggestion": tool,
-                "reasoning": f"Comando Telegram detectado: {cmd_pattern}"
+                "reasoning": f"Keyword de task detectado: {keyword}"
             }
     
-    # Detectar perguntas sobre sistema (question)
+    # ========================================
+    # PRIORIDADE 3: Perguntas sobre sistema (QUESTION)
+    # ========================================
     question_patterns = [
         "memoria", "memória", "memory",
         "quantos containers", "quantos docker",
         "como está", "estado do",
         "quanto espaço", "quanto disco",
-        "quantos serviços", "quais serviços"
+        "quantos serviços", "quais serviços",
+        "tem instalado", "o que tem instalado", "quais programas",
     ]
     
     for pattern in question_patterns:
@@ -210,60 +271,39 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "reasoning": f"Pergunta sobre sistema detectada: {pattern}"
             }
     
-    # Detectar perguntas sobre aplicativos/pacotes instalados
-    app_patterns = [
-        "o que você tem instalado", "quais aplicativos", "quais programas",
-        "o que está instalado", "lista de pacotes", "tem instalado",
-        "você tem python", "você tem docker", "você tem node",
-        "tem python", "tem docker", "tem node", "tem nginx",
-        "quais ferramentas", "quais softwares", "o que existe instalado"
-    ]
+    # ========================================
+    # PRIORIDADE 4: Comandos específicos do Telegram
+    # ========================================
+    telegram_commands = {
+        "status do sistema": "get_system_status",
+        "status geral": "get_system_status",
+        "quanta ram": "get_ram",
+        "quantas ram": "get_ram",
+        "uso da ram": "get_ram",
+        "lista containers": "list_containers",
+        "listar containers": "list_containers",
+        "containers docker": "list_containers",
+        "containers": "list_containers",
+        "docker": "list_containers",
+        "health check": "get_system_status",
+        "healthcheck": "get_system_status",
+        "health": "get_system_status",
+    }
     
-    for pattern in app_patterns:
-        if pattern in msg_lower:
-            # Verificar se é pergunta específica sobre um comando
-            specific_commands = ["python", "docker", "node", "npm", "git", "nginx", "redis"]
-            for cmd in specific_commands:
-                if cmd in msg_lower:
-                    return {
-                        "intent": "question",
-                        "confidence": 0.9,
-                        "entities": [cmd],
-                        "action_required": True,
-                        "tool_suggestion": "check_command",
-                        "reasoning": f"Verificando se {cmd} está instalado"
-                    }
-            
-            # Pergunta geral sobre tudo instalado
+    for cmd_pattern, tool in telegram_commands.items():
+        if cmd_pattern in msg_lower:
             return {
-                "intent": "question",
-                "confidence": 0.9,
-                "entities": ["packages", "apps"],
+                "intent": "command",
+                "confidence": 0.95,
+                "entities": [tool],
                 "action_required": True,
-                "tool_suggestion": "get_installed_packages",
-                "reasoning": "Listando aplicativos e pacotes instalados"
+                "tool_suggestion": tool,
+                "reasoning": f"Comando Telegram detectado: {cmd_pattern}"
             }
     
-    # Detectar tarefas (task)
-    task_patterns = [
-        "liste", "mostre", "exiba", "verifique", "check",
-        "inicie", "pare", "reinicie", "restart", "stop", "start",
-        "faça", "execute", "rode", "run",
-        "crie", "add", "adicione", "remova", "delete"
-    ]
-    
-    for pattern in task_patterns:
-        if msg_lower.startswith(pattern):
-            return {
-                "intent": "task",
-                "confidence": 0.85,
-                "entities": [],
-                "action_required": True,
-                "tool_suggestion": "",
-                "reasoning": "Tarefa a executar detectada"
-            }
-    
-    # Detectar self-improve
+    # ========================================
+    # PRIORIDADE 5: Self-Improve
+    # ========================================
     improve_patterns = [
         "crie um agente", "novo agente", "adicionar funcionalidade",
         "integre com", "implemente", "desenvolva"
@@ -280,7 +320,9 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "reasoning": "Pedido de auto-melhoria detectado"
             }
     
-    # Default: chat (conversa natural)
+    # ========================================
+    # DEFAULT: Chat (conversa natural)
+    # ========================================
     return {
         "intent": "chat",
         "confidence": 0.7,
@@ -313,9 +355,13 @@ def classify_intent_with_llm(message: str, **kwargs) -> tuple:
             }
         )
     except:
-        # Fallback total
-        from .intent_classifier import classify_intent
-        return classify_intent(message)
+        # Fallback total: usar inferência local (não depende de intent_classifier.py)
+        result = infer_intent_from_message(message)
+        return (
+            result["intent"],
+            result["confidence"],
+            result
+        )
 
 
 __all__ = [

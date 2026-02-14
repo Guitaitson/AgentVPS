@@ -21,8 +21,8 @@ logger = structlog.get_logger()
 # Configuração
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash-lite")
 DEFAULT_TEMPERATURE = float(os.getenv("OPENROUTER_TEMPERATURE", "0.3"))
-DEFAULT_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "256"))
-TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "15"))
+DEFAULT_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "10000"))
+TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "60"))
 
 
 @dataclass

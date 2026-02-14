@@ -4,13 +4,24 @@ version: "1.0.0"
 security_level: safe
 triggers:
   - buscar
+  - busque
   - pesquise
+  - pesquise na internet
+  - busque na internet
   - pesquisa
   - google
   - procurar
   - search
   - web
   - na internet
+  - como instalar
+  - como fazer
+  - como configurar
+  - o que é
+  - o que são
+  - qual é o preço
+  - preço de
+  - informações sobre
 parameters:
   query:
     type: string
