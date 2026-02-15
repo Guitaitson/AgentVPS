@@ -123,6 +123,22 @@ class CapGate:
                 )
                 conn.commit()
                 conn.close()
+
+                # Notificar via Telegram
+                try:
+                    from telegram_bot.bot import send_notification
+
+                    asyncio.ensure_future(
+                        send_notification(
+                            f"Proposta autonoma #{proposal_id}:\n"
+                            f"Acao: {action}\n\n"
+                            f"Aprovar? /approve {proposal_id}\n"
+                            f"Rejeitar? /reject {proposal_id}"
+                        )
+                    )
+                except Exception as notify_err:
+                    logger.error("notification_error", error=str(notify_err))
+
                 return {"blocked": True, "reason": "requires_approval", "action": action}
             except Exception as e:
                 logger.error("cap_gate_security_error", error=str(e))
@@ -240,13 +256,15 @@ class AutonomousLoop:
             conn.close()
 
             # Executar via skill registry
-            result = {"status": "completed"}
             from core.skills.registry import get_skill_registry
 
             registry = get_skill_registry()
-            if action == "shell_exec":
-                skill_result = await registry.execute_skill("shell_exec", args)
+            skill = registry.get(action)
+            if skill:
+                skill_result = await registry.execute_skill(action, args)
                 result = {"output": skill_result}
+            else:
+                result = {"status": "completed", "note": f"No skill '{action}' found"}
 
             # Atualizar missão
             conn = self._get_conn()
@@ -383,16 +401,28 @@ def get_autonomous_loop() -> AutonomousLoop:
                 for c in containers:
                     if any(name in c.name for name in critical):
                         status[c.name] = "running" if c.status == "running" else "stopped"
+                import time
+
+                engine._redis.set("health:last_check", str(time.time()))
                 engine._redis.setex("health:containers", 60, json.dumps(status))
                 return status
             except Exception as e:
                 logger.error("health_check_error", error=str(e))
                 return {}
 
+        def health_check_condition() -> bool:
+            """Verifica se ultimo check foi > 60s."""
+            last = _autonomous_loop._redis.get("health:last_check")
+            if last:
+                import time
+
+                return (time.time() - float(last)) > 60
+            return True
+
         _autonomous_loop.register_trigger(
             Trigger(
                 name="health_check",
-                condition=lambda: True,
+                condition=health_check_condition,
                 action=health_check_action,
                 interval=60,
                 enabled=True,
@@ -417,10 +447,22 @@ def get_autonomous_loop() -> AutonomousLoop:
                 logger.error("memory_cleanup_error", error=str(e))
                 return {"deleted": 0}
 
+        def memory_cleanup_condition() -> bool:
+            """Apenas se conversation_log tem > 1000 registros."""
+            try:
+                conn = _autonomous_loop._get_conn()
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM conversation_log")
+                count = cur.fetchone()[0]
+                conn.close()
+                return count > 1000
+            except Exception:
+                return False
+
         _autonomous_loop.register_trigger(
             Trigger(
                 name="memory_cleanup",
-                condition=lambda: True,
+                condition=memory_cleanup_condition,
                 action=memory_cleanup_action,
                 interval=3600,
                 enabled=True,
@@ -469,10 +511,30 @@ def get_autonomous_loop() -> AutonomousLoop:
                 logger.error("skill_stats_error", error=str(e))
                 return {}
 
+        def skill_stats_condition() -> bool:
+            """Apenas se algum skill foi usado desde ultimo flush."""
+            skills = [
+                "get_ram",
+                "list_containers",
+                "get_system_status",
+                "check_postgres",
+                "check_redis",
+                "shell_exec",
+                "file_manager",
+                "memory_query",
+                "web_search",
+                "self_edit",
+            ]
+            for skill in skills:
+                count = _autonomous_loop._redis.get(f"skill_usage:{skill}")
+                if count and int(count) > 0:
+                    return True
+            return False
+
         _autonomous_loop.register_trigger(
             Trigger(
                 name="skill_stats",
-                condition=lambda: True,
+                condition=skill_stats_condition,
                 action=skill_stats_action,
                 interval=300,
                 enabled=True,
@@ -563,10 +625,26 @@ def get_autonomous_loop() -> AutonomousLoop:
                 logger.error("error_repeated_check_error", error=str(e))
             return {"status": "no_errors"}
 
+        def error_repeated_condition() -> bool:
+            """Apenas se houve erros recentes no learnings."""
+            try:
+                conn = _autonomous_loop._get_conn()
+                cur = conn.cursor()
+                cur.execute(
+                    """SELECT COUNT(*) FROM learnings
+                    WHERE category = 'execution_error'
+                    AND created_at > NOW() - INTERVAL '1 hour'"""
+                )
+                count = cur.fetchone()[0]
+                conn.close()
+                return count > 3
+            except Exception:
+                return False
+
         _autonomous_loop.register_trigger(
             Trigger(
                 name="error_repeated",
-                condition=lambda: True,
+                condition=error_repeated_condition,
                 action=error_repeated_action,
                 interval=600,
                 enabled=True,
@@ -608,10 +686,25 @@ def get_autonomous_loop() -> AutonomousLoop:
                 logger.error("schedule_due_check_error", error=str(e))
             return {"status": "no_tasks"}
 
+        def schedule_due_condition() -> bool:
+            """Apenas se existem tarefas agendadas pendentes."""
+            try:
+                conn = _autonomous_loop._get_conn()
+                cur = conn.cursor()
+                cur.execute(
+                    """SELECT COUNT(*) FROM scheduled_tasks
+                    WHERE status = 'pending' AND scheduled_time <= NOW()"""
+                )
+                count = cur.fetchone()[0]
+                conn.close()
+                return count > 0
+            except Exception:
+                return False
+
         _autonomous_loop.register_trigger(
             Trigger(
                 name="schedule_due",
-                condition=lambda: True,
+                condition=schedule_due_condition,
                 action=schedule_due_action,
                 interval=60,
                 enabled=True,

@@ -1,21 +1,6 @@
 """
-Tools do VPS-Agent - Funções executáveis na VPS.
+Tools do VPS-Agent.
 
-Fase 6.2: Function calling para ações na VPS.
+Legacy module — funcionalidade migrada para core/skills/.
+Use core.skills.registry.get_skill_registry() para acesso a skills.
 """
-
-from .system_tools import (
-    check_postgres,
-    check_redis,
-    get_ram_usage,
-    get_system_status,
-    list_docker_containers,
-)
-
-__all__ = [
-    "get_ram_usage",
-    "list_docker_containers",
-    "get_system_status",
-    "check_postgres",
-    "check_redis",
-]

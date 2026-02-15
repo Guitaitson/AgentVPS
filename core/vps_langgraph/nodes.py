@@ -15,45 +15,6 @@ logger = structlog.get_logger()
 memory = AgentMemory()
 
 
-async def node_classify_intent(state: AgentState) -> AgentState:
-    """Classifica a intenção do usuário usando LLM."""
-    from .intent_classifier_llm import classify_intent_llm
-
-    message = state["user_message"]
-    conversation_history = state.get("conversation_history", [])
-
-    logger.info(
-        "node_classify_intent_start",
-        message=message[:100],
-        history_len=len(conversation_history),
-    )
-
-    # Usar classificador LLM moderno
-    result = await classify_intent_llm(message, conversation_history)
-
-    logger.info(
-        "node_classify_intent_result",
-        intent=result["intent"],
-        confidence=result["confidence"],
-        action_required=result["action_required"],
-        tool_suggestion=result["tool_suggestion"],
-    )
-
-    return {
-        **state,
-        "intent": result["intent"],
-        "intent_confidence": result["confidence"],
-        "intent_details": {
-            "entities": result["entities"],
-            "action_required": result["action_required"],
-            "tool_suggestion": result["tool_suggestion"],
-            "reasoning": result["reasoning"],
-        },
-        "tool_suggestion": result["tool_suggestion"],
-        "action_required": result["action_required"],
-    }
-
-
 def node_load_context(state: AgentState) -> AgentState:
     """Carrega contexto do usuário da memória."""
     user_id = state["user_id"]
@@ -75,161 +36,6 @@ def node_load_context(state: AgentState) -> AgentState:
         **state,
         "user_context": user_facts,
         "conversation_history": history,
-    }
-
-
-def node_plan(state: AgentState) -> AgentState:
-    """Cria plano de ação baseado na intenção."""
-    from ..skills.registry import get_skill_registry
-
-    intent = state.get("intent")
-    tool_suggestion = state.get("tool_suggestion", "")
-    action_required = state.get("action_required", False)
-    user_message = state.get("user_message", "")
-
-    logger.info(
-        "node_plan",
-        intent=intent,
-        tool_suggestion=tool_suggestion,
-        action_required=action_required,
-        message=user_message[:50],
-    )
-
-    # Obter registry de skills para roteamento inteligente
-    registry = get_skill_registry()
-    msg_lower = user_message.lower().strip()
-
-    # ========================================
-    # INTENT: COMMAND - Comandos diretos
-    # ========================================
-    if intent == "command":
-        # Se começa com /, extrair comando
-        if msg_lower.startswith("/"):
-            command = msg_lower[1:].split()[0]
-        # Se tem tool_suggestion, usar como comando
-        elif tool_suggestion:
-            command = tool_suggestion
-        else:
-            # Fallback: usar primeira palavra
-            command = msg_lower.split()[0]
-
-        logger.info("node_plan_command", command=command)
-
-        return {
-            **state,
-            "plan": [{"type": "command", "action": command, "raw_message": user_message}],
-            "current_step": 0,
-            "tools_needed": [],
-        }
-
-    # ========================================
-    # INTENT: TASK - Tarefas a executar
-    # ========================================
-    if intent == "task":
-        # PRIORIDADE 1: Se tem tool_suggestion do LLM, usar ela primeiro
-        if tool_suggestion:
-            skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
-            if skill:
-                logger.info(
-                    "node_plan_task_from_llm", skill=skill.name, tool_suggestion=tool_suggestion
-                )
-                return {
-                    **state,
-                    "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
-                    "current_step": 0,
-                    "tools_needed": [skill.name],
-                }
-
-        # PRIORIDADE 2: Tentar encontrar skill pelo trigger na mensagem
-        skill = registry.find_by_trigger(user_message)
-
-        if skill:
-            logger.info("node_plan_task_found_skill", skill=skill.name, message=user_message[:50])
-            return {
-                **state,
-                "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
-                "current_step": 0,
-                "tools_needed": [skill.name],
-            }
-
-        # Fallback: usar a mensagem como ação
-        logger.info("node_plan_task_fallback", message=user_message[:50])
-        return {
-            **state,
-            "plan": [{"type": "execute", "action": user_message, "raw_message": user_message}],
-            "current_step": 0,
-            "tools_needed": [],
-        }
-
-    # ========================================
-    # INTENT: QUESTION - Perguntas sobre sistema
-    # ========================================
-    if intent == "question":
-        # Se tem tool sugerida, usar ela
-        if tool_suggestion:
-            # Primeiro tentar encontrar skill pelo nome
-            skill = registry.get(tool_suggestion)
-            if not skill:
-                # Tentar por trigger
-                skill = registry.find_by_trigger(tool_suggestion)
-
-            if skill:
-                logger.info("node_plan_question_skill", skill=skill.name)
-                return {
-                    **state,
-                    "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
-                    "current_step": 0,
-                    "tools_needed": [skill.name],
-                }
-
-            # Se não encontrou skill, mapear tool_suggestion antigo para comando
-            command_map = {
-                "get_ram": "ram",
-                "list_containers": "containers",
-                "get_system_status": "status",
-                "check_postgres": "postgres",
-                "check_redis": "redis",
-            }
-            if tool_suggestion in command_map:
-                return {
-                    **state,
-                    "plan": [
-                        {
-                            "type": "command",
-                            "action": command_map[tool_suggestion],
-                            "raw_message": user_message,
-                        }
-                    ],
-                    "current_step": 0,
-                    "tools_needed": [],
-                }
-
-        # Tentar encontrar skill por trigger na mensagem
-        skill = registry.find_by_trigger(user_message)
-        if skill:
-            logger.info("node_plan_question_trigger", skill=skill.name)
-            return {
-                **state,
-                "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
-                "current_step": 0,
-                "tools_needed": [skill.name],
-            }
-
-        # Fallback: info do sistema
-        return {
-            **state,
-            "plan": [{"type": "query", "action": "get_system_info", "raw_message": user_message}],
-            "current_step": 0,
-            "tools_needed": [],
-        }
-
-    # ========================================
-    # INTENT: CHAT ou DEFAULT - Resposta direta
-    # ========================================
-    return {
-        **state,
-        "plan": None,
-        "current_step": None,
     }
 
 
@@ -298,6 +104,32 @@ def node_security_check(state: AgentState) -> AgentState:
 
         debug_info["result"] = "allowed"
 
+    # Skills do tipo "skill" verificam o comando dentro dos args
+    if action_type == "skill":
+        skill_args = current_action.get("args", {})
+        # Se o skill é shell_exec, verificar o comando
+        if action == "shell_exec" and "command" in skill_args:
+            full_command = skill_args["command"]
+            debug_info["full_command"] = full_command
+            result = allowlist.check(ResourceType.COMMAND, full_command)
+            debug_info["allowed"] = result.allowed
+            debug_info["reason"] = result.reason
+            if not result.allowed:
+                debug_info["blocked"] = True
+                logger.debug("security_check_blocked_skill", **debug_info)
+                return {
+                    **state,
+                    "security_check": {
+                        "passed": False,
+                        "reason": result.reason,
+                        "rule": result.rule.name if result.rule else None,
+                        "permission": result.permission.value,
+                    },
+                    "blocked_by_security": True,
+                    "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}",
+                }
+        debug_info["result"] = "skill_allowed"
+
     # Tools do tipo "tool" são permitidas (são nossas tools controladas)
     if action_type == "tool":
         debug_info["result"] = "tool_allowed"
@@ -314,8 +146,36 @@ def node_security_check(state: AgentState) -> AgentState:
     }
 
 
+async def _execute_with_hooks(registry, skill_name, skill_args, user_id):
+    """Executa skill com pre/post hooks."""
+    import time
+
+    from ..hooks.runner import HookContext, get_hook_runner
+
+    hook_runner = get_hook_runner()
+    ctx = HookContext(skill_name=skill_name, args=skill_args, user_id=user_id)
+
+    should_proceed = await hook_runner.run_pre(ctx)
+    if not should_proceed:
+        return None, "Execucao cancelada por politica de seguranca."
+
+    start = time.time()
+    try:
+        result = await registry.execute_skill(skill_name, skill_args)
+        ctx.duration_ms = (time.time() - start) * 1000
+        ctx.result = str(result)
+    except Exception as e:
+        ctx.duration_ms = (time.time() - start) * 1000
+        ctx.error = str(e)
+        await hook_runner.run_post(ctx)
+        raise
+
+    await hook_runner.run_post(ctx)
+    return result, None
+
+
 async def node_execute(state: AgentState) -> AgentState:
-    """Executa ação usando Skill Registry."""
+    """Executa ação usando Skill Registry + Hook System."""
     from .error_handler import format_error_for_user, wrap_error
 
     if state.get("blocked_by_security"):
@@ -327,34 +187,23 @@ async def node_execute(state: AgentState) -> AgentState:
     step = state.get("current_step", 0)
     tool_suggestion = state.get("tool_suggestion", "")
     user_message = state.get("user_message", "")
+    user_id = state.get("user_id", "unknown")
 
     try:
         # 1. Tentar skill pelo plano
         if plan and step < len(plan):
             current_action = plan[step]
-            action_type = current_action.get("type")
             action = current_action.get("action", "")
             raw_message = current_action.get("raw_message", user_message)
 
-            logger.info(
-                "node_execute_from_plan",
-                action_type=action_type,
-                action=action,
-                raw_message=raw_message[:50],
-            )
-
-            # Mapear action para skill name
             skill = registry.get(action) or registry.find_by_trigger(action)
             if skill:
-                logger.info("node_execute_skill_found", skill=skill.name)
-                # Verificar se há args estruturados do function calling
                 skill_args = current_action.get("args", {})
-                if skill_args:
-                    # Usar args estruturados do LLM (function calling)
-                    result = await registry.execute_skill(skill.name, skill_args)
-                else:
-                    # Fallback: usar raw_input para compatibilidade
-                    result = await registry.execute_skill(skill.name, {"raw_input": raw_message})
+                if not skill_args:
+                    skill_args = {"raw_input": raw_message}
+                result, veto = await _execute_with_hooks(registry, skill.name, skill_args, user_id)
+                if veto:
+                    return {**state, "execution_result": veto}
                 return {**state, "execution_result": result}
             else:
                 logger.warning("node_execute_skill_not_found", action=action)
@@ -363,15 +212,21 @@ async def node_execute(state: AgentState) -> AgentState:
         if tool_suggestion:
             skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
             if skill:
-                logger.info("node_execute_tool_suggestion", skill=skill.name)
-                result = await registry.execute_skill(skill.name, {"raw_input": user_message})
+                result, veto = await _execute_with_hooks(
+                    registry, skill.name, {"raw_input": user_message}, user_id
+                )
+                if veto:
+                    return {**state, "execution_result": veto}
                 return {**state, "execution_result": result}
 
         # 3. Skill não encontrado — tentar encontrar por trigger na mensagem
         skill = registry.find_by_trigger(user_message)
         if skill:
-            logger.info("node_execute_trigger_fallback", skill=skill.name)
-            result = await registry.execute_skill(skill.name, {"raw_input": user_message})
+            result, veto = await _execute_with_hooks(
+                registry, skill.name, {"raw_input": user_message}, user_id
+            )
+            if veto:
+                return {**state, "execution_result": veto}
             return {**state, "execution_result": result}
 
         # 4. Skill não encontrado — resposta inteligente
@@ -381,22 +236,14 @@ async def node_execute(state: AgentState) -> AgentState:
         )
 
         detected = detect_missing_skill_keywords(user_message.lower())
-
-        # Listar skills disponíveis para o usuário
         available_skills = registry.list_skills()
         skills_list = ", ".join([s["name"] for s in available_skills])
 
         response = generate_smart_unavailable_response(user_message, detected_skills=detected)
-
-        # Adicionar informação sobre skills disponíveis
         if available_skills:
-            response += f"\n\n📋 Skills disponíveis: {skills_list}"
+            response += f"\n\n Skills disponíveis: {skills_list}"
 
-        logger.warning(
-            "node_execute_no_skill_found",
-            message=user_message[:50],
-            available=len(available_skills),
-        )
+        logger.warning("node_execute_no_skill_found", message=user_message[:50])
         return {**state, "execution_result": response}
 
     except Exception as e:
@@ -409,14 +256,6 @@ async def node_execute(state: AgentState) -> AgentState:
             "error": wrapped.to_dict(),
             "execution_result": format_error_for_user(e),
         }
-
-
-# Alias para compatibilidade com código legado
-def get_async_tool(name: str):
-    """Fallback para compatibilidade com código legado."""
-    from ..tools.system_tools import get_async_tool as legacy_get_async_tool
-
-    return legacy_get_async_tool(name)
 
 
 async def node_generate_response(state: AgentState) -> AgentState:
@@ -438,7 +277,14 @@ async def node_generate_response(state: AgentState) -> AgentState:
         "node_generate_response_start",
         intent=intent,
         has_execution_result=execution_result is not None,
+        has_response=state.get("response") is not None,
     )
+
+    # Se react_node ou format_response já definiu response, usar diretamente
+    existing_response = state.get("response")
+    if existing_response:
+        logger.info("node_generate_response_from_react", preview=str(existing_response)[:100])
+        return state
 
     response = None
 
@@ -569,145 +415,3 @@ def node_save_memory(state: AgentState) -> AgentState:
         memory.save_fact(user_id, key, value)
 
     return state
-
-
-# ============ Self-Improvement Nodes ============
-
-
-def node_check_capabilities(state: AgentState) -> AgentState:
-    """Verifica se o agente tem as capacidades necessárias."""
-    try:
-        from ..capabilities import capabilities_registry
-
-        task = state.get("user_message", "")
-        missing = capabilities_registry.detect_missing(task)
-
-        if missing:
-            missing_list = [cap.to_dict() for cap in missing]
-            return {
-                **state,
-                "missing_capabilities": missing_list,
-                "needs_improvement": True,
-                "improvement_summary": f"Detectei {len(missing)} capacidades faltantes: {', '.join(cap.name for cap in missing)}",
-            }
-
-        return {
-            **state,
-            "missing_capabilities": [],
-            "needs_improvement": False,
-            "improvement_summary": "Todas as capacidades necessárias estão disponíveis.",
-        }
-    except ImportError as e:
-        return {
-            **state,
-            "missing_capabilities": [],
-            "needs_improvement": False,
-            "improvement_summary": f"Capabilities registry não disponível: {e}",
-        }
-
-
-def node_self_improve(state: AgentState) -> AgentState:
-    """Planeja e executa auto-improvement."""
-    try:
-        from ..capabilities import capabilities_registry
-
-        missing = state.get("missing_capabilities", [])
-
-        if not missing:
-            return {**state, "should_improve": False, "improvement_plan": None}
-
-        # Criar plano de implementação
-        plan = []
-        for cap_dict in missing:
-            cap_name = cap_dict["name"]
-            cap = capabilities_registry.get_capability(cap_name)
-            if cap:
-                plan.append(
-                    {
-                        "capability": cap.to_dict(),
-                        "steps": capabilities_registry.get_implementation_plan(cap),
-                    }
-                )
-
-        return {
-            **state,
-            "improvement_plan": plan,
-            "should_improve": True,
-            "improvement_status": "planning",
-        }
-    except ImportError as e:
-        return {
-            **state,
-            "should_improve": False,
-            "improvement_plan": None,
-            "improvement_summary": f"Não foi possível acessar capabilities registry: {e}",
-        }
-
-
-def node_implement_capability(state: AgentState) -> AgentState:
-    """Implementa uma nova capacidade usando o CLI."""
-    try:
-        plan = state.get("improvement_plan", [])
-
-        if not plan:
-            return {
-                **state,
-                "implementation_result": "Nada para implementar",
-                "new_capability": None,
-            }
-
-        # Chamar CLI para implementar a primeira capacidade
-        target_cap = plan[0]["capability"]
-        cap_name = target_cap["name"]
-        cap_description = target_cap["description"]
-
-        # Criar prompt para o CLI
-        f"""# Auto-Implementação de Capacidade
-
-## Capacidade a Implementar
-**Nome:** {cap_name}
-**Descrição:** {cap_description}
-
-## Contexto
-O agente detectou que esta capacidade está faltante e precisa ser implementada automaticamente.
-
-## Requisitos
-1. Criar módulo Python funcional
-2. Integrar com sistemas existentes (LangGraph, MCP Server, etc.)
-3. Adicionar testes
-4. Documentar uso
-
-## Plano de Implementação
-{plan[0]["steps"]}
-
-## Restrições
-- Deve funcionar na VPS (Ubuntu 24.04)
-- Deve respeitar limites de RAM (2.4 GB total)
-- Deve ser testado antes de marcar como implementado
-
-Por favor, implemente esta capacidade seguindo o plano acima.
-"""
-
-        # Simular chamada ao CLI (na implementação real, isso seria uma chamada real)
-        # Por enquanto, vamos gerar um código placeholder
-        implementation_code = f"""# Placeholder para {cap_name}
-# Esta capacidade será implementada pelo CLI/Kilocode
-
-def {cap_name.replace("-", "_")}():
-    \"\"\"{cap_description}\"\"\"# TODO: Implementar funcionalidade
-    pass
-"""
-
-        return {
-            **state,
-            "implementation_result": f"Código gerado para {cap_name}. Agora preciso integrar e testar.",
-            "generated_code": implementation_code,
-            "new_capability": cap_name,
-            "implementation_status": "code_generated",
-        }
-    except ImportError as e:
-        return {
-            **state,
-            "implementation_result": f"Não foi possível implementar: {e}",
-            "new_capability": None,
-        }
