@@ -314,6 +314,112 @@ Consulte o diretório `docs/adr/` para decisões documentadas:
 | 1.3 | Auth | Gateway API key real |
 | 2.0 | Modernização | LangGraph moderno, tool use |
 
+## Autonomous Engine (Sprint 02)
+
+O **Autonomous Engine** implementa o ciclo de 6 passos para automação autônoma:
+
+### 6-Step Blueprint
+
+```mermaid
+DETECT → PROPOSE → FILTER → EXECUTE → COMPLETE → RE-TRIGGER
+```
+
+| Passo | Descrição | Componente |
+|-------|-----------|-------------|
+| DETECT | Monitora condições do sistema | Triggers (RAM, erro, schedule) |
+| PROPOSE | Cria proposal no PostgreSQL | `create_proposal()` |
+| FILTER | Verifica recursos/segurança | Cap Gates |
+| EXECUTE | Executa via Skill Registry | `_execute_mission()` |
+| COMPLETE | Emite resultado | `agent_missions` table |
+| RE-TRIGGER | Gera novas proposals | Event loop |
+
+### Cap Gates
+
+Verificações de segurança antes de executar:
+
+```python
+class CapGate:
+    check_rate_limit()    # max 10 proposals/hora
+    check_ram_threshold()  # min 200MB RAM livre
+    check_security_level() # ações perigosas requerem aprovação
+```
+
+### Tabelas PostgreSQL
+
+- `agent_proposals`: Ações sugeridas pelo agente
+- `agent_missions`: Execução de proposals
+- `agent_policies`: Regras de governança
+
+### Triggers Autônomos
+
+| Trigger | Condição | Ação |
+|---------|----------|------|
+| `ram_high` | RAM > 80% | Limpar containers inativos |
+| `error_repeated` | >3 erros/hora | Investigar erros |
+| `schedule_due` | Tarefa pendente | Executar tarefa |
+| `health_check` | A cada 60s | Verificar containers |
+
+## ReAct Node (Sprint 02)
+
+O **ReAct Node** permite que o agente use tools via LLM:
+
+```python
+# Fluxo ReAct
+1. LLM analiza mensagem → tool_call
+2. Skill Registry executa tool
+3. LLM gera resposta final
+```
+
+### Tool Schemas
+
+Todas as skills expõem schemas OpenAI-compatible:
+
+```python
+# Exemplo: shell_exec
+{
+    "type": "function",
+    "function": {
+        "name": "shell_exec",
+        "description": "Executa comando shell",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string"}
+            }
+        }
+    }
+}
+```
+
+## Skills System (Sprint 02)
+
+Sistema de plugins para capacidades do agente:
+
+### Built-in Skills
+
+| Skill | Descrição | Handler |
+|-------|-----------|---------|
+| `shell_exec` | Executa comandos shell | `core/skills/_builtin/shell_exec/` |
+| `get_ram` | Consulta memória RAM | `core/skills/_builtin/ram/` |
+| `list_containers` | Lista Docker containers | `core/skills/_builtin/containers/` |
+| `get_system_status` | Status geral | `core/skills/_builtin/system_status/` |
+| `check_postgres` | Health PostgreSQL | `core/skills/_builtin/check_postgres/` |
+| `check_redis` | Health Redis | `core/skills/_builtin/check_redis/` |
+| `file_manager` | Operações arquivo | `core/skills/_builtin/file_manager/` |
+| `memory_query` | Consulta memória | `core/skills/_builtin/memory_query/` |
+| `web_search` | Pesquisa web | `core/skills/_builtin/web_search/` |
+| `self_edit` | Auto-edição | `core/skills/_builtin/self_edit/` |
+
+### Skill Registry
+
+Padrão registry para descoberta dinâmica:
+
+```python
+registry = get_skill_registry()
+schemas = registry.list_tool_schemas()
+result = await registry.execute_skill("shell_exec", {"command": "ls"})
+```
+
 ## Referências
 
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
