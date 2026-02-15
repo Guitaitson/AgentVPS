@@ -1,5 +1,5 @@
 name: get_ram
-description: "Mostra uso atual de RAM do sistema em MB"
+description: "Mostra uso atual de memória RAM do servidor. Use quando perguntarem sobre memória, RAM, ou recursos."
 version: "1.0.0"
 security_level: safe
 triggers:
@@ -11,6 +11,7 @@ triggers:
   - quanta ram
   - quanto de ram
 parameters: {}
+parameters_schema: {}
 max_output_chars: 500
 timeout_seconds: 10
 enabled: true

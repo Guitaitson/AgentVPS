@@ -1,5 +1,5 @@
 name: file_manager
-description: "Gerencia arquivos - ler, criar, editar, listar diretórios"
+description: "Lê, cria, edita ou lista arquivos e diretórios no servidor. Use para qualquer operação com arquivos."
 version: "1.0.0"
 security_level: moderate
 triggers:
@@ -25,6 +25,19 @@ parameters:
     type: string
     required: false
     description: "Conteúdo para escrever (para write/append)"
+parameters_schema:
+  operation:
+    type: string
+    description: "A operação: 'read', 'write', 'append', ou 'list'"
+    required: true
+  path:
+    type: string
+    description: "O caminho do arquivo ou diretório (ex: '/opt/vps-agent/README.md')"
+    required: true
+  content:
+    type: string
+    description: "Conteúdo para escrita (apenas para write/append)"
+    required: false
 max_output_chars: 5000
 timeout_seconds: 15
 enabled: true

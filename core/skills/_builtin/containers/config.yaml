@@ -1,5 +1,5 @@
 name: list_containers
-description: "Lista containers Docker em execução"
+description: "Lista containers Docker em execução no servidor. Use quando perguntarem sobre containers ou Docker."
 version: "1.0.0"
 security_level: safe
 triggers:
@@ -9,6 +9,7 @@ triggers:
   - listar containers
   - quais containers
 parameters: {}
+parameters_schema: {}
 max_output_chars: 2000
 timeout_seconds: 15
 enabled: true

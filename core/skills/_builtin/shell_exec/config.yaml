@@ -1,5 +1,5 @@
 name: shell_exec
-description: "Executa comandos shell na VPS com classificação de segurança"
+description: "Executa um comando shell na VPS. Use para verificar status do sistema, listar arquivos, verificar instalações, gerenciar containers, e executar qualquer comando do sistema operacional."
 version: "1.0.0"
 security_level: moderate
 triggers:
@@ -18,6 +18,11 @@ parameters:
     type: string
     required: true
     description: "Comando shell a executar"
+parameters_schema:
+  command:
+    type: string
+    description: "O comando shell a executar. Exemplos: 'which docker', 'free -h', 'df -h', 'docker ps'"
+    required: true
 max_output_chars: 2000
 timeout_seconds: 30
 enabled: true

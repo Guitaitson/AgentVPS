@@ -181,6 +181,54 @@ class SkillRegistry:
     def count(self) -> int:
         return len(self._skills)
 
+    def list_tool_schemas(self) -> List[dict]:
+        """
+        Retorna lista de tool schemas para function calling.
+        
+        Formato compatível com OpenRouter/Gemini function calling.
+        """
+        tools = []
+        for skill in self._skills.values():
+            properties = {}
+            required = []
+            
+            # Usar parameters_schema do config, ou gerar do parameters
+            schema = skill.config.parameters_schema
+            if not schema and skill.config.parameters:
+                # Gerar schema automaticamente do parameters
+                for param_name, param_info in skill.config.parameters.items():
+                    properties[param_name] = {
+                        "type": param_info.get("type", "string"),
+                        "description": param_info.get("description", ""),
+                    }
+                    if param_info.get("required", False):
+                        required.append(param_name)
+            elif schema:
+                # Usar schema definido explicitamente
+                for param_name, param_info in schema.items():
+                    properties[param_name] = {
+                        "type": param_info.get("type", "string"),
+                        "description": param_info.get("description", ""),
+                    }
+                    if param_info.get("required", False):
+                        required.append(param_name)
+            
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": skill.name,
+                    "description": skill.config.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": required,
+                    }
+                }
+            })
+        
+        logger.info("tool_schemas_generated", count=len(tools))
+        return tools
+
 
 # Singleton
 _registry: Optional[SkillRegistry] = None

@@ -1,5 +1,5 @@
 name: web_search
-description: "Pesquisa na web usando Brave Search API"
+description: "Pesquisa informações na internet. Use quando o usuário perguntar sobre qualquer assunto que não seja sobre o próprio servidor."
 version: "1.0.0"
 security_level: safe
 triggers:
@@ -27,6 +27,11 @@ parameters:
     type: string
     required: true
     description: "Termo de busca"
+parameters_schema:
+  query:
+    type: string
+    description: "O termo de busca (ex: 'como instalar Node.js 22 no Ubuntu', 'best Python frameworks 2026')"
+    required: true
 max_output_chars: 3000
 timeout_seconds: 15
 enabled: true

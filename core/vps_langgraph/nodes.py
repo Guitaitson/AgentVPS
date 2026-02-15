@@ -238,9 +238,8 @@ def node_security_check(state: AgentState) -> AgentState:
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
 
-    # DEBUG: Log para arquivo
+    # Log de debug via structlog
     debug_info = {
-        "timestamp": datetime.now().isoformat(),
         "plan": plan,
         "step": step,
         "action_type": None,
@@ -252,8 +251,7 @@ def node_security_check(state: AgentState) -> AgentState:
 
     if not plan or step >= len(plan):
         debug_info["result"] = "no_action"
-        with open("/tmp/security_debug.log", "a") as f:
-            f.write(json.dumps(debug_info) + "\n")
+        logger.debug("security_check_no_action", **debug_info)
         return {**state, "security_check": {"passed": True, "reason": "no_action"}}
 
     current_action = plan[step]
@@ -279,8 +277,7 @@ def node_security_check(state: AgentState) -> AgentState:
 
         if not result.allowed:
             debug_info["blocked"] = True
-            with open("/tmp/security_debug.log", "a") as f:
-                f.write(json.dumps(debug_info) + "\n")
+            logger.debug("security_check_blocked", **debug_info)
             return {
                 **state,
                 "security_check": {
@@ -299,8 +296,7 @@ def node_security_check(state: AgentState) -> AgentState:
     if action_type == "tool":
         debug_info["result"] = "tool_allowed"
 
-    with open("/tmp/security_debug.log", "a") as f:
-        f.write(json.dumps(debug_info) + "\n")
+    logger.debug("security_check_allowed", **debug_info)
 
     return {
         **state,
@@ -345,8 +341,14 @@ async def node_execute(state: AgentState) -> AgentState:
             skill = registry.get(action) or registry.find_by_trigger(action)
             if skill:
                 logger.info("node_execute_skill_found", skill=skill.name)
-                # Passar a mensagem ORIGINAL do usuário para que o skill possa extrair argumentos
-                result = await registry.execute_skill(skill.name, {"raw_input": raw_message})
+                # Verificar se há args estruturados do function calling
+                skill_args = current_action.get("args", {})
+                if skill_args:
+                    # Usar args estruturados do LLM (function calling)
+                    result = await registry.execute_skill(skill.name, skill_args)
+                else:
+                    # Fallback: usar raw_input para compatibilidade
+                    result = await registry.execute_skill(skill.name, {"raw_input": raw_message})
                 return {**state, "execution_result": result}
             else:
                 logger.warning("node_execute_skill_not_found", action=action)

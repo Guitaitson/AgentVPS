@@ -9,7 +9,7 @@ import httpx
 from core.skills.base import SkillBase
 
 
-BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "BSA1oVa6QVwZf5E3lCRo1h19cmY9Ywo")
+BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "")
 
 
 class WebSearchSkill(SkillBase):

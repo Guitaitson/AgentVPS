@@ -27,6 +27,7 @@ class SkillConfig:
     security_level: SecurityLevel = SecurityLevel.SAFE
     triggers: List[str] = field(default_factory=list)    # keywords que ativam o skill
     parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters_schema: Dict[str, Any] = field(default_factory=dict)  # Schema para function calling
     max_output_chars: int = 2000
     timeout_seconds: int = 30
     enabled: bool = True
