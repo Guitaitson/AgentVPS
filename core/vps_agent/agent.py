@@ -21,7 +21,7 @@ def _get_request_logger():
 def get_agent_graph():
     """
     Retorna a instância singleton do grafo do agente.
-    
+
     Lazy loading para garantir que o grafo é criado uma única vez.
     """
     from core.vps_langgraph.graph import get_agent_graph as _get_graph

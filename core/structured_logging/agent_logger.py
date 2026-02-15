@@ -33,7 +33,7 @@ def _ensure_log_dir():
 class AgentLogger:
     """
     Logger estruturado que salva cada request em JSON Lines.
-    
+
     Útil para debug do fluxo: intent → plan → execute → response
     """
 

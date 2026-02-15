@@ -6,7 +6,7 @@ para streaming real de respostas.
 
 Uso:
     python -m core.mcp_sse
-    
+
 O servidor expos tools via MCP com suporte a SSE.
 Conecte via: http://localhost:8000/mcp
 """
@@ -59,7 +59,7 @@ class MCPPrompt:
 class MCPServer:
     """
     Servidor MCP com suporte a SSE.
-    
+
     Implementa o protocolo completo:
     - tools/list, tools/call
     - resources/list, resources/read
@@ -190,7 +190,7 @@ class MCPServer:
         if name not in self.tools:
             return {"error": f"Tool '{name}' not found"}
 
-        tool = self.tools[name]
+        self.tools[name]
 
         try:
             # Executa a tool
@@ -433,7 +433,7 @@ async def health():
 @app.get("/")
 async def root():
     """Info endpoint."""
-    settings = get_settings()
+    get_settings()
     return {
         "name": "VPS-Agent MCP Server",
         "version": "2.0.0",

@@ -13,9 +13,9 @@ import subprocess
 def get_ram_usage() -> str:
     """
     Get current RAM usage in MB.
-    
+
     Usa /proc/meminfo para compatibilidade universal (funciona sem 'free').
-    
+
     Returns:
         Formatted string with RAM information
     """
@@ -72,7 +72,7 @@ def get_ram_usage() -> str:
 def list_docker_containers() -> str:
     """
     List all running Docker containers.
-    
+
     Returns:
         Formatted table with container information
     """
@@ -118,7 +118,7 @@ def list_docker_containers() -> str:
 def get_system_status() -> str:
     """
     Get overall system status.
-    
+
     Returns:
         Summary of system health
     """
@@ -201,7 +201,7 @@ def get_system_status() -> str:
 def check_postgres() -> str:
     """
     Check PostgreSQL connection.
-    
+
     Returns:
         Status of PostgreSQL service
     """
@@ -247,7 +247,7 @@ def check_postgres() -> str:
 def check_redis() -> str:
     """
     Check Redis connection.
-    
+
     Returns:
         Status of Redis service
     """

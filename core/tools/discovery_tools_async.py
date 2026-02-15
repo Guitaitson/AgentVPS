@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 async def _run_command(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
     """
     Executa comando de forma async.
-    
+
     Returns:
         Tuple de (returncode, stdout, stderr)
     """

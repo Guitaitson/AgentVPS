@@ -36,7 +36,7 @@ class SkillConfig:
 class SkillBase(ABC):
     """
     Classe base para skills.
-    
+
     Para criar um skill novo:
     1. Criar diretório em core/skills/ (ex: core/skills/meu_skill/)
     2. Criar handler.py com classe que herda SkillBase
@@ -51,10 +51,10 @@ class SkillBase(ABC):
     async def execute(self, args: Dict[str, Any] = None) -> str:
         """
         Executa o skill.
-        
+
         Args:
             args: Argumentos opcionais (ex: {"command": "ls -la"})
-            
+
         Returns:
             String com resultado da execução
         """

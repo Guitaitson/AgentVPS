@@ -116,14 +116,14 @@ class UnifiedLLMProvider:
     ) -> LLMResponse:
         """
         Gera resposta do LLM.
-        
+
         Args:
             user_message: Mensagem do usuário
             system_prompt: Prompt de sistema opcional
             history: Histórico de conversa
             tools: Tools disponíveis para function calling
             json_mode: Se True, força saída JSON
-            
+
         Returns:
             LLMResponse padronizada
         """
@@ -211,11 +211,11 @@ class UnifiedLLMProvider:
     ) -> IntentClassification:
         """
         Classifica a intent da mensagem usando LLM com structured output.
-        
+
         Args:
             message: Mensagem do usuário
             history: Histórico opcional
-            
+
         Returns:
             IntentClassification estruturada
         """
@@ -346,12 +346,12 @@ Retorne EXATAMENTE este formato JSON:
     ) -> str:
         """
         Gera resposta com identidade VPS-Agent.
-        
+
         Args:
             user_message: Mensagem do usuário
             conversation_history: Histórico de conversa
             user_context: Contexto do usuário
-            
+
         Returns:
             Resposta em string
         """
@@ -405,11 +405,11 @@ async def classify_intent_with_llm(
 ) -> dict[str, Any]:
     """
     Função de conveniência para classificar intent.
-    
+
     Args:
         message: Mensagem do usuário
         history: Histórico opcional
-        
+
     Returns:
         Dicionário com classificação
     """

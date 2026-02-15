@@ -195,7 +195,7 @@ def get_autonomous_loop() -> AutonomousLoop:
                         cur.execute(
                             """INSERT INTO agent_skills (skill_name, success_count)
                                VALUES (%s, %s)
-                               ON CONFLICT (skill_name) 
+                               ON CONFLICT (skill_name)
                                DO UPDATE SET success_count = agent_skills.success_count + EXCLUDED.success_count""",
                             (skill, count),
                         )
@@ -280,11 +280,11 @@ def get_autonomous_loop() -> AutonomousLoop:
                 conn = _autonomous_loop._get_conn()
                 cur = conn.cursor()
                 cur.execute("""
-                    SELECT trigger, COUNT(*) as count 
-                    FROM learnings 
-                    WHERE category = 'execution_error' 
+                    SELECT trigger, COUNT(*) as count
+                    FROM learnings
+                    WHERE category = 'execution_error'
                     AND created_at > NOW() - INTERVAL '1 hour'
-                    GROUP BY trigger 
+                    GROUP BY trigger
                     HAVING COUNT(*) > 3
                 """)
                 errors = cur.fetchall()
@@ -326,9 +326,9 @@ def get_autonomous_loop() -> AutonomousLoop:
                 conn = _autonomous_loop._get_conn()
                 cur = conn.cursor()
                 cur.execute("""
-                    SELECT id, task_name, scheduled_time 
-                    FROM scheduled_tasks 
-                    WHERE status = 'pending' 
+                    SELECT id, task_name, scheduled_time
+                    FROM scheduled_tasks
+                    WHERE status = 'pending'
                     AND scheduled_time <= NOW()
                     LIMIT 5
                 """)

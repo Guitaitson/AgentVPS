@@ -18,7 +18,7 @@ logger = structlog.get_logger()
 class SkillRegistry:
     """
     Registry central de skills.
-    
+
     Descobre skills automaticamente em diretórios configurados.
     Cada skill é um diretório com handler.py + config.yaml.
     """
@@ -34,7 +34,7 @@ class SkillRegistry:
     def discover_and_register(self) -> int:
         """
         Descobre skills em todos os diretórios configurados.
-        
+
         Returns:
             Número de skills registrados
         """
@@ -183,7 +183,7 @@ class SkillRegistry:
     def list_tool_schemas(self) -> List[dict]:
         """
         Retorna lista de tool schemas para function calling.
-        
+
         Formato compatível com OpenRouter/Gemini function calling.
         """
         tools = []

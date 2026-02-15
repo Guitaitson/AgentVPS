@@ -16,7 +16,12 @@ try:
     from opentelemetry import trace
     from opentelemetry.sdk.resources import SERVICE_NAME, Resource
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+    from opentelemetry.sdk.trace.export import (
+        BatchSpanExporter,
+        BatchSpanProcessor,
+        ConsoleSpanExporter,
+        OTLPSpanExporter,
+    )
     from opentelemetry.trace import Status, StatusCode
     _OPENTELEMETRY_AVAILABLE = True
 except ImportError:
@@ -68,7 +73,7 @@ def init_observability(
 ) -> None:
     """
     Inicializa o OpenTelemetry.
-    
+
     Args:
         service_name: Nome do serviço
         otlp_endpoint: Endpoint do OTLP Collector (opcional)
@@ -114,7 +119,7 @@ def get_tracer() -> trace.Tracer:
 def trace_async(name: str = None):
     """
     Decorador para traced functions async.
-    
+
     Uso:
         @trace_async("minha_funcao")
         async def minha_funcao():
@@ -143,7 +148,7 @@ def trace_async(name: str = None):
 def trace_sync(name: str = None):
     """
     Decorador para traced functions sync.
-    
+
     Uso:
         @trace_sync("minha_funcao")
         def minha_funcao():
@@ -186,7 +191,7 @@ def set_attribute(key: str, value: Any) -> None:
 class ObservabilityContext:
     """
     Contexto de observabilidade para operations.
-    
+
     Uso:
         async with ObservabilityContext("minha_operacao", {"key": "value"}):
             # código monitored

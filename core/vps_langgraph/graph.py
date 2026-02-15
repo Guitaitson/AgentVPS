@@ -29,7 +29,7 @@ memory = AgentMemory()
 def get_checkpointer():
     """
     Retorna o checkpointer para persistência de estado.
-    
+
     Por enquanto usa MemorySaver. PostgreSQL checkpointing requer
     setup mais complexo com async context managers.
     """

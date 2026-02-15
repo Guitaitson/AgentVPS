@@ -13,7 +13,7 @@ from langgraph.graph import add_messages
 class AgentState(TypedDict):
     """
     Estado que flui pelo grafo do agente.
-    
+
     Usa Annotated para:
     - add_messages: Acumula mensagens automaticamente
     - Reducers personalizados para outros campos

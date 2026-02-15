@@ -63,14 +63,14 @@ async def classify_intent_llm(
 ) -> dict[str, Any]:
     """
     Classifica intent usando LLM com structured output.
-    
+
     Tenta usar o LLM unificado primeiro, se falhar usa regex como fallback.
-    
+
     Args:
         message: Mensagem do usuário
         conversation_history: Histórico opcional
         llm_client: Cliente LLM (legado, não usado)
-        
+
     Returns:
         Dicionário com classificação estruturada
     """
@@ -347,7 +347,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
 def classify_intent_with_llm(message: str, **kwargs) -> tuple:
     """
     Wrapper compatível com interface antiga (síncrono).
-    
+
     Retorna: (intent_str, confidence, details_dict)
     """
     import asyncio

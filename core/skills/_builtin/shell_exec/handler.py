@@ -96,7 +96,7 @@ def classify_command(command: str) -> SecurityLevel:
 class ShellExecSkill(SkillBase):
     """
     Executa comandos shell com classificação de segurança.
-    
+
     Este skill é uma FUNÇÃO PURA:
     - Recebe 'command' como argumento estruturado
     - Retorna output RAW (sem formatação)

@@ -35,7 +35,7 @@ def get_connection_string() -> str:
 async def get_checkpointer() -> AsyncIterator[Optional[PostgresSaver]]:
     """
     Context manager para o checkpointer PostgreSQL.
-    
+
     Yields:
         PostgresSaver configurado ou None se não disponível
     """
@@ -69,7 +69,7 @@ async def get_checkpointer() -> AsyncIterator[Optional[PostgresSaver]]:
 def create_sync_checkpointer() -> Optional[PostgresSaver]:
     """
     Cria checkpointer síncrono para uso com graph.sync().
-    
+
     Returns:
         PostgresSaver configurado ou None se não disponível
     """

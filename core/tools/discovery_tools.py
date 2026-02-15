@@ -23,7 +23,7 @@ _learned_commands: dict[str, str] = {}
 def get_installed_packages() -> str:
     """
     Lista pacotes instalados no sistema.
-    
+
     Tenta múltiplos métodos para compatibilidade com diferentes distros.
     """
     results = []
@@ -137,10 +137,10 @@ def get_installed_packages() -> str:
 def check_command_available(command: str) -> str:
     """
     Verifica se um comando específico está disponível.
-    
+
     Args:
         command: Nome do comando (ex: 'python3', 'docker')
-        
+
     Returns:
         Status do comando
     """
@@ -253,12 +253,12 @@ def execute_discovered_command(
 ) -> str:
     """
     Executa um comando descoberto dinamicamente.
-    
+
     Args:
         command: Comando principal
         args: Argumentos opcionais
         timeout: Timeout em segundos
-        
+
     Returns:
         Resultado da execução
     """
@@ -302,11 +302,11 @@ def execute_discovered_command(
 def learn_command(query: str, command: str) -> str:
     """
     Salva um comando aprendido para futuras consultas.
-    
+
     Args:
         query: Pergunta/tipo de consulta (ex: "listar pacotes")
         command: Comando que resolve (ex: "dpkg -l")
-        
+
     Returns:
         Confirmação
     """
@@ -318,10 +318,10 @@ def learn_command(query: str, command: str) -> str:
 def get_learned_command(query: str) -> Optional[str]:
     """
     Recupera um comando previamente aprendido.
-    
+
     Args:
         query: Pergunta a buscar
-        
+
     Returns:
         Comando aprendido ou None
     """

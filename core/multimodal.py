@@ -44,10 +44,10 @@ class VisionCapabilities:
     def analyze_image(self, image_data: bytes) -> ImageAnalysis:
         """
         Analisa uma imagem e retorna informações.
-        
+
         Args:
             image_data: Bytes da imagem
-            
+
         Returns:
             ImageAnalysis com detalhes da imagem
         """
@@ -90,16 +90,16 @@ class VisionCapabilities:
     ) -> str:
         """
         Usa API de visão (GPT-4V, Claude Vision, etc) para descrever imagem.
-        
+
         Args:
             image_data: Bytes da imagem
             prompt: Prompt para a API de visão
-            
+
         Returns:
             Descrição gerada pela API
         """
         # Codifica imagem em base64
-        image_b64 = base64.b64encode(image_data).decode("utf-8")
+        base64.b64encode(image_data).decode("utf-8")
 
         # Aqui você pode integrar com:
         # - OpenAI GPT-4 Vision
@@ -138,11 +138,11 @@ class VisionCapabilities:
     def save_uploaded_file(self, file_data: bytes, filename: str) -> str:
         """
         Salva arquivo de upload temporariamente.
-        
+
         Args:
             file_data: Bytes do arquivo
             filename: Nome original do arquivo
-            
+
         Returns:
             Caminho do arquivo salvo
         """
@@ -175,11 +175,11 @@ class AudioCapabilities:
     ) -> str:
         """
         Transcreve áudio para texto.
-        
+
         Args:
             audio_data: Bytes do áudio
             language: Código do idioma (padrão: pt-BR)
-            
+
         Returns:
             Transcrição do áudio
         """
@@ -199,10 +199,10 @@ class AudioCapabilities:
     def get_audio_info(self, audio_data: bytes) -> Dict[str, Any]:
         """
         Retorna informações sobre o áudio.
-        
+
         Args:
             audio_data: Bytes do áudio
-            
+
         Returns:
             Dicionário com informações do áudio
         """
@@ -232,10 +232,10 @@ class DocumentCapabilities:
     def extract_text_from_pdf(self, pdf_data: bytes) -> str:
         """
         Extrai texto de PDF.
-        
+
         Args:
             pdf_data: Bytes do PDF
-            
+
         Returns:
             Texto extraído
         """
@@ -261,10 +261,10 @@ class DocumentCapabilities:
     def extract_text_from_docx(self, docx_data: bytes) -> str:
         """
         Extrai texto de DOCX.
-        
+
         Args:
             docx_data: Bytes do DOCX
-            
+
         Returns:
             Texto extraído
         """
@@ -286,10 +286,10 @@ class DocumentCapabilities:
     def read_plain_text(self, text_data: bytes) -> str:
         """
         Lê texto plano.
-        
+
         Args:
             text_data: Bytes do texto
-            
+
         Returns:
             Conteúdo do texto
         """
@@ -312,11 +312,11 @@ document = DocumentCapabilities()
 async def handle_photo(update, bot) -> str:
     """
     Processa foto enviada pelo usuário.
-    
+
     Args:
         update: Update do Telegram
         bot: Instância do bot
-        
+
     Returns:
         Resposta para o usuário
     """
@@ -341,11 +341,11 @@ async def handle_photo(update, bot) -> str:
 async def handle_voice(update, bot) -> str:
     """
     Processa mensagem de voz enviada pelo usuário.
-    
+
     Args:
         update: Update do Telegram
         bot: Instância do bot
-        
+
     Returns:
         Resposta para o usuário
     """
@@ -369,11 +369,11 @@ async def handle_voice(update, bot) -> str:
 async def handle_document(update, bot) -> str:
     """
     Processa documento enviado pelo usuário.
-    
+
     Args:
         update: Update do Telegram
         bot: Instância do bot
-        
+
     Returns:
         Resposta para o usuário
     """

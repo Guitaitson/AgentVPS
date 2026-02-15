@@ -55,7 +55,7 @@ class SelfImprovementConfig:
 class SelfImprovementEngine:
     """
     Motor de auto-melhoria do agente.
-    
+
     Fluxo:
     1. Analisa request do usuário
     2. Detecta capability gap
@@ -86,10 +86,10 @@ class SelfImprovementEngine:
     async def analyze_request(self, user_message: str) -> Optional[CapabilityGap]:
         """
         Analisa uma mensagem do usuário para detectar capability gaps.
-        
+
         Args:
             user_message: Mensagem do usuário
-            
+
         Returns:
             CapabilityGap se detectada, None caso contrário
         """
@@ -124,10 +124,10 @@ class SelfImprovementEngine:
     async def generate_implementation_plan(self, gap: CapabilityGap) -> str:
         """
         Gera um plano de implementação para o capability gap.
-        
+
         Args:
             gap: CapabilityGap a ser implementado
-            
+
         Returns:
             Plano de implementação em markdown
         """
@@ -177,11 +177,11 @@ class SelfImprovementEngine:
     ) -> Improvement:
         """
         Implementa uma nova capability.
-        
+
         Args:
             gap: CapabilityGap a implementar
             implementation_code: Código a ser implementado
-            
+
         Returns:
             Improvement com resultado
         """
@@ -231,10 +231,10 @@ class SelfImprovementEngine:
     async def rollback_improvement(self, improvement_id: str) -> bool:
         """
         Faz rollback de uma melhoria.
-        
+
         Args:
             improvement_id: ID da melhoria
-            
+
         Returns:
             True se sucesso
         """
@@ -278,10 +278,10 @@ class SelfImprovementNode:
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processa o state para verificar necessidade de self-improvement.
-        
+
         Args:
             state: State do LangGraph
-            
+
         Returns:
             State atualizado
         """
