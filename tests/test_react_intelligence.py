@@ -160,7 +160,9 @@ class TestToolSchemas:
         assert shell_exec is not None, "shell_exec not found in schemas"
 
         func = shell_exec["function"]
-        assert "command" in func.get("parameters", {}).get("properties", {}), "shell_exec should have 'command' param"
+        assert "command" in func.get("parameters", {}).get("properties", {}), (
+            "shell_exec should have 'command' param"
+        )
 
 
 @pytest.mark.asyncio
