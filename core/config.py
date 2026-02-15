@@ -14,20 +14,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class PostgresSettings(BaseSettings):
     """Configurações do PostgreSQL."""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="POSTGRES_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     host: str = Field(default="127.0.0.1", description="Host do PostgreSQL")
     port: int = Field(default=5432, description="Porta do PostgreSQL")
     db: str = Field(default="vps_agent", description="Nome do banco de dados")
     user: Optional[str] = Field(default=None, description="Usuário do PostgreSQL")
     password: Optional[str] = Field(default=None, description="Senha do PostgreSQL")
-    
+
     @property
     def dsn(self) -> str:
         """Retorna string de conexão DSN."""
@@ -36,14 +36,14 @@ class PostgresSettings(BaseSettings):
 
 class RedisSettings(BaseSettings):
     """Configurações do Redis."""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="REDIS_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     host: str = Field(default="127.0.0.1", description="Host do Redis")
     port: int = Field(default=6379, description="Porta do Redis")
     password: Optional[str] = Field(default=None, description="Senha do Redis (opcional)")
@@ -51,17 +51,17 @@ class RedisSettings(BaseSettings):
 
 class TelegramSettings(BaseSettings):
     """Configurações do Telegram Bot."""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="TELEGRAM_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     bot_token: Optional[str] = Field(default=None, description="Token do bot")
     allowed_users: str = Field(default="", description="IDs de usuários autorizados separados por vírgula")
-    
+
     @property
     def allowed_user_ids(self) -> list[int]:
         """Retorna lista de IDs de usuários autorizados."""
@@ -70,14 +70,14 @@ class TelegramSettings(BaseSettings):
 
 class OpenRouterSettings(BaseSettings):
     """Configurações do OpenRouter (LLM)."""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="OPENROUTER_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     api_key: Optional[str] = Field(default=None, description="Chave API do OpenRouter")
     model: str = Field(default="google/gemini-2.5-flash-lite", description="Modelo LLM padrão")
     max_tokens: int = Field(default=256, description="Máximo de tokens na resposta")
@@ -87,27 +87,27 @@ class OpenRouterSettings(BaseSettings):
 
 class QdrantSettings(BaseSettings):
     """Configurações do Qdrant (Memória Semântica)."""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="QDRANT_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     url: str = Field(default="http://127.0.0.1:6333", description="URL do Qdrant")
 
 
 class GatewaySettings(BaseSettings):
     """Configurações do Gateway API."""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="GATEWAY_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     host: str = Field(default="0.0.0.0", description="Host do Gateway")
     port: int = Field(default=8080, description="Porta do Gateway")
     api_key: Optional[str] = Field(default=None, description="Chave API do Gateway")
@@ -119,13 +119,13 @@ class AppSettings(BaseSettings):
     Configurações principais da aplicação.
     Agrega todas as configurações em um só lugar.
     """
-    
+
     model_config = SettingsConfigDict(
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
+
     # Sub-configurações
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
@@ -133,7 +133,7 @@ class AppSettings(BaseSettings):
     openrouter: OpenRouterSettings = Field(default_factory=OpenRouterSettings)
     qdrant: QdrantSettings = Field(default_factory=QdrantSettings)
     gateway: GatewaySettings = Field(default_factory=GatewaySettings)
-    
+
     # Configurações gerais
     env: str = Field(default="production", description="Ambiente (production/development)")
     debug: bool = Field(default=False, description="Modo debug")
@@ -155,7 +155,7 @@ settings = get_settings()
 
 __all__ = [
     "AppSettings",
-    "PostgresSettings", 
+    "PostgresSettings",
     "RedisSettings",
     "TelegramSettings",
     "OpenRouterSettings",

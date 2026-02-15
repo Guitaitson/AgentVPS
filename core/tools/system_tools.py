@@ -8,7 +8,6 @@ Decoradas para serem usadas como tools pelo LLM.
 import asyncio
 import os
 import subprocess
-from typing import Optional
 
 
 def get_ram_usage() -> str:
@@ -24,14 +23,14 @@ def get_ram_usage() -> str:
         # Ler /proc/meminfo (funciona em qualquer Linux)
         with open("/proc/meminfo", "r") as f:
             meminfo = f.read()
-        
+
         # Parse valores (em KB)
         mem_total = 0
         mem_available = 0
         mem_free = 0
         buffers = 0
         cached = 0
-        
+
         for line in meminfo.strip().split("\n"):
             if line.startswith("MemTotal:"):
                 mem_total = int(line.split()[1])
@@ -43,19 +42,19 @@ def get_ram_usage() -> str:
                 buffers = int(line.split()[1])
             elif line.startswith("Cached:"):
                 cached = int(line.split()[1])
-        
+
         # Se MemAvailable não existe (kernels antigos), calcular
         if mem_available == 0:
             mem_available = mem_free + buffers + cached
-        
+
         # Converter para MB
         total_mb = mem_total // 1024
         available_mb = mem_available // 1024
         used_mb = (mem_total - mem_available) // 1024
-        
+
         # Calcular porcentagem
         usage_pct = (used_mb / total_mb) * 100 if total_mb > 0 else 0
-        
+
         return (
             f"🧠 **Uso de RAM**\n\n"
             f"Total: {total_mb} MB\n"
@@ -63,7 +62,7 @@ def get_ram_usage() -> str:
             f"Disponível: {available_mb} MB\n"
             f"Por Processos: `cat /proc/meminfo | grep -E '^(Mem|Swap)'`"
         )
-        
+
     except FileNotFoundError:
         return "❌ /proc/meminfo não encontrado (sistema não é Linux?)"
     except Exception as e:
@@ -84,19 +83,19 @@ def list_docker_containers() -> str:
             text=True,
             timeout=10
         )
-        
+
         if result.returncode != 0:
             return f"❌ Erro Docker: {result.stderr}"
-        
+
         if not result.stdout.strip():
             return "📦 **Containers Docker**\n\nNenhum container ativo"
-        
+
         lines = result.stdout.strip().split("\n")
         formatted = ["📦 **Containers Docker**\n"]
         formatted.append("```")
         formatted.append(f"{'NOME':<20} {'STATUS':<15} {'PORTAS'}")
         formatted.append("-" * 55)
-        
+
         for line in lines:
             parts = line.split("\t")
             if len(parts) >= 2:
@@ -104,10 +103,10 @@ def list_docker_containers() -> str:
                 status = parts[1][:13]
                 ports = parts[2] if len(parts) > 2 else "-"
                 formatted.append(f"{name:<20} {status:<15} {ports}")
-        
+
         formatted.append("```")
         return "\n".join(formatted)
-        
+
     except subprocess.TimeoutExpired:
         return "❌ Timeout ao listar containers"
     except FileNotFoundError:
@@ -123,27 +122,26 @@ def get_system_status() -> str:
     Returns:
         Summary of system health
     """
-    import os
-    
+
     checks = []
-    
+
     # Check RAM (usando /proc/meminfo)
     try:
         with open("/proc/meminfo", "r") as f:
             meminfo = f.read()
-        
+
         mem_total = 0
         mem_available = 0
-        
+
         for line in meminfo.strip().split("\n"):
             if line.startswith("MemTotal:"):
                 mem_total = int(line.split()[1])
             elif line.startswith("MemAvailable:"):
                 mem_available = int(line.split()[1])
-        
+
         if mem_total > 0:
             usage_pct = ((mem_total - mem_available) / mem_total) * 100
-            
+
             if usage_pct > 90:
                 checks.append(("🚨 RAM", f"{usage_pct:.0f}% - CRÍTICO"))
             elif usage_pct > 75:
@@ -154,7 +152,7 @@ def get_system_status() -> str:
             checks.append(("❌ RAM", "Não disponível"))
     except:
         checks.append(("❌ RAM", "Não disponível"))
-    
+
     # Check Disk
     try:
         result = subprocess.run(
@@ -166,7 +164,7 @@ def get_system_status() -> str:
         lines = result.stdout.strip().split("\n")
         disk_line = lines[1].split()
         usage = disk_line[4].replace("%", "")
-        
+
         if int(usage) > 90:
             checks.append(("🚨 Disco", f"{usage}% - CRÍTICO"))
         elif int(usage) > 75:
@@ -175,7 +173,7 @@ def get_system_status() -> str:
             checks.append(("✅ Disco", f"{usage}% - OK"))
     except:
         checks.append(("❌ Disco", "Não disponível"))
-    
+
     # Check Docker
     try:
         result = subprocess.run(
@@ -191,12 +189,12 @@ def get_system_status() -> str:
             checks.append(("❌ Docker", "Indisponível"))
     except:
         checks.append(("❌ Docker", "Não instalado"))
-    
+
     # Format output
     formatted = ["📊 **Status do Sistema**\n"]
     for name, status in checks:
         formatted.append(f"{name}: {status}")
-    
+
     return "\n".join(formatted)
 
 
@@ -209,7 +207,7 @@ def check_postgres() -> str:
     """
     try:
         import psycopg2
-        
+
         conn = psycopg2.connect(
             host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
             port=int(os.getenv("POSTGRES_PORT", 5432)),
@@ -218,28 +216,28 @@ def check_postgres() -> str:
             password=os.getenv("POSTGRES_PASSWORD", "postgres"),
             connect_timeout=5
         )
-        
+
         # Get version
         cursor = conn.cursor()
         cursor.execute("SELECT version();")
         version = cursor.fetchone()[0].split()[1]
-        
+
         # Get database size
         cursor.execute("""
             SELECT pg_size_pretty(pg_database_size(%s));
         """, (os.getenv("POSTGRES_DB", "vps_agent"),))
         size = cursor.fetchone()[0]
-        
+
         cursor.close()
         conn.close()
-        
+
         return (
             f"✅ **PostgreSQL**\n\n"
             f"Status: Online\n"
             f"Versão: {version}\n"
             f"Tamanho: {size}"
         )
-        
+
     except psycopg2.OperationalError as e:
         return f"❌ **PostgreSQL**\n\nNão conecta: {str(e)}"
     except Exception as e:
@@ -255,7 +253,7 @@ def check_redis() -> str:
     """
     try:
         import redis
-        
+
         r = redis.Redis(
             host=os.getenv("REDIS_HOST", "127.0.0.1"),
             port=int(os.getenv("REDIS_PORT", 6379)),
@@ -263,16 +261,16 @@ def check_redis() -> str:
             socket_timeout=5,
             socket_connect_timeout=5
         )
-        
+
         # Test connection
         r.ping()
-        
+
         # Get info
         info = r.info()
         version = info.get("redis_version", "unknown")
         used_memory = info.get("used_memory_human", "unknown")
         keys_count = r.dbsize()
-        
+
         return (
             f"✅ **Redis**\n\n"
             f"Status: Online\n"
@@ -280,7 +278,7 @@ def check_redis() -> str:
             f"Memória usada: {used_memory}\n"
             f"Chaves: {keys_count}"
         )
-        
+
     except redis.ConnectionError:
         return "❌ **Redis**\n\nNão conecta: Connection refused"
     except redis.TimeoutError:
@@ -318,18 +316,18 @@ async def check_redis_async() -> str:
 # Import discovery tools (async nativo)
 try:
     from .discovery_tools_async import (
-        get_installed_packages_async,
         check_command_available_async,
+        get_installed_packages_async,
         get_system_info_async,
     )
     _discovery_available = True
 except ImportError:
     _discovery_available = False
-    
+
     # Fallback para versões com to_thread
     from .discovery_tools import (
-        get_installed_packages_async,
         check_command_available_async,
+        get_installed_packages_async,
         get_system_info_async,
     )
 

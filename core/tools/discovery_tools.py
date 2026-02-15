@@ -8,7 +8,6 @@ Permite ao agente:
 """
 
 import asyncio
-import json
 import os
 import subprocess  # FALTANDO - necessário para executar comandos
 from typing import Optional
@@ -28,7 +27,7 @@ def get_installed_packages() -> str:
     Tenta múltiplos métodos para compatibilidade com diferentes distros.
     """
     results = []
-    
+
     # Método 1: dpkg (Debian/Ubuntu)
     try:
         result = subprocess.run(
@@ -49,7 +48,7 @@ def get_installed_packages() -> str:
             results.append("\n")
     except Exception as e:
         logger.debug("dpkg_failed", error=str(e))
-    
+
     # Método 2: apt list
     try:
         result = subprocess.run(
@@ -68,7 +67,7 @@ def get_installed_packages() -> str:
             results.append("\n")
     except Exception as e:
         logger.debug("apt_failed", error=str(e))
-    
+
     # Método 3: Verificar comandos comuns + CLIs modernos
     common_commands = [
         # Comandos tradicionais
@@ -84,7 +83,7 @@ def get_installed_packages() -> str:
         # DevOps
         "docker", "podman", "docker-compose", "docker-compose",
     ]
-    
+
     found = []
     for cmd in common_commands:
         try:
@@ -98,12 +97,12 @@ def get_installed_packages() -> str:
                 found.append(cmd)
         except:
             pass
-    
+
     if found:
         results.append("🔧 **Comandos Disponíveis:**\n")
         results.append(", ".join(found))
         results.append("\n")
-    
+
     # Método 4: Snap packages
     try:
         result = subprocess.run(
@@ -122,7 +121,7 @@ def get_installed_packages() -> str:
             results.append("\n")
     except Exception as e:
         logger.debug("snap_failed", error=str(e))
-    
+
     if not results:
         return (
             "❌ Não consegui listar pacotes instalados.\n\n"
@@ -131,7 +130,7 @@ def get_installed_packages() -> str:
             "• 'tem docker instalado?'\n"
             "• 'qual versão do node?'"
         )
-    
+
     return "\n".join(results)
 
 
@@ -153,16 +152,16 @@ def check_command_available(command: str) -> str:
             text=True,
             timeout=3
         )
-        
+
         if result.returncode != 0:
             return f"❌ Comando '{command}' não encontrado"
-        
+
         path = result.stdout.strip()
-        
+
         # Tentar obter versão
         version = ""
         version_flags = ["--version", "-v", "-V", "version"]
-        
+
         for flag in version_flags:
             try:
                 ver_result = subprocess.run(
@@ -176,12 +175,12 @@ def check_command_available(command: str) -> str:
                     break
             except:
                 continue
-        
+
         if version:
             return f"✅ **{command}**\nLocal: `{path}`\nVersão: `{version}`"
         else:
             return f"✅ **{command}**\nLocal: `{path}`\nVersão: não detectada"
-            
+
     except subprocess.TimeoutExpired:
         return f"⏱️ Timeout ao verificar '{command}'"
     except Exception as e:
@@ -193,7 +192,7 @@ def get_system_info() -> str:
     Coleta informações gerais do sistema.
     """
     info = []
-    
+
     # OS Info
     try:
         with open("/etc/os-release", "r") as f:
@@ -205,7 +204,7 @@ def get_system_info() -> str:
                 break
     except:
         info.append("🖥️ **Sistema:** Linux (detalhes não disponíveis)")
-    
+
     # Kernel
     try:
         result = subprocess.run(
@@ -218,7 +217,7 @@ def get_system_info() -> str:
             info.append(f"🔧 **Kernel:** {result.stdout.strip()}")
     except:
         pass
-    
+
     # Arquitetura
     try:
         result = subprocess.run(
@@ -231,7 +230,7 @@ def get_system_info() -> str:
             info.append(f"⚙️ **Arquitetura:** {result.stdout.strip()}")
     except:
         pass
-    
+
     # Uptime
     try:
         with open("/proc/uptime", "r") as f:
@@ -240,10 +239,10 @@ def get_system_info() -> str:
             info.append(f"⏱️ **Uptime:** {uptime_hours:.1f} horas")
     except:
         pass
-    
+
     # Usuário atual
     info.append(f"👤 **Usuário:** {os.getenv('USER', 'unknown')}")
-    
+
     return "\n".join(info)
 
 
@@ -265,12 +264,12 @@ def execute_discovered_command(
     """
     if args is None:
         args = []
-    
+
     # Verificar se comando está na allowlist (básica)
     dangerous = ["rm", "mkfs", "dd", "shutdown", "reboot", "poweroff"]
     if command in dangerous:
         return f"⛔ Comando '{command}' bloqueado por segurança"
-    
+
     try:
         result = subprocess.run(
             [command] + args,
@@ -278,20 +277,20 @@ def execute_discovered_command(
             text=True,
             timeout=timeout
         )
-        
+
         output = result.stdout.strip()
         if result.stderr:
             output += f"\n⚠️ stderr: {result.stderr.strip()[:200]}"
-        
+
         # Limitar output
         if len(output) > 2000:
             output = output[:2000] + "\n... (truncado)"
-        
+
         return (
             f"✅ Comando: `{command} {' '.join(args)}`\n"
             f"```\n{output}\n```"
         )
-        
+
     except subprocess.TimeoutExpired:
         return f"⏱️ Timeout ao executar '{command}'"
     except FileNotFoundError:
@@ -335,16 +334,15 @@ def list_learned_commands() -> str:
     """
     if not _learned_commands:
         return "📚 Nenhum comando aprendido ainda."
-    
+
     lines = ["📚 **Comandos Aprendidos:**\n"]
     for query, command in _learned_commands.items():
         lines.append(f"• '{query}' → `{command}`")
-    
+
     return "\n".join(lines)
 
 
 # Async versions
-import asyncio
 
 
 async def get_installed_packages_async() -> str:

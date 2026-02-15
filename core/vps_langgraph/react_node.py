@@ -7,8 +7,6 @@ Substitui: node_classify_intent + node_plan + interpretação do shell_exec.
 Este é o núcleo da mudança de "botões pré-codificados" para "inteligência real".
 """
 
-import json
-from typing import Any, Dict, Optional
 
 import structlog
 
@@ -46,7 +44,7 @@ Exemplos de quando NÃO usar tools:
 async def node_react(state: AgentState) -> AgentState:
     """
     Nó ReAct: LLM decide se usa tool ou responde diretamente.
-    
+
     Este nó substitui node_classify_intent + node_plan em uma única chamada LLM.
     O LLM recebe a lista de tools e decide qual usar (ou nenhuma).
     """
@@ -54,7 +52,7 @@ async def node_react(state: AgentState) -> AgentState:
 
     user_message = state.get("user_message", "")
     conversation_history = state.get("conversation_history", [])
-    
+
     registry = get_skill_registry()
     tools = registry.list_tool_schemas()
 
@@ -119,7 +117,7 @@ async def node_react(state: AgentState) -> AgentState:
 async def node_format_response(state: AgentState) -> AgentState:
     """
     Após execução da tool, envia resultado ao LLM para formatação.
-    
+
     O skill retorna output raw (ex: "1.2Gi / 4.0Gi").
     O LLM interpreta e gera resposta conversacional.
     """
@@ -133,14 +131,14 @@ async def node_format_response(state: AgentState) -> AgentState:
         return state
 
     provider = get_llm_provider()
-    
+
     format_prompt = f"""O usuário perguntou: "{user_message}"
 
 Você usou a ferramenta '{tool_name}' e obteve este resultado:
 
 {execution_result}
 
-Responda a pergunta do usuário de forma natural e conversacional em português, 
+Responda a pergunta do usuário de forma natural e conversacional em português,
 interpretando o resultado acima. Seja conciso."""
 
     response = await provider.generate(

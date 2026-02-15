@@ -326,7 +326,7 @@ def classify_action(action: str, resource: str = None) -> str:
     """
     allowlist = create_default_allowlist()
     result = allowlist.check(ResourceType.COMMAND, action)
-    
+
     if result.permission == PermissionLevel.DENY:
         return "dangerous"
     elif result.permission == PermissionLevel.REQUIRE_APPROVAL:

@@ -5,7 +5,6 @@ Versão: 2.0 — Com LangGraph e timeout otimizado
 
 import logging
 import os
-from datetime import datetime, timezone
 
 import psycopg2
 import redis
@@ -142,7 +141,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /status — usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_status", user_id=user_id)
-    
+
     # Roteia pelo grafo com /status para ativar intent de comando
     response = await process_message_async(user_id, "/status")
     await update.message.reply_text(response)
@@ -153,7 +152,7 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /ram — usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_ram", user_id=user_id)
-    
+
     # Roteia pelo grafo com /ram para ativar intent de comando
     response = await process_message_async(user_id, "/ram")
     await update.message.reply_text(response)
@@ -164,7 +163,7 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /containers — usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_containers", user_id=user_id)
-    
+
     # Roteia pelo grafo com /containers para ativar intent de comando
     response = await process_message_async(user_id, "/containers")
     await update.message.reply_text(response)
@@ -175,7 +174,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /health — usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_health", user_id=user_id)
-    
+
     # Roteia pelo grafo com /health para ativar intent de comando
     response = await process_message_async(user_id, "/health")
     await update.message.reply_text(response)

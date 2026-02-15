@@ -36,12 +36,12 @@ class AgentLogger:
     
     Útil para debug do fluxo: intent → plan → execute → response
     """
-    
+
     def __init__(self, request_id: Optional[str] = None):
         self.request_id = request_id or str(uuid.uuid4())[:8]
         self.started_at = datetime.now(timezone.utc)
         self.events: list[Dict] = []
-    
+
     def log(
         self,
         step: str,
@@ -56,28 +56,28 @@ class AgentLogger:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "step": step,
         }
-        
+
         if input_data is not None:
             # Truncar dados grandes
             input_str = str(input_data)
             if len(input_str) > 500:
                 input_str = input_str[:500] + "..."
             event["input"] = input_str
-        
+
         if output_data is not None:
             output_str = str(output_data)
             if len(output_str) > 500:
                 output_str = output_str[:500] + "..."
             event["output"] = output_str
-        
+
         if metadata:
             event["metadata"] = metadata
-        
+
         if error:
             event["error"] = error[:200] if len(error) > 200 else error
-        
+
         self.events.append(event)
-        
+
         # Log para stdout também
         logger = structlog.get_logger()
         logger.info(
@@ -86,10 +86,10 @@ class AgentLogger:
             output=event.get("output", "")[:100] if "output" in event else None,
             error=error,
         )
-        
+
         # Salvar em arquivo
         self._write_to_file(event)
-    
+
     def _write_to_file(self, event: Dict):
         """Escreve evento no arquivo JSONL."""
         try:
@@ -98,11 +98,11 @@ class AgentLogger:
                 f.write(json.dumps(event, ensure_ascii=False) + "\n")
         except Exception:
             pass  # Silencioso se falhar
-    
+
     def finalize(self, success: bool = True):
         """Finaliza o log do request."""
         duration_ms = int((datetime.now(timezone.utc) - self.started_at).total_seconds() * 1000)
-        
+
         self.log(
             step="request_complete",
             metadata={
@@ -119,13 +119,13 @@ class AgentLogger:
 
 class log_agent_flow:
     """Context manager para logging automático do fluxo do agente."""
-    
+
     def __init__(self, request_id: Optional[str] = None):
         self.logger = AgentLogger(request_id)
-    
+
     def __enter__(self):
         return self.logger
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             self.logger.log(

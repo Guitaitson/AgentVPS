@@ -33,7 +33,7 @@ class RateLimiter:
         self.config = RateLimitConfig(requests_per_minute=requests_per_minute)
         self.tokens: Dict[str, list] = defaultdict(list)
         self.burst_tokens: Dict[str, list] = defaultdict(list)
-        
+
         # Alias para compatibilidade com testes
         self.is_allowed = self.allow_request
 

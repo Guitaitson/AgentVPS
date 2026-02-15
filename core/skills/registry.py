@@ -5,7 +5,6 @@ Substitui o TOOLS_REGISTRY hardcoded de core/tools/system_tools.py.
 """
 
 import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -46,18 +45,18 @@ class SkillRegistry:
                 continue
 
             logger.info("scanning_skill_dir", path=skill_dir)
-            
+
             for entry in os.scandir(skill_dir):
                 if not entry.is_dir() or entry.name.startswith("_"):
                     continue
-                
+
                 config_path = os.path.join(entry.path, "config.yaml")
                 handler_path = os.path.join(entry.path, "handler.py")
 
                 if not os.path.exists(config_path):
                     logger.debug("skill_missing_config", path=entry.path)
                     continue
-                
+
                 if not os.path.exists(handler_path):
                     logger.debug("skill_missing_handler", path=entry.path)
                     continue
@@ -78,7 +77,7 @@ class SkillRegistry:
         """Carrega um skill a partir do diretório."""
         import importlib.util
         import sys
-        
+
         # Carregar config.yaml
         config_path = os.path.join(skill_path, "config.yaml")
         with open(config_path, "r", encoding="utf-8") as f:
@@ -93,15 +92,15 @@ class SkillRegistry:
 
         # Importar handler.py dinamicamente
         handler_path = os.path.join(skill_path, "handler.py")
-        
+
         # Criar módulo dinamicamente
         module_name = f"core.skills.{dir_name}.handler"
-        
+
         spec = importlib.util.spec_from_file_location(module_name, handler_path)
         if spec is None or spec.loader is None:
             logger.error("skill_spec_error", path=skill_path)
             return None
-            
+
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
@@ -110,8 +109,8 @@ class SkillRegistry:
         handler_class = None
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if (isinstance(attr, type) 
-                and issubclass(attr, SkillBase) 
+            if (isinstance(attr, type)
+                and issubclass(attr, SkillBase)
                 and attr is not SkillBase):
                 handler_class = attr
                 break
@@ -142,24 +141,24 @@ class SkillRegistry:
     def find_by_trigger(self, text: str) -> Optional[SkillBase]:
         """Encontra skill que melhor corresponde ao texto."""
         text_lower = text.lower()
-        
+
         # Primeiro: procurar trigger exato (case insensitive)
         for skill in self._skills.values():
             for trigger in skill.config.triggers:
                 if trigger.lower() == text_lower:
                     return skill
-        
+
         # Segundo: procurar trigger parcial
         for skill in self._skills.values():
             for trigger in skill.config.triggers:
                 if trigger.lower() in text_lower:
                     return skill
-        
+
         # Terceiro: procurar pelo nome do skill
         for skill in self._skills.values():
             if skill.name.lower() in text_lower:
                 return skill
-        
+
         return None
 
     async def execute_skill(self, name: str, args: Dict[str, Any] = None) -> str:
@@ -167,7 +166,7 @@ class SkillRegistry:
         skill = self.get(name)
         if not skill:
             return f"❌ Skill '{name}' não encontrado. Use /skills para ver disponíveis."
-        
+
         if not skill.validate_args(args):
             return f"❌ Argumentos inválidos para skill '{name}'."
 
@@ -191,7 +190,7 @@ class SkillRegistry:
         for skill in self._skills.values():
             properties = {}
             required = []
-            
+
             # Usar parameters_schema do config, ou gerar do parameters
             schema = skill.config.parameters_schema
             if not schema and skill.config.parameters:
@@ -212,7 +211,7 @@ class SkillRegistry:
                     }
                     if param_info.get("required", False):
                         required.append(param_name)
-            
+
             tools.append({
                 "type": "function",
                 "function": {
@@ -225,7 +224,7 @@ class SkillRegistry:
                     }
                 }
             })
-        
+
         logger.info("tool_schemas_generated", count=len(tools))
         return tools
 

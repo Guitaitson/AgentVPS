@@ -9,12 +9,12 @@ import base64
 import io
 import os
 import tempfile
-from pathlib import Path
-from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict
 
-from PIL import Image
 import httpx
+from PIL import Image
 
 
 @dataclass
@@ -32,15 +32,15 @@ class VisionCapabilities:
     Capacidades de visão para processar imagens.
     Usa modelos locais ou APIs para análise visual.
     """
-    
+
     def __init__(self):
         self.supported_formats = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
-    
+
     def is_supported_image(self, file_path: str) -> bool:
         """Verifica se o formato é suportado."""
         ext = Path(file_path).suffix.lower()
         return ext in self.supported_formats
-    
+
     def analyze_image(self, image_data: bytes) -> ImageAnalysis:
         """
         Analisa uma imagem e retorna informações.
@@ -52,7 +52,7 @@ class VisionCapabilities:
             ImageAnalysis com detalhes da imagem
         """
         image = Image.open(io.BytesIO(image_data))
-        
+
         return ImageAnalysis(
             description=self._generate_description(image),
             format=image.format or "UNKNOWN",
@@ -62,12 +62,12 @@ class VisionCapabilities:
                 image.mode == "P" and "transparency" in image.info
             )
         )
-    
+
     def _generate_description(self, image: Image.Image) -> str:
         """Gera uma descrição básica da imagem."""
         width, height = image.size
         total_pixels = width * height
-        
+
         # Classificação por resolução
         if total_pixels > 4000 * 3000:
             resolution = "muito alta"
@@ -77,12 +77,12 @@ class VisionCapabilities:
             resolution = "média"
         else:
             resolution = "baixa"
-        
+
         return (
             f"Imagem {resolution} ({width}x{height} pixels), "
             f"modo {image.mode}, formato {image.format or 'desconhecido'}"
         )
-    
+
     async def describe_with_vision_api(
         self,
         image_data: bytes,
@@ -100,17 +100,17 @@ class VisionCapabilities:
         """
         # Codifica imagem em base64
         image_b64 = base64.b64encode(image_data).decode("utf-8")
-        
+
         # Aqui você pode integrar com:
         # - OpenAI GPT-4 Vision
         # - Anthropic Claude Vision
         # - Google Gemini Vision
         # - Modelo local (LLaVA, etc)
-        
+
         # Por enquanto, retorna análise local
         analysis = self.analyze_image(image_data)
         return f"Análise local: {analysis.description}"
-    
+
     def extract_text_from_image(self, image_data: bytes) -> str:
         """
         Extrai texto de imagem (OCR).
@@ -121,10 +121,10 @@ class VisionCapabilities:
         # - Google Cloud Vision API
         # - AWS Textract
         # - Azure Computer Vision
-        
+
         try:
             image = Image.open(io.BytesIO(image_data))
-            
+
             # Verifica se tem pytesseract
             try:
                 import pytesseract
@@ -134,7 +134,7 @@ class VisionCapabilities:
                 return "OCR não disponível (pytesseract não instalado)"
         except Exception as e:
             return f"Erro ao extrair texto: {str(e)}"
-    
+
     def save_uploaded_file(self, file_data: bytes, filename: str) -> str:
         """
         Salva arquivo de upload temporariamente.
@@ -148,10 +148,10 @@ class VisionCapabilities:
         """
         temp_dir = tempfile.gettempdir()
         save_path = os.path.join(temp_dir, f"vps_agent_{filename}")
-        
+
         with open(save_path, "wb") as f:
             f.write(file_data)
-        
+
         return save_path
 
 
@@ -159,15 +159,15 @@ class AudioCapabilities:
     """
     Capacidades de áudio para processar mensagens de voz e áudio.
     """
-    
+
     def __init__(self):
         self.supported_formats = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
-    
+
     def is_supported_audio(self, file_path: str) -> bool:
         """Verifica se o formato é suportado."""
         ext = Path(file_path).suffix.lower()
         return ext in self.supported_formats
-    
+
     async def transcribe_audio(
         self,
         audio_data: bytes,
@@ -188,14 +188,14 @@ class AudioCapabilities:
         # - Whisper local
         # - Google Cloud Speech-to-Text
         # - AssemblyAI
-        
+
         # Por enquanto, retorna mensagem informativa
         return (
             "Transcrição de áudio não disponível. "
             "Configure uma API de speech-to-text (Whisper, Google Cloud, etc) "
             "para habilitar esta funcionalidade."
         )
-    
+
     def get_audio_info(self, audio_data: bytes) -> Dict[str, Any]:
         """
         Retorna informações sobre o áudio.
@@ -220,15 +220,15 @@ class DocumentCapabilities:
     """
     Capacidades para processar documentos (PDF, DOCX, etc).
     """
-    
+
     def __init__(self):
         self.supported_formats = {".pdf", ".docx", ".doc", ".txt", ".md"}
-    
+
     def is_supported_document(self, file_path: str) -> bool:
         """Verifica se o formato é suportado."""
         ext = Path(file_path).suffix.lower()
         return ext in self.supported_formats
-    
+
     def extract_text_from_pdf(self, pdf_data: bytes) -> str:
         """
         Extrai texto de PDF.
@@ -242,21 +242,22 @@ class DocumentCapabilities:
         try:
             # Tenta usar PyPDF2
             try:
-                import PyPDF2
                 from io import BytesIO
-                
+
+                import PyPDF2
+
                 reader = PyPDF2.PdfReader(BytesIO(pdf_data))
                 text = ""
-                
+
                 for page in reader.pages:
                     text += page.extract_text() + "\n"
-                
+
                 return text.strip() if text.strip() else "Nenhum texto encontrado"
             except ImportError:
                 return "Extração de PDF não disponível (PyPDF2 não instalado)"
         except Exception as e:
             return f"Erro ao extrair texto do PDF: {str(e)}"
-    
+
     def extract_text_from_docx(self, docx_data: bytes) -> str:
         """
         Extrai texto de DOCX.
@@ -269,18 +270,19 @@ class DocumentCapabilities:
         """
         try:
             try:
-                import docx
                 from io import BytesIO
-                
+
+                import docx
+
                 doc = docx.Document(BytesIO(docx_data))
                 text = "\n".join([para.text for para in doc.paragraphs])
-                
+
                 return text.strip() if text.strip() else "Nenhum texto encontrado"
             except ImportError:
                 return "Extração de DOCX não disponível (python-docx não instalado)"
         except Exception as e:
             return f"Erro ao extrair texto do DOCX: {str(e)}"
-    
+
     def read_plain_text(self, text_data: bytes) -> str:
         """
         Lê texto plano.
@@ -320,15 +322,15 @@ async def handle_photo(update, bot) -> str:
     """
     photo = update.message.photo[-1]  # Maior resolução
     file = await bot.get_file(photo.file_id)
-    
+
     # Baixa a foto
     async with httpx.AsyncClient() as client:
         response = await client.get(file.file_path)
         image_data = response.content
-    
+
     # Analisa a imagem
     analysis = vision.analyze_image(image_data)
-    
+
     return (
         f"📷 **Foto Recebida**\n\n"
         f"{analysis.description}\n\n"
@@ -349,15 +351,15 @@ async def handle_voice(update, bot) -> str:
     """
     voice = update.message.voice
     file = await bot.get_file(voice.file_id)
-    
+
     # Baixa o áudio
     async with httpx.AsyncClient() as client:
         response = await client.get(file.file_path)
         audio_data = response.content
-    
+
     # Transcreve
     transcription = await audio.transcribe_audio(audio_data)
-    
+
     return (
         f"🎤 **Mensagem de Voz**\n\n"
         f"{transcription}"
@@ -377,15 +379,15 @@ async def handle_document(update, bot) -> str:
     """
     document_msg = update.message.document
     file = await bot.get_file(document_msg.file_id)
-    
+
     # Baixa o documento
     async with httpx.AsyncClient() as client:
         response = await client.get(file.file_path)
         file_data = response.content
-    
+
     filename = document_msg.file_name or "documento"
     ext = Path(filename).suffix.lower()
-    
+
     # Extrai texto baseado no tipo
     if ext == ".pdf":
         text = document.extract_text_from_pdf(file_data)
@@ -395,11 +397,11 @@ async def handle_document(update, bot) -> str:
         text = document.read_plain_text(file_data)
     else:
         text = "Formato de documento não suportado para extração de texto."
-    
+
     # Limita tamanho da resposta
     if len(text) > 1000:
         text = text[:1000] + "..."
-    
+
     return (
         f"📄 **Documento: {filename}**\n\n"
         f"{text}"
@@ -408,7 +410,7 @@ async def handle_document(update, bot) -> str:
 
 __all__ = [
     "VisionCapabilities",
-    "AudioCapabilities", 
+    "AudioCapabilities",
     "DocumentCapabilities",
     "vision",
     "audio",

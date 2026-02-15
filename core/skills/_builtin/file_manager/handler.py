@@ -9,8 +9,7 @@ Paths proibidos: /etc/shadow, /root/.ssh/, /etc/passwd
 import os
 from typing import Any, Dict
 
-from core.skills.base import SecurityLevel, SkillBase
-
+from core.skills.base import SkillBase
 
 # Paths permitidos para leitura
 ALLOWED_READ_PATHS = ["/opt/vps-agent/", "/tmp/", "/home/", "/var/log/", "/proc/"]
@@ -54,12 +53,12 @@ class FileManagerSkill(SkillBase):
 
     async def execute(self, args: Dict[str, Any] = None) -> str:
         args = args or {}
-        
+
         # Detectar operação a partir do texto
         raw_input = args.get("raw_input", "")
         operation = args.get("operation", "")
         path = args.get("path", "")
-        
+
         # Detectar operação automaticamente se não especificada
         if not operation:
             raw_lower = raw_input.lower()

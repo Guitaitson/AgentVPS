@@ -273,18 +273,18 @@ async def telegram_webhook(request: Request):
             user_id = result.get("user_id")
             text = result.get("text")
             chat_id = result.get("chat_id")
-            
+
             # Processar via agente
             agent_result = await process_message_async(
                 user_id=user_id,
                 message=text,
                 session_id=chat_id
             )
-            
+
             # Responder ao usuário
             response_text = agent_result.get("response", "Erro ao processar")
             adapter.send_message(chat_id, response_text)
-            
+
             return {"ok": True, "processed": True, "response": response_text}
 
         return result

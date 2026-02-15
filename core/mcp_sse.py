@@ -13,16 +13,14 @@ Conecte via: http://localhost:8000/mcp
 
 import asyncio
 import json
-from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from core.config import get_settings
-
 
 # ============================================
 # MCP Protocol Types
@@ -37,7 +35,7 @@ class MCPTool:
     handler: Callable = field(default=None)
 
 
-@dataclass  
+@dataclass
 class MCPResource:
     """Representa um resource MCP."""
     uri: str
@@ -67,16 +65,16 @@ class MCPServer:
     - resources/list, resources/read
     - prompts/list, prompts/get
     """
-    
+
     def __init__(self):
         self.tools: Dict[str, MCPTool] = {}
         self.resources: Dict[str, MCPResource] = {}
         self.prompts: Dict[str, MCPPrompt] = {}
         self._register_default_tools()
-    
+
     def _register_default_tools(self):
         """Registra tools padrão do VPS-Agent."""
-        
+
         # Tool: get_ram
         self.register_tool(
             MCPTool(
@@ -89,20 +87,20 @@ class MCPServer:
                 }
             )
         )
-        
+
         # Tool: list_containers
         self.register_tool(
             MCPTool(
                 name="list_containers",
                 description="List all Docker containers",
                 input_schema={
-                    "type": "object", 
+                    "type": "object",
                     "properties": {"all": {"type": "boolean", "default": False}},
                     "required": []
                 }
             )
         )
-        
+
         # Tool: get_system_status
         self.register_tool(
             MCPTool(
@@ -115,7 +113,7 @@ class MCPServer:
                 }
             )
         )
-        
+
         # Tool: check_postgres
         self.register_tool(
             MCPTool(
@@ -128,7 +126,7 @@ class MCPServer:
                 }
             )
         )
-        
+
         # Tool: check_redis
         self.register_tool(
             MCPTool(
@@ -141,7 +139,7 @@ class MCPServer:
                 }
             )
         )
-        
+
         # Tool: execute_command
         self.register_tool(
             MCPTool(
@@ -157,23 +155,23 @@ class MCPServer:
                 }
             )
         )
-    
+
     def register_tool(self, tool: MCPTool):
         """Registra uma tool."""
         self.tools[tool.name] = tool
-    
+
     def register_resource(self, resource: MCPResource):
         """Registra um resource."""
         self.resources[resource.uri] = resource
-    
+
     def register_prompt(self, prompt: MCPPrompt):
         """Registra um prompt."""
         self.prompts[prompt.name] = prompt
-    
+
     # ========================================
     # MCP Protocol Methods
     # ========================================
-    
+
     async def list_tools(self) -> Dict[str, Any]:
         """Lista todas as tools disponíveis."""
         return {
@@ -186,14 +184,14 @@ class MCPServer:
                 for tool in self.tools.values()
             ]
         }
-    
+
     async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Chama uma tool pelo nome."""
         if name not in self.tools:
             return {"error": f"Tool '{name}' not found"}
-        
+
         tool = self.tools[name]
-        
+
         try:
             # Executa a tool
             if name == "get_ram":
@@ -221,7 +219,7 @@ class MCPServer:
                 result = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
             else:
                 result = f"Tool '{name}' executed"
-            
+
             return {
                 "content": [
                     {
@@ -232,7 +230,7 @@ class MCPServer:
             }
         except Exception as e:
             return {"error": str(e)}
-    
+
     async def list_resources(self) -> Dict[str, Any]:
         """Lista todos os resources."""
         return {
@@ -246,14 +244,14 @@ class MCPServer:
                 for res in self.resources.values()
             ]
         }
-    
+
     async def read_resource(self, uri: str) -> Dict[str, Any]:
         """Lê um resource."""
         if uri not in self.resources:
             return {"error": f"Resource '{uri}' not found"}
-        
+
         resource = self.resources[uri]
-        
+
         # Por enquanto, retorna info básica
         return {
             "contents": [
@@ -264,7 +262,7 @@ class MCPServer:
                 }
             ]
         }
-    
+
     async def list_prompts(self) -> Dict[str, Any]:
         """Lista todos os prompts."""
         return {
@@ -357,7 +355,7 @@ async def mcp_stream(request: Request):
             "event": "connected",
             "data": json.dumps({"status": "connected", "server": "vps-agent-mcp"})
         }
-        
+
         # Mantém conexão viva com heartbeats
         try:
             while True:
@@ -371,7 +369,7 @@ async def mcp_stream(request: Request):
                 "event": "disconnected",
                 "data": json.dumps({"status": "disconnected"})
             }
-    
+
     return EventSourceResponse(event_generator())
 
 
@@ -386,38 +384,38 @@ async def mcp_websocket(websocket: WebSocket):
     Suporta streaming de tool results e notifications.
     """
     await websocket.accept()
-    
+
     try:
         while True:
             # Recebe mensagem
             data = await websocket.receive_text()
             message = json.loads(data)
-            
+
             method = message.get("method")
             params = message.get("params", {})
-            
+
             # Processa método
             if method == "tools/list":
                 result = await mcp_server.list_tools()
                 await websocket.send_json({"id": message.get("id"), "result": result})
-            
+
             elif method == "tools/call":
                 result = await mcp_server.call_tool(
                     params.get("name"),
                     params.get("arguments", {})
                 )
                 await websocket.send_json({"id": message.get("id"), "result": result})
-            
+
             elif method == "resources/list":
                 result = await mcp_server.list_resources()
                 await websocket.send_json({"id": message.get("id"), "result": result})
-            
+
             else:
                 await websocket.send_json({
                     "id": message.get("id"),
                     "error": {"code": -32601, "message": f"Method not found: {method}"}
                 })
-    
+
     except WebSocketDisconnect:
         pass
 
@@ -454,7 +452,7 @@ async def root():
 def main():
     """Inicia o servidor MCP com SSE."""
     import uvicorn
-    
+
     print("=" * 50)
     print("VPS-Agent MCP Server (SSE)")
     print("=" * 50)
@@ -465,7 +463,7 @@ def main():
     print("  WS   /mcp/ws            - WebSocket")
     print("  GET  /                   - Info")
     print("=" * 50)
-    
+
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
 

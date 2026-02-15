@@ -1,6 +1,7 @@
 """Testes para o Skill Registry."""
 
 import pytest
+
 from core.skills.base import SecurityLevel, SkillBase, SkillConfig
 from core.skills.registry import SkillRegistry, get_skill_registry
 
@@ -107,7 +108,7 @@ class TestSkillRegistry:
     def test_builtin_skills_exist(self):
         """Testa que os skills builtin esperados existem."""
         registry = get_skill_registry()
-        
+
         assert registry.get("get_ram") is not None
         assert registry.get("list_containers") is not None
         assert registry.get("get_system_status") is not None
@@ -117,7 +118,7 @@ class TestSkillRegistry:
     def test_find_ram_by_trigger(self):
         """Testa encontrar skill ram por trigger."""
         registry = get_skill_registry()
-        
+
         found = registry.find_by_trigger("quanta ram?")
         assert found is not None
         assert found.name == "get_ram"
@@ -125,7 +126,7 @@ class TestSkillRegistry:
     def test_find_containers_by_trigger(self):
         """Testa encontrar skill containers por trigger."""
         registry = get_skill_registry()
-        
+
         found = registry.find_by_trigger("listar containers")
         assert found is not None
         assert found.name == "list_containers"
@@ -133,7 +134,7 @@ class TestSkillRegistry:
     def test_find_status_by_trigger(self):
         """Testa encontrar skill status por trigger."""
         registry = get_skill_registry()
-        
+
         found = registry.find_by_trigger("como está o sistema?")
         assert found is not None
         assert found.name == "get_system_status"
@@ -148,7 +149,7 @@ class TestSkillConfig:
             name="test",
             description="Test skill"
         )
-        
+
         assert config.version == "1.0.0"
         assert config.security_level == SecurityLevel.SAFE
         assert config.triggers == []
@@ -170,6 +171,6 @@ class TestSkillBase:
             security_level=SecurityLevel.MODERATE,
         )
         skill = MockSkill(config)
-        
+
         assert skill.name == "test_skill"
         assert skill.security_level == SecurityLevel.MODERATE

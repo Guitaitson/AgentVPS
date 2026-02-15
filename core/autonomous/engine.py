@@ -6,9 +6,7 @@ Gerencia triggers e execução automática de tarefas.
 
 import asyncio
 import json
-import logging
 import os
-from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 import psycopg2
@@ -123,7 +121,7 @@ def get_autonomous_loop() -> AutonomousLoop:
         _autonomous_loop = AutonomousLoop()
 
         # Registrar triggers iniciais (S4-03)
-        
+
         # Trigger 1: Health Check
         async def health_check_action():
             import docker
@@ -182,8 +180,8 @@ def get_autonomous_loop() -> AutonomousLoop:
         # Trigger 3: Skill Stats
         async def skill_stats_action():
             try:
-                skills = ["get_ram", "list_containers", "get_system_status", 
-                          "check_postgres", "check_redis", "shell_exec", 
+                skills = ["get_ram", "list_containers", "get_system_status",
+                          "check_postgres", "check_redis", "shell_exec",
                           "file_manager", "memory_query", "web_search", "self_edit"]
                 stats = {}
                 for skill in skills:
@@ -232,16 +230,16 @@ def get_autonomous_loop() -> AutonomousLoop:
             try:
                 with open("/proc/meminfo", "r") as f:
                     meminfo = f.read()
-                
+
                 values = {}
                 for line in meminfo.split("\n"):
                     if ":" in line:
                         key, val = line.split(":", 1)
                         values[key.strip()] = int(val.strip().split()[0])
-                
+
                 total = values.get("MemTotal", 0) // 1024  # MB
                 available = values.get("MemAvailable", 0) // 1024  # MB
-                
+
                 if total > 0:
                     used_percent = ((total - available) / total) * 100
                     return used_percent > 80
@@ -291,11 +289,11 @@ def get_autonomous_loop() -> AutonomousLoop:
                 """)
                 errors = cur.fetchall()
                 conn.close()
-                
+
                 if errors:
                     error_triggers = [e[0] for e in errors]
                     logger.warning("trigger_error_repeated", errors=error_triggers)
-                    
+
                     _autonomous_loop._redis.setex(
                         "proposal:error_repeated",
                         3600,
@@ -336,11 +334,11 @@ def get_autonomous_loop() -> AutonomousLoop:
                 """)
                 tasks = cur.fetchall()
                 conn.close()
-                
+
                 if tasks:
                     task_list = [{"id": t[0], "name": t[1], "time": str(t[2])} for t in tasks]
                     logger.info("trigger_schedule_due", tasks=task_list)
-                    
+
                     _autonomous_loop._redis.setex(
                         "proposal:schedule_due",
                         3600,

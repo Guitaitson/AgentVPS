@@ -55,7 +55,7 @@ class UnifiedLLMProvider:
     - Structured output (JSON)
     - Fallback entre providers
     """
-    
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -68,13 +68,13 @@ class UnifiedLLMProvider:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.base_url = "https://openrouter.ai/api/v1"
-        
+
         logger.info(
             "llm_provider_initialized",
             model=model,
             has_api_key=bool(self.api_key),
         )
-    
+
     def _get_headers(self) -> dict:
         """Retorna headers para requisição."""
         return {
@@ -83,7 +83,7 @@ class UnifiedLLMProvider:
             "HTTP-Referer": "https://vps-agent.local",
             "X-Title": "VPS-Agent",
         }
-    
+
     def _build_messages(
         self,
         user_message: str,
@@ -92,20 +92,20 @@ class UnifiedLLMProvider:
     ) -> list[dict]:
         """Constrói lista de mensagens."""
         messages = []
-        
+
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        
+
         if history:
             for msg in history[-5:]:  # Últimas 5 mensagens
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
                 messages.append({"role": role, "content": content})
-        
+
         messages.append({"role": "user", "content": user_message})
-        
+
         return messages
-    
+
     async def generate(
         self,
         user_message: str,
@@ -134,23 +134,23 @@ class UnifiedLLMProvider:
                 success=False,
                 error="API key não configurada ou inválida",
             )
-        
+
         messages = self._build_messages(user_message, system_prompt, history)
-        
+
         payload = {
             "model": self.model,
             "messages": messages,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
-        
+
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-        
+
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
-        
+
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT) as client:
                 response = await client.post(
@@ -158,7 +158,7 @@ class UnifiedLLMProvider:
                     headers=self._get_headers(),
                     json=payload,
                 )
-                
+
                 if response.status_code != 200:
                     error_text = response.text[:200]
                     logger.error(
@@ -171,16 +171,16 @@ class UnifiedLLMProvider:
                         success=False,
                         error=f"API error {response.status_code}: {error_text}",
                     )
-                
+
                 data = response.json()
                 choice = data["choices"][0]
                 message = choice["message"]
-                
+
                 # Extrair tool calls se presentes
                 tool_calls = None
                 if "tool_calls" in message:
                     tool_calls = message["tool_calls"]
-                
+
                 return LLMResponse(
                     content=message.get("content", ""),
                     tool_calls=tool_calls,
@@ -188,7 +188,7 @@ class UnifiedLLMProvider:
                     model=data.get("model", self.model),
                     success=True,
                 )
-                
+
         except httpx.TimeoutException:
             logger.error("llm_timeout")
             return LLMResponse(
@@ -203,7 +203,7 @@ class UnifiedLLMProvider:
                 success=False,
                 error=f"Erro: {str(e)}",
             )
-    
+
     async def classify_intent(
         self,
         message: str,
@@ -224,7 +224,7 @@ class UnifiedLLMProvider:
         # ============================================================
         # Isso evita que o LLM classifique errado perguntas como "chat"
         msg_lower = message.lower()
-        
+
         # Padrões que DEVEM executar ação (não podem ser classificados como chat)
         force_action_patterns = [
             "tem o", "tem installed", "esta instalado", "está instalado",
@@ -232,11 +232,11 @@ class UnifiedLLMProvider:
             "tem docker", "tem postgres", "tem redis", "tem o claude",
             "execute ", "rode ", "pesquise ", "busque ",
         ]
-        
+
         use_regex_fallback = any(
             pattern in msg_lower for pattern in force_action_patterns
         )
-        
+
         if use_regex_fallback:
             logger.info(
                 "intent_forced_regex_fallback",
@@ -246,7 +246,7 @@ class UnifiedLLMProvider:
             from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
             result = infer_intent_from_message(message)
             return IntentClassification(**result)
-        
+
         system_prompt = """Você é um classificador de intenções para o VPS-Agent.
 Analise a mensagem do usuário e retorne APENAS um JSON válido.
 
@@ -288,14 +288,14 @@ Retorne EXATAMENTE este formato JSON:
     "entities": ["ram", "docker"],
     "reasoning": "breve explicação"
 }"""
-        
+
         response = await self.generate(
             user_message=message,
             system_prompt=system_prompt,
             history=history,
             json_mode=True,
         )
-        
+
         if not response.success or not response.content:
             logger.warning(
                 "intent_classification_failed",
@@ -306,7 +306,7 @@ Retorne EXATAMENTE este formato JSON:
             from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
             result = infer_intent_from_message(message)
             return IntentClassification(**result)
-        
+
         try:
             # Parse JSON
             content = response.content.strip()
@@ -315,9 +315,9 @@ Retorne EXATAMENTE este formato JSON:
             if content.endswith("```"):
                 content = content[:-3]
             content = content.strip()
-            
+
             data = json.loads(content)
-            
+
             return IntentClassification(
                 intent=data.get("intent", "chat"),
                 confidence=float(data.get("confidence", 0.7)),
@@ -326,7 +326,7 @@ Retorne EXATAMENTE este formato JSON:
                 entities=data.get("entities", []),
                 reasoning=data.get("reasoning", ""),
             )
-            
+
         except json.JSONDecodeError as e:
             logger.error(
                 "intent_json_parse_error",
@@ -337,7 +337,7 @@ Retorne EXATAMENTE este formato JSON:
             from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
             result = infer_intent_from_message(message)
             return IntentClassification(**result)
-    
+
     async def generate_with_identity(
         self,
         user_message: str,
@@ -356,25 +356,25 @@ Retorne EXATAMENTE este formato JSON:
             Resposta em string
         """
         from .agent_identity import get_vps_agent_identity
-        
+
         system_prompt = get_vps_agent_identity()
-        
+
         # Adicionar contexto do usuário
         if user_context:
             context_str = "\n\n## Contexto do Usuário\n"
             for key, value in user_context.items():
                 context_str += f"- {key}: {value}\n"
             system_prompt += context_str
-        
+
         response = await self.generate(
             user_message=user_message,
             system_prompt=system_prompt,
             history=conversation_history,
         )
-        
+
         if response.success:
             return response.content
-        
+
         # Fallback
         return (
             "Sou o VPS-Agent! 😊\n\n"

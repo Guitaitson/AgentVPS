@@ -22,7 +22,7 @@ class AgentState(TypedDict):
     # ============ Input ============
     user_id: str
     user_message: str
-    
+
     # Mensagens (acumulam automaticamente)
     messages: Annotated[list, add_messages]
 

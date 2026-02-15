@@ -8,17 +8,9 @@ Sistema de auto-melhoria que permite ao agente:
 4. Aprender com resultados
 """
 
-import asyncio
-import json
-import os
-import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-from core.config import get_settings
-
 
 # ============================================
 # Data Models
@@ -72,25 +64,25 @@ class SelfImprovementEngine:
     5. Testa a implementação
     6. Faz deploy ou rollback
     """
-    
+
     def __init__(self, config: Optional[SelfImprovementConfig] = None):
         self.config = config or SelfImprovementConfig()
         self.pending_gaps: List[CapabilityGap] = []
         self.completed_improvements: List[Improvement] = []
         self._load_history()
-    
+
     def _load_history(self):
         """Carrega histórico de melhorias do banco."""
         # Por enquanto, mantém em memória
         # Futuro: carregar de PostgreSQL
         pass
-    
+
     def _save_history(self):
         """Salva histórico de melhorias."""
         # Por enquanto, mantém em memória
         # Futuro: salvar em PostgreSQL
         pass
-    
+
     async def analyze_request(self, user_message: str) -> Optional[CapabilityGap]:
         """
         Analisa uma mensagem do usuário para detectar capability gaps.
@@ -113,9 +105,9 @@ class SelfImprovementEngine:
             "backup": "backup automático",
             "monitor": "monitoramento específico",
         }
-        
+
         message_lower = user_message.lower()
-        
+
         for pattern, capability_name in patterns.items():
             if pattern in message_lower:
                 gap = CapabilityGap(
@@ -126,9 +118,9 @@ class SelfImprovementEngine:
                 )
                 self.pending_gaps.append(gap)
                 return gap
-        
+
         return None
-    
+
     async def generate_implementation_plan(self, gap: CapabilityGap) -> str:
         """
         Gera um plano de implementação para o capability gap.
@@ -177,10 +169,10 @@ class SelfImprovementEngine:
 1-2 horas
 """
         return plan
-    
+
     async def implement_capability(
-        self, 
-        gap: CapabilityGap, 
+        self,
+        gap: CapabilityGap,
         implementation_code: str
     ) -> Improvement:
         """
@@ -194,10 +186,10 @@ class SelfImprovementEngine:
             Improvement com resultado
         """
         improvement_id = f"imp_{gap.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
+
         # Atualiza status
         gap.status = "implementing"
-        
+
         try:
             # Em modo sandbox, não modifica arquivos reais
             if self.config.sandbox_mode:
@@ -208,7 +200,7 @@ class SelfImprovementEngine:
                 # Por segurança, não permite execução direta de códigoarbitrário
                 test_result = "Execução em produção não habilitada"
                 status = "failed"
-            
+
             improvement = Improvement(
                 id=improvement_id,
                 capability=gap.name,
@@ -218,12 +210,12 @@ class SelfImprovementEngine:
                 timestamp=datetime.now().isoformat(),
                 status=status
             )
-            
+
             self.completed_improvements.append(improvement)
             gap.status = "deployed" if status == "success" else "failed"
-            
+
             return improvement
-            
+
         except Exception as e:
             gap.status = "failed"
             return Improvement(
@@ -235,7 +227,7 @@ class SelfImprovementEngine:
                 timestamp=datetime.now().isoformat(),
                 status="failed"
             )
-    
+
     async def rollback_improvement(self, improvement_id: str) -> bool:
         """
         Faz rollback de uma melhoria.
@@ -251,7 +243,7 @@ class SelfImprovementEngine:
                 imp.status = "rolled_back"
                 return True
         return False
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Retorna status do motor de auto-melhoria."""
         return {
@@ -279,10 +271,10 @@ class SelfImprovementNode:
     Node do LangGraph para self-improvement.
     Usado no grafo de processamento de mensagens.
     """
-    
+
     def __init__(self):
         self.engine = SelfImprovementEngine()
-    
+
     async def process(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processa o state para verificar necessidade de self-improvement.
@@ -294,14 +286,14 @@ class SelfImprovementNode:
             State atualizado
         """
         user_message = state.get("user_message", "")
-        
+
         # Detecta capability gap
         gap = await self.engine.analyze_request(user_message)
-        
+
         if gap:
             # Gera plano
             plan = await self.engine.generate_implementation_plan(gap)
-            
+
             state["needs_self_improvement"] = True
             state["capability_gap"] = {
                 "name": gap.name,
@@ -310,7 +302,7 @@ class SelfImprovementNode:
             }
         else:
             state["needs_self_improvement"] = False
-        
+
         return state
 
 
@@ -321,10 +313,10 @@ class SelfImprovementNode:
 def status_command():
     """Mostra status do self-improvement engine."""
     from core.self_improver import SelfImprovementEngine
-    
+
     engine = SelfImprovementEngine()
     status = engine.get_status()
-    
+
     print("=" * 50)
     print("Self-Improvement Engine Status")
     print("=" * 50)
@@ -354,14 +346,14 @@ def disable_command():
 
 if __name__ == "__main__":
     import sys
-    
+
     if len(sys.argv) < 2:
         print("Usage: python -m core.self_improver <command>")
         print("Commands: status, enable, disable")
         sys.exit(1)
-    
+
     command = sys.argv[1]
-    
+
     if command == "status":
         status_command()
     elif command == "enable":
@@ -375,7 +367,7 @@ if __name__ == "__main__":
 
 __all__ = [
     "CapabilityGap",
-    "Improvement", 
+    "Improvement",
     "SelfImprovementConfig",
     "SelfImprovementEngine",
     "SelfImprovementNode",

@@ -3,14 +3,13 @@ Nodes do agente LangGraph.
 Cada função é um nó no grafo de decisões.
 """
 
-import asyncio
 from datetime import datetime
 
 import structlog
 
+from ..skills.registry import get_skill_registry
 from .memory import AgentMemory
 from .state import AgentState
-from ..skills.registry import get_skill_registry
 
 logger = structlog.get_logger()
 memory = AgentMemory()
@@ -113,9 +112,9 @@ def node_plan(state: AgentState) -> AgentState:
         else:
             # Fallback: usar primeira palavra
             command = msg_lower.split()[0]
-        
+
         logger.info("node_plan_command", command=command)
-        
+
         return {
             **state,
             "plan": [{"type": "command", "action": command, "raw_message": user_message}],
@@ -138,10 +137,10 @@ def node_plan(state: AgentState) -> AgentState:
                     "current_step": 0,
                     "tools_needed": [skill.name],
                 }
-        
+
         # PRIORIDADE 2: Tentar encontrar skill pelo trigger na mensagem
         skill = registry.find_by_trigger(user_message)
-        
+
         if skill:
             logger.info("node_plan_task_found_skill", skill=skill.name, message=user_message[:50])
             return {
@@ -150,7 +149,7 @@ def node_plan(state: AgentState) -> AgentState:
                 "current_step": 0,
                 "tools_needed": [skill.name],
             }
-        
+
         # Fallback: usar a mensagem como ação
         logger.info("node_plan_task_fallback", message=user_message[:50])
         return {
@@ -171,7 +170,7 @@ def node_plan(state: AgentState) -> AgentState:
             if not skill:
                 # Tentar por trigger
                 skill = registry.find_by_trigger(tool_suggestion)
-            
+
             if skill:
                 logger.info("node_plan_question_skill", skill=skill.name)
                 return {
@@ -180,7 +179,7 @@ def node_plan(state: AgentState) -> AgentState:
                     "current_step": 0,
                     "tools_needed": [skill.name],
                 }
-            
+
             # Se não encontrou skill, mapear tool_suggestion antigo para comando
             command_map = {
                 "get_ram": "ram",
@@ -196,7 +195,7 @@ def node_plan(state: AgentState) -> AgentState:
                     "current_step": 0,
                     "tools_needed": [],
                 }
-        
+
         # Tentar encontrar skill por trigger na mensagem
         skill = registry.find_by_trigger(user_message)
         if skill:
@@ -207,7 +206,7 @@ def node_plan(state: AgentState) -> AgentState:
                 "current_step": 0,
                 "tools_needed": [skill.name],
             }
-        
+
         # Fallback: info do sistema
         return {
             **state,
@@ -231,9 +230,8 @@ def node_security_check(state: AgentState) -> AgentState:
     Verifica segurança antes de executar comandos.
     Consulta allowlist para bloquear comandos perigosos.
     """
+
     from ..security.allowlist import ResourceType, create_default_allowlist
-    import json
-    from datetime import datetime
 
     plan = state.get("plan", [])
     step = state.get("current_step", 0)
@@ -257,7 +255,7 @@ def node_security_check(state: AgentState) -> AgentState:
     current_action = plan[step]
     action_type = current_action.get("type")
     action = current_action.get("action", "")
-    
+
     debug_info["action_type"] = action_type
     debug_info["action"] = action
 
@@ -289,7 +287,7 @@ def node_security_check(state: AgentState) -> AgentState:
                 "blocked_by_security": True,
                 "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}\n\nPara executar este comando, adicione-o à allowlist ou use modo de aprovação.",
             }
-        
+
         debug_info["result"] = "allowed"
 
     # Tools do tipo "tool" são permitidas (são nossas tools controladas)
@@ -329,7 +327,7 @@ async def node_execute(state: AgentState) -> AgentState:
             action_type = current_action.get("type")
             action = current_action.get("action", "")
             raw_message = current_action.get("raw_message", user_message)
-            
+
             logger.info(
                 "node_execute_from_plan",
                 action_type=action_type,
@@ -369,19 +367,22 @@ async def node_execute(state: AgentState) -> AgentState:
             return {**state, "execution_result": result}
 
         # 4. Skill não encontrado — resposta inteligente
-        from .smart_responses import generate_smart_unavailable_response, detect_missing_skill_keywords
+        from .smart_responses import (
+            detect_missing_skill_keywords,
+            generate_smart_unavailable_response,
+        )
         detected = detect_missing_skill_keywords(user_message.lower())
-        
+
         # Listar skills disponíveis para o usuário
         available_skills = registry.list_skills()
         skills_list = ", ".join([s["name"] for s in available_skills])
-        
+
         response = generate_smart_unavailable_response(user_message, detected_skills=detected)
-        
+
         # Adicionar informação sobre skills disponíveis
         if available_skills:
             response += f"\n\n📋 Skills disponíveis: {skills_list}"
-        
+
         logger.warning("node_execute_no_skill_found", message=user_message[:50], available=len(available_skills))
         return {**state, "execution_result": response}
 
@@ -496,7 +497,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
                 "• Integrar ferramentas\n\n"
                 f"{get_capabilities_summary()}"
             )
-    
+
     else:
         response = "Comando executado com sucesso! ✅"
         logger.info("node_generate_response_default")

@@ -35,7 +35,7 @@ def get_checkpointer():
     """
     # TODO: Implementar PostgreSQL checkpointing com AsyncPostgresSaver
     # quando houver tempo para configurar corretamente
-    
+
     logger.info("checkpointer_memory_ativo")
     return MemorySaver()
 
@@ -69,14 +69,14 @@ def build_agent_graph():
         intent = state.get("intent", "unknown")
         action_required = state.get("action_required", False)
         tool_suggestion = state.get("tool_suggestion", "")
-        
+
         logger.info(
             "route_after_plan",
             intent=intent,
             action_required=action_required,
             tool_suggestion=tool_suggestion,
         )
-        
+
         # Perguntas que requerem ação vão para security_check → execute
         if intent in ["command", "task"]:
             return "security_check"
@@ -104,7 +104,7 @@ def build_agent_graph():
         """Roteia após verificação de segurança."""
         blocked = state.get("blocked_by_security", False)
         logger.info("route_after_security", blocked=blocked)
-        
+
         if blocked:
             return "respond"
         return "execute"
@@ -126,7 +126,7 @@ def build_agent_graph():
         """Roteia após verificação de capacidades."""
         needs_improvement = state.get("needs_improvement", False)
         logger.info("route_after_capabilities", needs_improvement=needs_improvement)
-        
+
         return "self_improve" if needs_improvement else "respond"
 
     workflow.add_conditional_edges(
@@ -146,9 +146,9 @@ def build_agent_graph():
     # Compilar com checkpointer para persistência de estado
     checkpointer = get_checkpointer()
     compiled_graph = workflow.compile(checkpointer=checkpointer)
-    
+
     logger.info("grafo_compilado_com_checkpointer")
-    
+
     return compiled_graph
 
 

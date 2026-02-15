@@ -18,7 +18,6 @@ except ImportError:
     PostgresSaver = None
     Connection = None
 
-from .state import AgentState
 
 
 def get_connection_string() -> str:
@@ -28,7 +27,7 @@ def get_connection_string() -> str:
     dbname = os.getenv("POSTGRES_DB", "vps_agent")
     user = os.getenv("POSTGRES_USER", "vps_agent")
     password = os.getenv("POSTGRES_PASSWORD", "")
-    
+
     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
 
 
@@ -43,25 +42,25 @@ async def get_checkpointer() -> AsyncIterator[Optional[PostgresSaver]]:
     if not CHECKPOINT_AVAILABLE:
         yield None
         return
-    
+
     conn_string = get_connection_string()
-    
+
     try:
         # Criar conexão
         import psycopg
-        
+
         conn = await psycopg.AsyncConnection.connect(conn_string)
-        
+
         # Criar checkpointer
         checkpointer = PostgresSaver(conn)
-        
+
         # Setup das tabelas
         await checkpointer.setup()
-        
+
         yield checkpointer
-        
+
         await conn.close()
-        
+
     except Exception as e:
         print(f"Erro ao criar checkpointer: {e}")
         yield None
@@ -76,18 +75,18 @@ def create_sync_checkpointer() -> Optional[PostgresSaver]:
     """
     if not CHECKPOINT_AVAILABLE:
         return None
-    
+
     try:
         import psycopg
-        
+
         conn_string = get_connection_string()
         conn = psycopg.connect(conn_string)
-        
+
         checkpointer = PostgresSaver(conn)
         checkpointer.setup()
-        
+
         return checkpointer
-        
+
     except Exception as e:
         print(f"Erro ao criar checkpointer síncrono: {e}")
         return None
@@ -100,17 +99,17 @@ _checkpointer_instance: Optional[PostgresSaver] = None
 def get_checkpointer_instance() -> Optional[PostgresSaver]:
     """Retorna instância singleton do checkpointer."""
     global _checkpointer_instance
-    
+
     if _checkpointer_instance is None:
         _checkpointer_instance = create_sync_checkpointer()
-    
+
     return _checkpointer_instance
 
 
 def close_checkpointer():
     """Fecha conexão do checkpointer."""
     global _checkpointer_instance
-    
+
     if _checkpointer_instance is not None:
         try:
             _checkpointer_instance.conn.close()

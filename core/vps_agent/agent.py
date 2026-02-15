@@ -50,7 +50,7 @@ async def process_message_async(user_id: str, message: str) -> str:
             input_data=message[:100],
             metadata={"user_id": user_id},
         )
-    
+
     logger.info("processando_mensagem", user_id=user_id, message=message[:100])
 
     # Criar estado inicial
@@ -75,18 +75,18 @@ async def process_message_async(user_id: str, message: str) -> str:
         }
 
         logger.info("iniciando_ainvoke", thread_id=config["configurable"]["thread_id"])
-        
+
         if debug_logger:
             debug_logger.log(step="invoke_graph", input_data="LangGraph invoke")
-        
+
         result = await graph.ainvoke(initial_state, config=config)
-        
+
         if debug_logger:
             debug_logger.log(
                 step="graph_result",
                 output_data=f"keys: {list(result.keys())}",
             )
-        
+
         logger.info("resultado_grafo", result_keys=list(result.keys()))
 
         # Extrair resposta
@@ -105,11 +105,11 @@ async def process_message_async(user_id: str, message: str) -> str:
 
         logger.error("erro_processamento", error=str(e), user_id=user_id)
         logger.error("traceback", traceback=traceback.format_exc())
-        
+
         if debug_logger:
             debug_logger.log(step="error", error=str(e)[:200])
             debug_logger.finalize(success=False)
-        
+
         return f"❌ Erro ao processar mensagem: {str(e)}"
 
 

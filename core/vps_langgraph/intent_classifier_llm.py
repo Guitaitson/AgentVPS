@@ -18,7 +18,7 @@ logger = structlog.get_logger()
 
 class IntentClassification(BaseModel):
     """Schema para classificação de intent via LLM."""
-    
+
     intent: str = Field(
         ...,
         enum=["command", "task", "question", "chat", "self_improve"],
@@ -77,10 +77,10 @@ async def classify_intent_llm(
     # ============ GUARD CLAUSE: Mensagens curtas = CHAT ============
     # Isso corrige o bug de "oi" retornando containers
     msg_lower = message.lower().strip()
-    
+
     # Se é uma saudação curta (≤15 chars), FORÇAR chat
     if len(message) <= 15 and any(
-        msg_lower == sauda or sauda in msg_lower 
+        msg_lower == sauda or sauda in msg_lower
         for sauda in _FORCE_CHAT_MESSAGES
     ):
         logger.info(
@@ -96,13 +96,13 @@ async def classify_intent_llm(
             "tool_suggestion": "",
             "reasoning": "Saudação curta detectada - forçar chat"
         }
-    
+
     try:
         # Tentar usar o novo LLM Provider unificado
         from ..llm.unified_provider import classify_intent_with_llm
-        
+
         result = await classify_intent_with_llm(message, conversation_history)
-        
+
         # Verificar se o LLM retornou resultado válido
         if result.get("intent") and result.get("confidence", 0) > 0.5:
             logger.info(
@@ -112,17 +112,17 @@ async def classify_intent_llm(
                 tool_suggestion=result.get("tool_suggestion", ""),
             )
             return result
-        
+
         # Se confidence baixo, usar fallback
         logger.warning(
             "llm_low_confidence",
             confidence=result.get("confidence", 0),
             fallback="regex",
         )
-        
+
     except Exception as e:
         logger.error("llm_classification_error", error=str(e), fallback="regex")
-    
+
     # Fallback para regex local
     return infer_intent_from_message(message)
 
@@ -130,7 +130,7 @@ async def classify_intent_llm(
 def infer_intent_from_message(message: str) -> dict[str, Any]:
     """Inferência baseada em regex para classificar intenções."""
     msg_lower = message.lower().strip()
-    
+
     # ========================================
     # PRIORIDADE 1: Comandos diretos (/comando)
     # ========================================
@@ -144,7 +144,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             "tool_suggestion": cmd,
             "reasoning": "Comando direto detectado"
         }
-    
+
     # ========================================
     # PRIORIDADE 2: Ações que requerem execução (TASK)
     # ========================================
@@ -159,7 +159,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         "verifique ", "check ", "verifica ",
         "inicie ", "pare ", "pare ", "reinicie ", "restart ", "start ", "stop ",
     ]
-    
+
     for pattern in task_starters:
         if msg_lower.startswith(pattern):
             # Detectar tipo de task pelo padrão
@@ -208,7 +208,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                     "tool_suggestion": "",
                     "reasoning": f"Task detectada: {pattern.strip()}"
                 }
-    
+
     # Detectar tarefas no meio da frase
     task_keywords = [
         ("pesquise", "web_search"), ("busque", "web_search"), ("pesquisar", "web_search"),
@@ -217,7 +217,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         ("leia", "file_manager"), ("ler", "file_manager"), ("arquivo", "file_manager"),
         ("crie", "shell_exec"), ("criar", "shell_exec"),
     ]
-    
+
     for keyword, tool in task_keywords:
         if keyword in msg_lower:
             return {
@@ -228,7 +228,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "tool_suggestion": tool,
                 "reasoning": f"Keyword de task detectado: {keyword}"
             }
-    
+
     # ========================================
     # PRIORIDADE 3: Perguntas sobre sistema (QUESTION) - COM ACTION REQUIRED
     # ========================================
@@ -250,12 +250,12 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         "esta instalado", "está instalado", "está instalados",
         "como ver", "como verificar", "como saber",
     ]
-    
+
     for pattern in question_with_action:
         if pattern in msg_lower:
             entities = []
             tool = "shell_exec"  # MUDANÇA: shell_exec é o padrão para perguntas sobre instalação
-            
+
             if any(w in msg_lower for w in ["ram", "memória", "memoria", "memory"]):
                 entities.append("ram")
                 tool = "get_ram"
@@ -271,7 +271,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             elif any(w in msg_lower for w in ["redis"]):
                 entities.append("redis")
                 tool = "check_redis"
-            
+
             return {
                 "intent": "question",
                 "confidence": 0.9,
@@ -280,7 +280,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "tool_suggestion": tool,
                 "reasoning": f"Pergunta sobre sistema detectada: {pattern}"
             }
-    
+
     # ========================================
     # PRIORIDADE 4: Comandos específicos do Telegram
     # ========================================
@@ -299,7 +299,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         "healthcheck": "get_system_status",
         "health": "get_system_status",
     }
-    
+
     for cmd_pattern, tool in telegram_commands.items():
         if cmd_pattern in msg_lower:
             return {
@@ -310,7 +310,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "tool_suggestion": tool,
                 "reasoning": f"Comando Telegram detectado: {cmd_pattern}"
             }
-    
+
     # ========================================
     # PRIORIDADE 5: Self-Improve
     # ========================================
@@ -318,7 +318,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         "crie um agente", "novo agente", "adicionar funcionalidade",
         "integre com", "implemente", "desenvolva"
     ]
-    
+
     for pattern in improve_patterns:
         if pattern in msg_lower:
             return {
@@ -329,7 +329,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "tool_suggestion": "",
                 "reasoning": "Pedido de auto-melhoria detectado"
             }
-    
+
     # ========================================
     # DEFAULT: Chat (conversa natural)
     # ========================================
@@ -351,7 +351,7 @@ def classify_intent_with_llm(message: str, **kwargs) -> tuple:
     Retorna: (intent_str, confidence, details_dict)
     """
     import asyncio
-    
+
     try:
         result = asyncio.run(classify_intent_llm(message, **kwargs))
         return (

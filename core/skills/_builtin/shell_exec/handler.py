@@ -20,7 +20,6 @@ from typing import Any, Dict
 
 from core.skills.base import SecurityLevel, SkillBase
 
-
 # Padrões de classificação (ordem importa: FORBIDDEN primeiro)
 FORBIDDEN_PATTERNS = [
     r"rm\s+-rf\s+/\s*$",
@@ -107,7 +106,7 @@ class ShellExecSkill(SkillBase):
     async def execute(self, args: Dict[str, Any] = None) -> str:
         # Receber command estruturado (do function calling) ou raw_input (fallback)
         command = (args or {}).get("command", "")
-        
+
         # Fallback: se não recebeu command estruturado, tentar raw_input
         if not command:
             command = (args or {}).get("raw_input", "")
@@ -121,7 +120,7 @@ class ShellExecSkill(SkillBase):
             if command_clean.lower().startswith(prefix):
                 command_clean = command_clean[len(prefix):].strip()
                 break
-        
+
         if command_clean != command:
             command = command_clean
 
