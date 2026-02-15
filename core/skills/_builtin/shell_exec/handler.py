@@ -149,6 +149,74 @@ class ShellExecSkill(SkillBase):
             }
             emoji = level_emoji.get(level, "⚙️")
 
+            # ============================================================
+            # GERAR RESPOSTA CONVERSACIONAL
+            # ============================================================
+            
+            # Detectar tipo de pergunta para gerar resposta adequada
+            user_input_lower = raw_input.lower() if raw_input else ""
+            
+            # Respostas para perguntas sobre instalação
+            if "tem o" in user_input_lower or "tem " in user_input_lower or "esta instalado" in user_input_lower or "está instalado" in user_input_lower:
+                if output.strip():
+                    # Encontrou o programa
+                    return f"✅ Sim, está instalado em: `{output.strip()}`"
+                else:
+                    # Não encontrou
+                    # Tentar extrair nome do programa
+                    programa = None
+                    if "tem o " in user_input_lower:
+                        programa = user_input_lower.split("tem o ")[1].split()[0].rstrip("?")
+                    elif "tem " in user_input_lower:
+                        programa = user_input_lower.split("tem ")[1].split()[0].rstrip("?")
+                    return f"❌ Não, o programa não está instalado na VPS."
+            
+            # Respostas para perguntas sobre RAM
+            if any(p in user_input_lower for p in ["memoria", "memória", "ram", "quanta ram", "quanto ram"]):
+                if output.strip():
+                    lines = output.strip().split('\n')
+                    if len(lines) >= 2:
+                        # Parse free -h output
+                        parts = lines[1].split()
+                        if len(parts) >= 2:
+                            total = parts[1] if len(parts) > 1 else "?"
+                            used = parts[2] if len(parts) > 2 else "?"
+                            free = parts[3] if len(parts) > 3 else "?"
+                            return f"💾 Memória RAM:\n• Total: {total}\n• Usado: {used}\n• Livre: {free}"
+                    return f"💾 {output.strip()}"
+            
+            # Respostas para perguntas sobre containers
+            if any(p in user_input_lower for p in ["container", "docker", "quantos container", "quantos docker"]):
+                lines = output.strip().split('\n')
+                count = len(lines) - 1  # Remove header
+                if count > 0:
+                    return f"🐳 {count} container(s) encontrado(s):\n```\n{output.strip()}\n```"
+                return "🐳 Nenhum container rodando no momento."
+            
+            # Respostas para perguntas sobre disco
+            if any(p in user_input_lower for p in ["disco", "espaço", "hd", "quanto espaç"]):
+                if output.strip():
+                    return f"💽 Espaço em disco:\n```\n{output.strip()}\n```"
+            
+            # Respostas para perguntas sobre processos
+            if any(p in user_input_lower for p in ["processo", "processos", "rodando"]):
+                lines = output.strip().split('\n')
+                count = len(lines)
+                return f"📊 {count} processos encontrados:\n```\n{output.strip()}\n```"
+            
+            # Respostas para perguntas sobre hostname
+            if any(p in user_input_lower for p in ["hostname", "nome da maquina", "nome da máquina"]):
+                return f"🏷️ Hostname: `{output.strip()}`"
+            
+            # Respostas para perguntas sobre usuário
+            if any(p in user_input_lower for p in ["quem sou", "qual usuario", "qual usuário"]):
+                return f"👤 Você é: `{output.strip()}`"
+            
+            # Respostas para perguntas sobre uptime
+            if any(p in user_input_lower for p in ["uptime", "tempo ligado", "quanto tempo"]):
+                return f"⏱️ Uptime: {output.strip()}"
+            
+            # Resposta padrão para outros comandos
             result = f"{emoji} `$ {command}`\n"
             if output.strip():
                 result += f"```\n{output.strip()}\n```"
