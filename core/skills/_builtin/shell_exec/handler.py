@@ -99,7 +99,7 @@ class ShellExecSkill(SkillBase):
             return "❌ Nenhum comando fornecido. Exemplo: 'execute ls -la'"
 
         # Detectar se é uma pergunta e usar LLM para interpretar
-        command = await self._interpret_and_generate_command(command)
+        command = await self._interpret_and_generate_command(command, raw_input)
         
         # Limpar prefixos comuns
         for prefix in ["execute ", "executar ", "rodar ", "run ", "me mostra ", "mostre ", "liste "]:
@@ -158,18 +158,22 @@ class ShellExecSkill(SkillBase):
             
             # Respostas para perguntas sobre instalação
             if "tem o" in user_input_lower or "tem " in user_input_lower or "esta instalado" in user_input_lower or "está instalado" in user_input_lower:
-                if output.strip():
+                if output.strip() and process.returncode == 0:
                     # Encontrou o programa
                     return f"✅ Sim, está instalado em: `{output.strip()}`"
                 else:
-                    # Não encontrou
-                    # Tentar extrair nome do programa
-                    programa = None
-                    if "tem o " in user_input_lower:
-                        programa = user_input_lower.split("tem o ")[1].split()[0].rstrip("?")
-                    elif "tem " in user_input_lower:
-                        programa = user_input_lower.split("tem ")[1].split()[0].rstrip("?")
-                    return f"❌ Não, o programa não está instalado na VPS."
+                    # Não encontrou - tentar extrair nome
+                    programa = self._extract_program_name(user_input_lower)
+                    if programa:
+                        return f"❌ Não, **{programa}** não está instalado na VPS."
+                    return "❌ Não encontrei o programa na VPS."
+            
+            # Respostas para perguntas sobre versão
+            if any(p in user_input_lower for p in ["versão", "versao", "version"]):
+                if output.strip() and process.returncode == 0:
+                    return f"📋 Versão: `{output.strip()}`"
+                else:
+                    return "❌ Não foi possível obter a versão."
             
             # Respostas para perguntas sobre RAM
             if any(p in user_input_lower for p in ["memoria", "memória", "ram", "quanta ram", "quanto ram"]):
@@ -232,7 +236,35 @@ class ShellExecSkill(SkillBase):
         except Exception as e:
             return f"❌ Erro ao executar: {e}"
 
-    async def _interpret_and_generate_command(self, user_input: str) -> str:
+    def _extract_program_name(self, text: str) -> str:
+        """Extrai nome do programa da pergunta."""
+        text_lower = text.lower()
+        
+        # Padrões comuns
+        patterns = [
+            "tem o ",
+            "tem ",
+            "esta instalado",
+            "está instalado",
+            "versão do ",
+            "versao do ",
+            "version do ",
+            "version of ",
+        ]
+        
+        for pattern in patterns:
+            if pattern in text_lower:
+                parte = text_lower.split(pattern)[1]
+                # Pegar primeira palavra
+                programa = parte.split()[0] if parte.split() else ""
+                # Limpar pontuação
+                programa = programa.strip("?!.,")
+                if programa and len(programa) > 1:
+                    return programa
+        
+        return ""
+
+    async def _interpret_and_generate_command(self, user_input: str, raw_input: str = "") -> str:
         """
         Usa LLM para interpretar a pergunta do usuário e gerar o comando shell adequado.
         
@@ -248,12 +280,11 @@ class ShellExecSkill(SkillBase):
         # ============================================================
         
         # Se já parece um comando shell válido, não precisa interpretar
-        # (começa com palavras-chave comuns de shell)
         shell_keywords = ["ls", "cd", "cat", "grep", "find", "docker", "apt", "pip", "git", "curl", "wget", "which", "psql", "redis", "free", "df", "ps", "whoami", "hostname", "uptime"]
         if any(user_input_lower.startswith(kw) for kw in shell_keywords):
             return user_input
         
-        # Se tem "execute" ou prefixos claros, não precisa interpretar
+        # Se tem "execute" ou prefixos claros
         for prefix in ["execute ", "executar ", "rode ", "roda ", "run "]:
             if user_input_lower.startswith(prefix):
                 return user_input[len(prefix):].strip()
@@ -264,26 +295,18 @@ class ShellExecSkill(SkillBase):
         
         # Detectar perguntas sobre instalação
         if "tem o" in user_input_lower or "tem " in user_input_lower or "esta instalado" in user_input_lower or "está instalado" in user_input_lower:
-            # Extrair nome do programa
-            programa = None
-            
-            # Tentar extrair nome após "tem o" ou "tem "
-            if "tem o " in user_input_lower:
-                parte = user_input_lower.split("tem o ")[1]
-                programa = parte.split()[0].rstrip("?")
-            elif "tem " in user_input_lower:
-                parte = user_input_lower.split("tem ")[1]
-                programa = parte.split()[0].rstrip("?")
-            elif "esta instalado" in user_input_lower or "está instalado" in user_input_lower:
-                parte = user_input_lower.split("instalado")[0]
-                programa = parte.split()[-1]
-            
+            programa = self._extract_program_name(user_input_lower)
             if programa:
-                # Limpar programa (remover pontuação)
-                programa = programa.strip("?.!,")
-                if programa and len(programa) > 1:
-                    logger.info("shell_heuristic_installed", programa=programa)
-                    return f"which {programa}"
+                logger.info("shell_heuristic_installed", programa=programa)
+                return f"which {programa}"
+        
+        # Detectar perguntas sobre versão
+        if any(p in user_input_lower for p in ["versão", "versao", "version"]):
+            programa = self._extract_program_name(user_input_lower)
+            if programa:
+                logger.info("shell_heuristic_version", programa=programa)
+                # Tentar vários comandos de versão
+                return f"{programa} --version 2>/dev/null || {programa} -v 2>/dev/null || which {programa}"
         
         # Detectar perguntas sobre RAM
         if any(p in user_input_lower for p in ["memoria", "memória", "ram", "quanta ram", "quanto ram", "como está a memoria"]):
