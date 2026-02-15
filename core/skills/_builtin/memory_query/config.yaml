@@ -1,5 +1,5 @@
 name: memory_query
-description: "Consulta memória do agente - histórico, fatos, aprendizados"
+description: "Consulta a memória do agente: histórico de conversas, fatos aprendizados, preferências do usuário."
 version: "1.0.0"
 security_level: safe
 triggers:
@@ -17,6 +17,11 @@ parameters:
     type: string
     required: false
     description: "Termo ou pergunta sobre a memória"
+parameters_schema:
+  query:
+    type: string
+    description: "O que procurar na memória (ex: 'últimas conversas', 'fatos sobre o usuário')"
+    required: false
 max_output_chars: 2000
 timeout_seconds: 10
 enabled: true

@@ -1,5 +1,5 @@
 name: check_redis
-description: "Verifica conexão e status do Redis"
+description: "Verifica conexão e status do Redis. Use quando perguntarem sobre cache ou Redis."
 version: "1.0.0"
 security_level: safe
 triggers:
@@ -7,6 +7,7 @@ triggers:
   - cache
   - /health
 parameters: {}
+parameters_schema: {}
 max_output_chars: 500
 timeout_seconds: 10
 enabled: true

@@ -1,5 +1,5 @@
 name: self_edit
-description: "Permite que o agente edite seus próprios arquivos de código"
+description: "Edita arquivos de código do agente. Use para corrigir bugs, adicionar funcionalidades ou refatorar código."
 version: "1.0.0"
 security_level: moderate
 triggers:
@@ -26,6 +26,20 @@ parameters:
     required: false
     description: "Modo: overwrite, append"
     default: "overwrite"
+parameters_schema:
+  file_path:
+    type: string
+    description: "O caminho do arquivo (ex: 'core/vps_agent/agent.py')"
+    required: true
+  content:
+    type: string
+    description: "O novo conteúdo do arquivo"
+    required: true
+  mode:
+    type: string
+    description: "Modo de edição: 'overwrite' (substitui) ou 'append' (adiciona)"
+    required: false
+    enum: ["overwrite", "append"]
 max_output_chars: 1500
 timeout_seconds: 30
 enabled: true

@@ -1,5 +1,5 @@
 name: check_postgres
-description: "Verifica conexão e status do PostgreSQL"
+description: "Verifica conexão e status do PostgreSQL. Use quando perguntarem sobre banco de dados ou PostgreSQL."
 version: "1.0.0"
 security_level: safe
 triggers:
@@ -9,6 +9,7 @@ triggers:
   - database
   - banco de dados
 parameters: {}
+parameters_schema: {}
 max_output_chars: 500
 timeout_seconds: 10
 enabled: true
