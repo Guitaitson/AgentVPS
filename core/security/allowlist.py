@@ -303,3 +303,33 @@ def save_allowlist_to_file(allowlist: SecurityAllowlist, filepath: str) -> None:
 
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+# ============================================
+# FUNÇÕES DE COMPATIBILIDADE PARA TESTES
+# ============================================
+
+def is_allowed(action: str, resource: str = None) -> bool:
+    """
+    Função de compatibilidade para testes.
+    Verifica se uma ação é permitida.
+    """
+    allowlist = create_default_allowlist()
+    result = allowlist.check(ResourceType.COMMAND, action)
+    return result.allowed
+
+
+def classify_action(action: str, resource: str = None) -> str:
+    """
+    Função de compatibilidade para testes.
+    Classifica o nível de segurança de uma ação.
+    """
+    allowlist = create_default_allowlist()
+    result = allowlist.check(ResourceType.COMMAND, action)
+    
+    if result.permission == PermissionLevel.DENY:
+        return "dangerous"
+    elif result.permission == PermissionLevel.REQUIRE_APPROVAL:
+        return "moderate"
+    else:
+        return "safe"

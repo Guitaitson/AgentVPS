@@ -3,18 +3,57 @@ OpenTelemetry Observability - Sprint 3
 
 Módulo de observabilidade para traces, métricas e logs.
 Integração com LangGraph e Telegram Bot.
+
+Este módulo é OPCIONAL - funciona apenas se opentelemetry estiver instalado.
 """
 
 from contextlib import asynccontextmanager
 from functools import wraps
 from typing import Any, Callable, Optional
 
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-from opentelemetry.trace import Status, StatusCode
+# Imports opcionais - se não tiver, usa fallback
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+    from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+    from opentelemetry.trace import Status, StatusCode
+    _OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    _OPENTELEMETRY_AVAILABLE = False
+    # Stub para quando não tiver opentelemetry
+    class MockSpan:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def set_status(self, *args, **kwargs): pass
+        def record_exception(self, *args): pass
+        def set_attribute(self, *args, **kwargs): pass
+        def add_event(self, *args, **kwargs): pass
+    
+    class MockTracer:
+        def start_as_current_span(self, name): return MockSpan()
+        def start_span(self, name): return MockSpan()
+    
+    class MockTrace:
+        def get_tracer(self, *args): return MockTracer()
+    
+    trace = MockTrace()
+    # Tipos para compatibilidade - devem ser callable
+    class MockStatus:
+        def __init__(self, code=None, description=None):
+            pass
+        OK = 'ok'
+        ERROR = 'error'
+    
+    def make_status(code):
+        return MockStatus(code)
+    
+    Status = make_status
+    StatusCode = MockStatus()
+    # Mock Tracer type
+    class MockTracerClass:
+        pass
+    trace.Tracer = MockTracerClass
 
 
 # Configuração global
@@ -36,6 +75,11 @@ def init_observability(
         console_export: Exporter para console (debug)
     """
     global _tracer, _enabled
+    
+    # Se opentelemetry não disponível, apenas marca como enabled
+    if not _OPENTELEMETRY_AVAILABLE:
+        _enabled = True
+        return
     
     # Criar resource
     resource = Resource.create({

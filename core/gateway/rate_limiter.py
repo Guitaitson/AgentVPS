@@ -26,10 +26,16 @@ class RateLimiter:
     Tracks requests per client and enforces rate limits.
     """
 
-    def __init__(self, requests_per_minute: int = 60):
+    def __init__(self, requests_per_minute: int = 60, max_requests: int = None, window_seconds: int = None):
+        # Compatibilidade com API antiga de testes
+        if max_requests is not None:
+            requests_per_minute = max_requests
         self.config = RateLimitConfig(requests_per_minute=requests_per_minute)
         self.tokens: Dict[str, list] = defaultdict(list)
         self.burst_tokens: Dict[str, list] = defaultdict(list)
+        
+        # Alias para compatibilidade com testes
+        self.is_allowed = self.allow_request
 
     def _cleanup_old_tokens(self, tokens: dict, window: int) -> None:
         """Remove tokens older than the window."""
