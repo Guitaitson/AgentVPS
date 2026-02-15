@@ -81,7 +81,7 @@ def list_docker_containers() -> str:
             ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         if result.returncode != 0:
@@ -155,12 +155,7 @@ def get_system_status() -> str:
 
     # Check Disk
     try:
-        result = subprocess.run(
-            ["df", "-h", "/"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True, timeout=5)
         lines = result.stdout.strip().split("\n")
         disk_line = lines[1].split()
         usage = disk_line[4].replace("%", "")
@@ -180,7 +175,7 @@ def get_system_status() -> str:
             ["docker", "info", "--format", "{{.ServerVersion}}"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
         if result.returncode == 0:
             version = result.stdout.strip()
@@ -214,7 +209,7 @@ def check_postgres() -> str:
             dbname=os.getenv("POSTGRES_DB", "vps_agent"),
             user=os.getenv("POSTGRES_USER", "vps_agent"),
             password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-            connect_timeout=5
+            connect_timeout=5,
         )
 
         # Get version
@@ -223,20 +218,18 @@ def check_postgres() -> str:
         version = cursor.fetchone()[0].split()[1]
 
         # Get database size
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT pg_size_pretty(pg_database_size(%s));
-        """, (os.getenv("POSTGRES_DB", "vps_agent"),))
+        """,
+            (os.getenv("POSTGRES_DB", "vps_agent"),),
+        )
         size = cursor.fetchone()[0]
 
         cursor.close()
         conn.close()
 
-        return (
-            f"✅ **PostgreSQL**\n\n"
-            f"Status: Online\n"
-            f"Versão: {version}\n"
-            f"Tamanho: {size}"
-        )
+        return f"✅ **PostgreSQL**\n\nStatus: Online\nVersão: {version}\nTamanho: {size}"
 
     except psycopg2.OperationalError as e:
         return f"❌ **PostgreSQL**\n\nNão conecta: {str(e)}"
@@ -259,7 +252,7 @@ def check_redis() -> str:
             port=int(os.getenv("REDIS_PORT", 6379)),
             password=os.getenv("REDIS_PASSWORD") or None,
             socket_timeout=5,
-            socket_connect_timeout=5
+            socket_connect_timeout=5,
         )
 
         # Test connection
@@ -320,6 +313,7 @@ try:
         get_installed_packages_async,
         get_system_info_async,
     )
+
     _discovery_available = True
 except ImportError:
     _discovery_available = False

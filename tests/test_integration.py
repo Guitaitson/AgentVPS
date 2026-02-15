@@ -14,6 +14,7 @@ import pytest
 # Testes de Integração do Fluxo Principal
 # ============================================
 
+
 class TestIntegrationFlow:
     """Testes do fluxo completo de processamento de mensagem."""
 
@@ -31,7 +32,7 @@ class TestIntegrationFlow:
             "tools_needed": [],
             "execution_result": None,
             "response": None,
-            "timestamp": "2026-02-13T12:00:00Z"
+            "timestamp": "2026-02-13T12:00:00Z",
         }
 
     def test_intent_classification_command(self, mock_state):
@@ -77,7 +78,7 @@ class TestToolsIntegration:
             "list_containers",
             "get_system_status",
             "check_postgres",
-            "check_redis"
+            "check_redis",
         ]
 
         for tool in expected_tools:
@@ -118,11 +119,7 @@ class TestMemoryIntegration:
         memory = AgentMemory()
 
         # Save
-        await memory.save_fact(
-            user_id="test_user",
-            fact="Test fact",
-            category="test"
-        )
+        await memory.save_fact(user_id="test_user", fact="Test fact", category="test")
 
         # Retrieve
         facts = await memory.get_facts("test_user", limit=5)
@@ -222,6 +219,7 @@ class TestObservabilityIntegration:
 # Fixtures para testes de integração
 # ============================================
 
+
 @pytest.fixture
 def mock_telegram_update():
     """Mock de update do Telegram."""
@@ -241,13 +239,14 @@ def mock_langgraph_state():
         "messages": [],
         "intent": "command",
         "plan": [{"type": "command", "action": "status"}],
-        "response": None
+        "response": None,
     }
 
 
 # ============================================
 # Testes End-to-End
 # ============================================
+
 
 class TestEndToEnd:
     """Testes end-to-end completos."""

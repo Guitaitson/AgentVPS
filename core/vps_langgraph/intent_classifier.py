@@ -14,6 +14,7 @@
 # FUNÇÕES DE COMPATIBILIDADE PARA TESTES
 # ============================================
 
+
 def classify_intent(message: str) -> dict:
     """
     Função de compatibilidade para testes.

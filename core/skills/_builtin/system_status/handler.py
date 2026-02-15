@@ -42,12 +42,7 @@ class SystemStatusSkill(SkillBase):
 
         # Check Disk
         try:
-            result = subprocess.run(
-                ["df", "-h", "/"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+            result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True, timeout=5)
             lines = result.stdout.strip().split("\n")
             disk_line = lines[1].split()
             usage = disk_line[4].replace("%", "")
@@ -67,7 +62,7 @@ class SystemStatusSkill(SkillBase):
                 ["docker", "info", "--format", "{{.ServerVersion}}"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             if result.returncode == 0:
                 version = result.stdout.strip()

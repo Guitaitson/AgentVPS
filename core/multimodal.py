@@ -20,6 +20,7 @@ from PIL import Image
 @dataclass
 class ImageAnalysis:
     """Resultado da análise de imagem."""
+
     description: str
     format: str
     size: tuple[int, int]
@@ -58,9 +59,8 @@ class VisionCapabilities:
             format=image.format or "UNKNOWN",
             size=image.size,
             mode=image.mode,
-            has_transparency=image.mode in ("RGBA", "LA") or (
-                image.mode == "P" and "transparency" in image.info
-            )
+            has_transparency=image.mode in ("RGBA", "LA")
+            or (image.mode == "P" and "transparency" in image.info),
         )
 
     def _generate_description(self, image: Image.Image) -> str:
@@ -84,9 +84,7 @@ class VisionCapabilities:
         )
 
     async def describe_with_vision_api(
-        self,
-        image_data: bytes,
-        prompt: str = "Descreva esta imagem em detalhes"
+        self, image_data: bytes, prompt: str = "Descreva esta imagem em detalhes"
     ) -> str:
         """
         Usa API de visão (GPT-4V, Claude Vision, etc) para descrever imagem.
@@ -128,6 +126,7 @@ class VisionCapabilities:
             # Verifica se tem pytesseract
             try:
                 import pytesseract
+
                 text = pytesseract.image_to_string(image, lang="por+eng")
                 return text.strip() if text.strip() else "Nenhum texto encontrado"
             except ImportError:
@@ -168,11 +167,7 @@ class AudioCapabilities:
         ext = Path(file_path).suffix.lower()
         return ext in self.supported_formats
 
-    async def transcribe_audio(
-        self,
-        audio_data: bytes,
-        language: str = "pt-BR"
-    ) -> str:
+    async def transcribe_audio(self, audio_data: bytes, language: str = "pt-BR") -> str:
         """
         Transcreve áudio para texto.
 
@@ -212,7 +207,7 @@ class AudioCapabilities:
             "size_kb": round(len(audio_data) / 1024, 2),
             "supported": True,
             "message": "Informações básicas disponíveis. "
-                      "Para metadados detalhados, configure pydub ou librosa."
+            "Para metadados detalhados, configure pydub ou librosa.",
         }
 
 
@@ -309,6 +304,7 @@ document = DocumentCapabilities()
 # Integração com Telegram Bot
 # ============================================
 
+
 async def handle_photo(update, bot) -> str:
     """
     Processa foto enviada pelo usuário.
@@ -360,10 +356,7 @@ async def handle_voice(update, bot) -> str:
     # Transcreve
     transcription = await audio.transcribe_audio(audio_data)
 
-    return (
-        f"🎤 **Mensagem de Voz**\n\n"
-        f"{transcription}"
-    )
+    return f"🎤 **Mensagem de Voz**\n\n{transcription}"
 
 
 async def handle_document(update, bot) -> str:
@@ -402,10 +395,7 @@ async def handle_document(update, bot) -> str:
     if len(text) > 1000:
         text = text[:1000] + "..."
 
-    return (
-        f"📄 **Documento: {filename}**\n\n"
-        f"{text}"
-    )
+    return f"📄 **Documento: {filename}**\n\n{text}"
 
 
 __all__ = [

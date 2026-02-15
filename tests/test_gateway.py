@@ -368,9 +368,7 @@ class TestGatewayEndpoints:
     def test_message_endpoint_auth_required(self, client):
         """Test that message endpoint requires authentication without dev mode."""
         # Without dev mode and without API key, should get 401
-        response = client.post(
-            "/api/v1/messages", json={"user_id": "test_user", "message": "Test"}
-        )
+        response = client.post("/api/v1/messages", json={"user_id": "test_user", "message": "Test"})
 
         assert response.status_code == 401
 

@@ -6,18 +6,20 @@ Simula o fluxo completo do grafo para entender onde está falhando.
 import asyncio
 import sys
 
-sys.path.insert(0, '/opt/vps-agent')
+sys.path.insert(0, "/opt/vps-agent")
+
 
 async def debug_command(message: str):
     """Debuga o processamento de um comando."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"DEBUGANDO COMANDO: '{message}'")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # 1. Testar classificador de intent
     print("1. TESTANDO CLASSIFICADOR DE INTENT...")
     try:
         from core.vps_langgraph.intent_classifier_llm import classify_intent_llm
+
         result = await classify_intent_llm(message)
         print(f"   Intent: {result['intent']}")
         print(f"   Confidence: {result['confidence']}")
@@ -27,12 +29,14 @@ async def debug_command(message: str):
     except Exception as e:
         print(f"   ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
     # 2. Testar allowlist
     print("\n2. TESTANDO ALLOWLIST...")
     try:
         from core.security.allowlist import ResourceType, create_default_allowlist
+
         allowlist = create_default_allowlist()
 
         # Verificar se o comando está na allowlist
@@ -55,12 +59,14 @@ async def debug_command(message: str):
     except Exception as e:
         print(f"   ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
     # 3. Testar tools
     print("\n3. TESTANDO TOOLS...")
     try:
         from core.tools.system_tools import get_async_tool
+
         tools = ["list_containers", "get_system_status", "get_ram"]
         for tool_name in tools:
             tool = get_async_tool(tool_name)
@@ -69,20 +75,24 @@ async def debug_command(message: str):
     except Exception as e:
         print(f"   ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
     # 4. Testar processamento completo
     print("\n4. TESTANDO PROCESSAMENTO COMPLETO...")
     try:
         from core.vps_agent.agent import process_message_async
+
         result = await process_message_async("test_user", message)
         print(f"   Resultado: {result[:200]}...")
     except Exception as e:
         print(f"   ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
-    print(f"\n{'='*60}\n")
+    print(f"\n{'=' * 60}\n")
+
 
 async def main():
     """Executa debug para todos os comandos."""
@@ -95,6 +105,7 @@ async def main():
 
     for cmd in commands:
         await debug_command(cmd)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

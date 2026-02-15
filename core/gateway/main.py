@@ -276,9 +276,7 @@ async def telegram_webhook(request: Request):
 
             # Processar via agente
             agent_result = await process_message_async(
-                user_id=user_id,
-                message=text,
-                session_id=chat_id
+                user_id=user_id, message=text, session_id=chat_id
             )
 
             # Responder ao usuário

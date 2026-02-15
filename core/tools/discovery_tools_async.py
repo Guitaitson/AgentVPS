@@ -22,20 +22,15 @@ async def _run_command(cmd: list[str], timeout: int = 10) -> tuple[int, str, str
     """
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(),
-            timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         return (
             proc.returncode or 0,
-            stdout.decode('utf-8', errors='ignore'),
-            stderr.decode('utf-8', errors='ignore')
+            stdout.decode("utf-8", errors="ignore"),
+            stderr.decode("utf-8", errors="ignore"),
         )
     except asyncio.TimeoutError:
         try:
@@ -69,15 +64,27 @@ async def get_installed_packages_async() -> str:
 
     # Método 2: Verificar comandos comuns
     common_commands = [
-        "python3", "python", "node", "npm", "docker", "docker-compose",
-        "git", "ssh", "curl", "wget", "nginx", "apache2", "mysql", "psql",
-        "redis-cli", "java", "go"
+        "python3",
+        "python",
+        "node",
+        "npm",
+        "docker",
+        "docker-compose",
+        "git",
+        "ssh",
+        "curl",
+        "wget",
+        "nginx",
+        "apache2",
+        "mysql",
+        "psql",
+        "redis-cli",
+        "java",
+        "go",
     ]
 
     found = []
-    check_tasks = [
-        _run_command(["which", cmd], timeout=2) for cmd in common_commands
-    ]
+    check_tasks = [_run_command(["which", cmd], timeout=2) for cmd in common_commands]
     check_results = await asyncio.gather(*check_tasks, return_exceptions=True)
 
     for cmd, result in zip(common_commands, check_results):
@@ -183,9 +190,7 @@ async def get_system_info_async() -> str:
 
 
 async def execute_command_async(
-    command: str,
-    args: Optional[list[str]] = None,
-    timeout: int = 10
+    command: str, args: Optional[list[str]] = None, timeout: int = 10
 ) -> str:
     """
     Executa um comando de forma async.

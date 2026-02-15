@@ -109,9 +109,7 @@ class SkillRegistry:
         handler_class = None
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if (isinstance(attr, type)
-                and issubclass(attr, SkillBase)
-                and attr is not SkillBase):
+            if isinstance(attr, type) and issubclass(attr, SkillBase) and attr is not SkillBase:
                 handler_class = attr
                 break
 
@@ -212,18 +210,20 @@ class SkillRegistry:
                     if param_info.get("required", False):
                         required.append(param_name)
 
-            tools.append({
-                "type": "function",
-                "function": {
-                    "name": skill.name,
-                    "description": skill.config.description,
-                    "parameters": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": required,
-                    }
+            tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": skill.name,
+                        "description": skill.config.description,
+                        "parameters": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required,
+                        },
+                    },
                 }
-            })
+            )
 
         logger.info("tool_schemas_generated", count=len(tools))
         return tools

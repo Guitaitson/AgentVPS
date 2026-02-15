@@ -12,12 +12,12 @@ from typing import AsyncIterator, Optional
 try:
     from langgraph.checkpoint.postgres import PostgresSaver
     from psycopg import Connection
+
     CHECKPOINT_AVAILABLE = True
 except ImportError:
     CHECKPOINT_AVAILABLE = False
     PostgresSaver = None
     Connection = None
-
 
 
 def get_connection_string() -> str:

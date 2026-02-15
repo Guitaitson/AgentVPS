@@ -125,6 +125,7 @@ def get_autonomous_loop() -> AutonomousLoop:
         # Trigger 1: Health Check
         async def health_check_action():
             import docker
+
             try:
                 client = docker.from_env()
                 containers = client.containers.list()
@@ -180,9 +181,18 @@ def get_autonomous_loop() -> AutonomousLoop:
         # Trigger 3: Skill Stats
         async def skill_stats_action():
             try:
-                skills = ["get_ram", "list_containers", "get_system_status",
-                          "check_postgres", "check_redis", "shell_exec",
-                          "file_manager", "memory_query", "web_search", "self_edit"]
+                skills = [
+                    "get_ram",
+                    "list_containers",
+                    "get_system_status",
+                    "check_postgres",
+                    "check_redis",
+                    "shell_exec",
+                    "file_manager",
+                    "memory_query",
+                    "web_search",
+                    "self_edit",
+                ]
                 stats = {}
                 for skill in skills:
                     count = _autonomous_loop._redis.get(f"skill_usage:{skill}")
@@ -249,17 +259,24 @@ def get_autonomous_loop() -> AutonomousLoop:
 
         async def ram_high_action():
             """Dispara quando RAM > 80%."""
-            logger.warning("trigger_ram_high", message="RAM acima de 80%, propomos limpeza de containers inativos")
+            logger.warning(
+                "trigger_ram_high",
+                message="RAM acima de 80%, propomos limpeza de containers inativos",
+            )
             # Salvar proposta no Redis para notificação
             _autonomous_loop._redis.setex(
                 "proposal:ram_high",
                 3600,
-                json.dumps({
-                    "trigger": "ram_high",
-                    "action": "shell_exec",
-                    "args": {"command": "docker ps -a --filter 'status=exited' --format '{{.ID}}' | head -5"},
-                    "description": "Limpar containers Docker inativos"
-                })
+                json.dumps(
+                    {
+                        "trigger": "ram_high",
+                        "action": "shell_exec",
+                        "args": {
+                            "command": "docker ps -a --filter 'status=exited' --format '{{.ID}}' | head -5"
+                        },
+                        "description": "Limpar containers Docker inativos",
+                    }
+                ),
             )
             return {"status": "proposal_created", "type": "ram_high"}
 
@@ -297,12 +314,14 @@ def get_autonomous_loop() -> AutonomousLoop:
                     _autonomous_loop._redis.setex(
                         "proposal:error_repeated",
                         3600,
-                        json.dumps({
-                            "trigger": "error_repeated",
-                            "action": "investigate_errors",
-                            "args": {"error_triggers": error_triggers},
-                            "description": f"Investigar erros repetidos: {error_triggers}"
-                        })
+                        json.dumps(
+                            {
+                                "trigger": "error_repeated",
+                                "action": "investigate_errors",
+                                "args": {"error_triggers": error_triggers},
+                                "description": f"Investigar erros repetidos: {error_triggers}",
+                            }
+                        ),
                     )
                     return {"status": "proposal_created", "errors": error_triggers}
             except Exception as e:
@@ -342,12 +361,14 @@ def get_autonomous_loop() -> AutonomousLoop:
                     _autonomous_loop._redis.setex(
                         "proposal:schedule_due",
                         3600,
-                        json.dumps({
-                            "trigger": "schedule_due",
-                            "action": "execute_scheduled",
-                            "args": {"tasks": task_list},
-                            "description": f"Executar tarefas agendadas: {[t['name'] for t in task_list]}"
-                        })
+                        json.dumps(
+                            {
+                                "trigger": "schedule_due",
+                                "action": "execute_scheduled",
+                                "args": {"tasks": task_list},
+                                "description": f"Executar tarefas agendadas: {[t['name'] for t in task_list]}",
+                            }
+                        ),
                     )
                     return {"status": "proposal_created", "tasks": task_list}
             except Exception as e:

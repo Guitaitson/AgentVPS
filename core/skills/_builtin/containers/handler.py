@@ -15,7 +15,7 @@ class ContainersSkill(SkillBase):
                 ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
 
             if result.returncode != 0:

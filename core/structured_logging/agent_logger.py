@@ -109,13 +109,14 @@ class AgentLogger:
                 "success": success,
                 "duration_ms": duration_ms,
                 "events_count": len(self.events),
-            }
+            },
         )
 
 
 # ============================================
 # Context manager para logging automático
 # ============================================
+
 
 class LogAgentFlow:
     """Context manager para logging automático do fluxo do agente."""
@@ -140,6 +141,7 @@ class LogAgentFlow:
 # ============================================
 # Funções de convenience
 # ============================================
+
 
 def log_intentclassification(message: str, result: Dict):
     """Log do resultado de classificação de intent."""

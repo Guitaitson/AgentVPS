@@ -19,7 +19,7 @@ class PostgresSkill(SkillBase):
                 dbname=os.getenv("POSTGRES_DB", "vps_agent"),
                 user=os.getenv("POSTGRES_USER", "vps_agent"),
                 password=os.getenv("POSTGRES_PASSWORD", "postgres"),
-                connect_timeout=5
+                connect_timeout=5,
             )
 
             # Get version
@@ -28,20 +28,18 @@ class PostgresSkill(SkillBase):
             version = cursor.fetchone()[0].split()[1]
 
             # Get database size
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT pg_size_pretty(pg_database_size(%s));
-            """, (os.getenv("POSTGRES_DB", "vps_agent"),))
+            """,
+                (os.getenv("POSTGRES_DB", "vps_agent"),),
+            )
             size = cursor.fetchone()[0]
 
             cursor.close()
             conn.close()
 
-            return (
-                f"✅ **PostgreSQL**\n\n"
-                f"Status: Online\n"
-                f"Versão: {version}\n"
-                f"Tamanho: {size}"
-            )
+            return f"✅ **PostgreSQL**\n\nStatus: Online\nVersão: {version}\nTamanho: {size}"
 
         except psycopg2.OperationalError as e:
             return f"❌ **PostgreSQL**\n\nNão conecta: {str(e)}"

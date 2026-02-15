@@ -12,20 +12,22 @@ from typing import Any, Dict, List
 
 class SecurityLevel(Enum):
     """Nível de segurança do skill."""
-    SAFE = "safe"              # Executa sem perguntar (leitura)
-    MODERATE = "moderate"      # Executa + log
-    DANGEROUS = "dangerous"    # Requer approval via Telegram
-    FORBIDDEN = "forbidden"    # Nunca executa
+
+    SAFE = "safe"  # Executa sem perguntar (leitura)
+    MODERATE = "moderate"  # Executa + log
+    DANGEROUS = "dangerous"  # Requer approval via Telegram
+    FORBIDDEN = "forbidden"  # Nunca executa
 
 
 @dataclass
 class SkillConfig:
     """Configuração de um skill, carregada do config.yaml."""
+
     name: str
     description: str
     version: str = "1.0.0"
     security_level: SecurityLevel = SecurityLevel.SAFE
-    triggers: List[str] = field(default_factory=list)    # keywords que ativam o skill
+    triggers: List[str] = field(default_factory=list)  # keywords que ativam o skill
     parameters: Dict[str, Any] = field(default_factory=dict)
     parameters_schema: Dict[str, Any] = field(default_factory=dict)  # Schema para function calling
     max_output_chars: int = 2000

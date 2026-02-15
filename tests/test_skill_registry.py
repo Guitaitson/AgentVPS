@@ -8,6 +8,7 @@ from core.skills.registry import SkillRegistry, get_skill_registry
 
 class MockSkill(SkillBase):
     """Skill de teste."""
+
     async def execute(self, args=None):
         return "mock result"
 
@@ -145,10 +146,7 @@ class TestSkillConfig:
 
     def test_default_values(self):
         """Testa valores padrão do SkillConfig."""
-        config = SkillConfig(
-            name="test",
-            description="Test skill"
-        )
+        config = SkillConfig(name="test", description="Test skill")
 
         assert config.version == "1.0.0"
         assert config.security_level == SecurityLevel.SAFE

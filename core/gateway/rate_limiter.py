@@ -26,7 +26,9 @@ class RateLimiter:
     Tracks requests per client and enforces rate limits.
     """
 
-    def __init__(self, requests_per_minute: int = 60, max_requests: int = None, window_seconds: int = None):
+    def __init__(
+        self, requests_per_minute: int = 60, max_requests: int = None, window_seconds: int = None
+    ):
         # Compatibilidade com API antiga de testes
         if max_requests is not None:
             requests_per_minute = max_requests

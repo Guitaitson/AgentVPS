@@ -16,9 +16,11 @@ from typing import Any, Dict, List, Optional
 # Data Models
 # ============================================
 
+
 @dataclass
 class CapabilityGap:
     """Representa uma capacidade que o agente não possui."""
+
     name: str
     description: str
     user_request: str
@@ -29,6 +31,7 @@ class CapabilityGap:
 @dataclass
 class Improvement:
     """Uma melhoria implementada."""
+
     id: str
     capability: str
     description: str
@@ -41,6 +44,7 @@ class Improvement:
 @dataclass
 class SelfImprovementConfig:
     """Configuração do sistema de auto-melhoria."""
+
     enabled: bool = True
     max_attempts: int = 3
     require_approval: bool = True
@@ -51,6 +55,7 @@ class SelfImprovementConfig:
 # ============================================
 # Self-Improvement Engine
 # ============================================
+
 
 class SelfImprovementEngine:
     """
@@ -114,7 +119,7 @@ class SelfImprovementEngine:
                     name=f"capability_{pattern}",
                     description=f"Nova capability: {capability_name}",
                     user_request=user_message,
-                    priority=3
+                    priority=3,
                 )
                 self.pending_gaps.append(gap)
                 return gap
@@ -171,9 +176,7 @@ class SelfImprovementEngine:
         return plan
 
     async def implement_capability(
-        self,
-        gap: CapabilityGap,
-        implementation_code: str
+        self, gap: CapabilityGap, implementation_code: str
     ) -> Improvement:
         """
         Implementa uma nova capability.
@@ -208,7 +211,7 @@ class SelfImprovementEngine:
                 implementation=implementation_code,
                 test_result=test_result,
                 timestamp=datetime.now().isoformat(),
-                status=status
+                status=status,
             )
 
             self.completed_improvements.append(improvement)
@@ -225,7 +228,7 @@ class SelfImprovementEngine:
                 implementation=implementation_code,
                 test_result=f"Erro: {str(e)}",
                 timestamp=datetime.now().isoformat(),
-                status="failed"
+                status="failed",
             )
 
     async def rollback_improvement(self, improvement_id: str) -> bool:
@@ -255,16 +258,17 @@ class SelfImprovementEngine:
                     "id": imp.id,
                     "capability": imp.capability,
                     "status": imp.status,
-                    "timestamp": imp.timestamp
+                    "timestamp": imp.timestamp,
                 }
                 for imp in self.completed_improvements[-5:]
-            ]
+            ],
         }
 
 
 # ============================================
 # Integração com LangGraph
 # ============================================
+
 
 class SelfImprovementNode:
     """
@@ -298,7 +302,7 @@ class SelfImprovementNode:
             state["capability_gap"] = {
                 "name": gap.name,
                 "description": gap.description,
-                "plan": plan
+                "plan": plan,
             }
         else:
             state["needs_self_improvement"] = False
@@ -309,6 +313,7 @@ class SelfImprovementNode:
 # ============================================
 # CLI Commands
 # ============================================
+
 
 def status_command():
     """Mostra status do self-improvement engine."""

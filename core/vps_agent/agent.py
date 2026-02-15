@@ -13,6 +13,7 @@ def _get_request_logger():
     """Retorna o logger de debug se disponível."""
     try:
         from core.structured_logging.agent_logger import AgentLogger
+
         return AgentLogger()
     except Exception:
         return None
@@ -63,7 +64,9 @@ async def process_message_async(user_id: str, message: str) -> str:
     try:
         # Usar singleton do grafo (não reconstruir a cada mensagem)
         graph = get_agent_graph()
-        logger.info("grafico_obtido", nodes=list(graph.nodes.keys()) if hasattr(graph, 'nodes') else "N/A")
+        logger.info(
+            "grafico_obtido", nodes=list(graph.nodes.keys()) if hasattr(graph, "nodes") else "N/A"
+        )
 
         # CORREÇÃO: Usar user_id como thread_id para manter contexto da conversa
         # Isso permite que o agente lembre de interações anteriores
@@ -92,10 +95,14 @@ async def process_message_async(user_id: str, message: str) -> str:
         # Extrair resposta
         response = result.get("response", "Desculpe, ocorreu um erro ao processar sua mensagem.")
 
-        logger.info("resposta_gerada", user_id=user_id, response=response[:100] if response else "None")
+        logger.info(
+            "resposta_gerada", user_id=user_id, response=response[:100] if response else "None"
+        )
 
         if debug_logger:
-            debug_logger.log(step="response_ready", output_data=response[:200] if response else "None")
+            debug_logger.log(
+                step="response_ready", output_data=response[:200] if response else "None"
+            )
             debug_logger.finalize(success=True)
 
         return response

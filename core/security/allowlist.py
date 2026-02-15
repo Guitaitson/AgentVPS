@@ -309,6 +309,7 @@ def save_allowlist_to_file(allowlist: SecurityAllowlist, filepath: str) -> None:
 # FUNÇÕES DE COMPATIBILIDADE PARA TESTES
 # ============================================
 
+
 def is_allowed(action: str, resource: str = None) -> bool:
     """
     Função de compatibilidade para testes.

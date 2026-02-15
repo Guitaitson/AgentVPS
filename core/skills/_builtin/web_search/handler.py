@@ -40,14 +40,14 @@ class WebSearchSkill(SkillBase):
         # Remover prefixos comuns
         for prefix in ["pesquise ", "busque ", "procure ", "search ", "buscar "]:
             if text.startswith(prefix):
-                return text[len(prefix):].strip()
+                return text[len(prefix) :].strip()
 
         # Pegar tudo após trigger words
         triggers = ["sobre ", "de ", "sobre "]
         for trigger in triggers:
             if trigger in text:
                 idx = text.find(trigger)
-                return text[idx + len(trigger):].strip()
+                return text[idx + len(trigger) :].strip()
 
         return text.strip()
 

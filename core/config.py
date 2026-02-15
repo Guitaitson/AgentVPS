@@ -19,7 +19,7 @@ class PostgresSettings(BaseSettings):
         env_prefix="POSTGRES_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     host: str = Field(default="127.0.0.1", description="Host do PostgreSQL")
@@ -41,7 +41,7 @@ class RedisSettings(BaseSettings):
         env_prefix="REDIS_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     host: str = Field(default="127.0.0.1", description="Host do Redis")
@@ -56,11 +56,13 @@ class TelegramSettings(BaseSettings):
         env_prefix="TELEGRAM_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     bot_token: Optional[str] = Field(default=None, description="Token do bot")
-    allowed_users: str = Field(default="", description="IDs de usuários autorizados separados por vírgula")
+    allowed_users: str = Field(
+        default="", description="IDs de usuários autorizados separados por vírgula"
+    )
 
     @property
     def allowed_user_ids(self) -> list[int]:
@@ -75,7 +77,7 @@ class OpenRouterSettings(BaseSettings):
         env_prefix="OPENROUTER_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     api_key: Optional[str] = Field(default=None, description="Chave API do OpenRouter")
@@ -92,7 +94,7 @@ class QdrantSettings(BaseSettings):
         env_prefix="QDRANT_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     url: str = Field(default="http://127.0.0.1:6333", description="URL do Qdrant")
@@ -105,7 +107,7 @@ class GatewaySettings(BaseSettings):
         env_prefix="GATEWAY_",
         env_file="/opt/vps-agent/core/.env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     host: str = Field(default="0.0.0.0", description="Host do Gateway")
@@ -121,9 +123,7 @@ class AppSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file="/opt/vps-agent/core/.env",
-        env_file_encoding="utf-8",
-        extra="ignore"
+        env_file="/opt/vps-agent/core/.env", env_file_encoding="utf-8", extra="ignore"
     )
 
     # Sub-configurações

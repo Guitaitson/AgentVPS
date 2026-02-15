@@ -26,9 +26,11 @@ from core.config import get_settings
 # MCP Protocol Types
 # ============================================
 
+
 @dataclass
 class MCPTool:
     """Representa uma tool MCP."""
+
     name: str
     description: str
     input_schema: Dict[str, Any]
@@ -38,6 +40,7 @@ class MCPTool:
 @dataclass
 class MCPResource:
     """Representa um resource MCP."""
+
     uri: str
     name: str
     description: str
@@ -47,6 +50,7 @@ class MCPResource:
 @dataclass
 class MCPPrompt:
     """Representa um prompt MCP."""
+
     name: str
     description: str
     arguments: List[Dict[str, Any]] = field(default_factory=list)
@@ -55,6 +59,7 @@ class MCPPrompt:
 # ============================================
 # MCP Server Implementation
 # ============================================
+
 
 class MCPServer:
     """
@@ -80,11 +85,7 @@ class MCPServer:
             MCPTool(
                 name="get_ram",
                 description="Get current RAM usage in MB",
-                input_schema={
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
+                input_schema={"type": "object", "properties": {}, "required": []},
             )
         )
 
@@ -96,8 +97,8 @@ class MCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {"all": {"type": "boolean", "default": False}},
-                    "required": []
-                }
+                    "required": [],
+                },
             )
         )
 
@@ -106,11 +107,7 @@ class MCPServer:
             MCPTool(
                 name="get_system_status",
                 description="Get overall system status (RAM, disk, Docker)",
-                input_schema={
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
+                input_schema={"type": "object", "properties": {}, "required": []},
             )
         )
 
@@ -119,11 +116,7 @@ class MCPServer:
             MCPTool(
                 name="check_postgres",
                 description="Check PostgreSQL connection and status",
-                input_schema={
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
+                input_schema={"type": "object", "properties": {}, "required": []},
             )
         )
 
@@ -132,11 +125,7 @@ class MCPServer:
             MCPTool(
                 name="check_redis",
                 description="Check Redis connection and status",
-                input_schema={
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
+                input_schema={"type": "object", "properties": {}, "required": []},
             )
         )
 
@@ -149,10 +138,10 @@ class MCPServer:
                     "type": "object",
                     "properties": {
                         "command": {"type": "string", "description": "Command to execute"},
-                        "timeout": {"type": "number", "default": 30}
+                        "timeout": {"type": "number", "default": 30},
                     },
-                    "required": ["command"]
-                }
+                    "required": ["command"],
+                },
             )
         )
 
@@ -179,7 +168,7 @@ class MCPServer:
                 {
                     "name": tool.name,
                     "description": tool.description,
-                    "inputSchema": tool.input_schema
+                    "inputSchema": tool.input_schema,
                 }
                 for tool in self.tools.values()
             ]
@@ -196,21 +185,27 @@ class MCPServer:
             # Executa a tool
             if name == "get_ram":
                 from core.tools.system_tools import get_ram_usage
+
                 result = get_ram_usage()
             elif name == "list_containers":
                 from core.tools.system_tools import list_docker_containers
+
                 result = list_docker_containers()
             elif name == "get_system_status":
                 from core.tools.system_tools import get_system_status
+
                 result = get_system_status()
             elif name == "check_postgres":
                 from core.tools.system_tools import check_postgres
+
                 result = check_postgres()
             elif name == "check_redis":
                 from core.tools.system_tools import check_redis
+
                 result = check_redis()
             elif name == "execute_command":
                 import subprocess
+
                 cmd = arguments.get("command", "")
                 timeout = arguments.get("timeout", 30)
                 result = subprocess.run(
@@ -220,14 +215,7 @@ class MCPServer:
             else:
                 result = f"Tool '{name}' executed"
 
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": str(result)
-                    }
-                ]
-            }
+            return {"content": [{"type": "text", "text": str(result)}]}
         except Exception as e:
             return {"error": str(e)}
 
@@ -239,7 +227,7 @@ class MCPServer:
                     "uri": res.uri,
                     "name": res.name,
                     "description": res.description,
-                    "mimeType": res.mime_type
+                    "mimeType": res.mime_type,
                 }
                 for res in self.resources.values()
             ]
@@ -258,7 +246,9 @@ class MCPServer:
                 {
                     "uri": uri,
                     "mimeType": resource.mime_type,
-                    "text": json.dumps({"name": resource.name, "description": resource.description})
+                    "text": json.dumps(
+                        {"name": resource.name, "description": resource.description}
+                    ),
                 }
             ]
         }
@@ -270,7 +260,7 @@ class MCPServer:
                 {
                     "name": prompt.name,
                     "description": prompt.description,
-                    "arguments": prompt.arguments
+                    "arguments": prompt.arguments,
                 }
                 for prompt in self.prompts.values()
             ]
@@ -284,7 +274,7 @@ class MCPServer:
 app = FastAPI(
     title="VPS-Agent MCP Server (SSE)",
     description="Model Context Protocol with Server-Sent Events",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 # CORS
@@ -303,6 +293,7 @@ mcp_server = MCPServer()
 # ============================================
 # MCP Endpoints (JSON-RPC 2.0)
 # ============================================
+
 
 @app.post("/mcp/v1/tools/list")
 async def mcp_list_tools():
@@ -343,17 +334,19 @@ async def mcp_list_prompts():
 # SSE Endpoint for Streaming
 # ============================================
 
+
 @app.get("/mcp/stream")
 async def mcp_stream(request: Request):
     """
     Endpoint SSE para streaming de eventos MCP.
     Usado por clientes que suportam SSE (Server-Sent Events).
     """
+
     async def event_generator():
         # Envia evento de conexão
         yield {
             "event": "connected",
-            "data": json.dumps({"status": "connected", "server": "vps-agent-mcp"})
+            "data": json.dumps({"status": "connected", "server": "vps-agent-mcp"}),
         }
 
         # Mantém conexão viva com heartbeats
@@ -362,13 +355,10 @@ async def mcp_stream(request: Request):
                 await asyncio.sleep(30)
                 yield {
                     "event": "heartbeat",
-                    "data": json.dumps({"time": asyncio.get_event_loop().time()})
+                    "data": json.dumps({"time": asyncio.get_event_loop().time()}),
                 }
         except asyncio.CancelledError:
-            yield {
-                "event": "disconnected",
-                "data": json.dumps({"status": "disconnected"})
-            }
+            yield {"event": "disconnected", "data": json.dumps({"status": "disconnected"})}
 
     return EventSourceResponse(event_generator())
 
@@ -376,6 +366,7 @@ async def mcp_stream(request: Request):
 # ============================================
 # WebSocket for Real-time Communication
 # ============================================
+
 
 @app.websocket("/mcp/ws")
 async def mcp_websocket(websocket: WebSocket):
@@ -400,10 +391,7 @@ async def mcp_websocket(websocket: WebSocket):
                 await websocket.send_json({"id": message.get("id"), "result": result})
 
             elif method == "tools/call":
-                result = await mcp_server.call_tool(
-                    params.get("name"),
-                    params.get("arguments", {})
-                )
+                result = await mcp_server.call_tool(params.get("name"), params.get("arguments", {}))
                 await websocket.send_json({"id": message.get("id"), "result": result})
 
             elif method == "resources/list":
@@ -411,10 +399,12 @@ async def mcp_websocket(websocket: WebSocket):
                 await websocket.send_json({"id": message.get("id"), "result": result})
 
             else:
-                await websocket.send_json({
-                    "id": message.get("id"),
-                    "error": {"code": -32601, "message": f"Method not found: {method}"}
-                })
+                await websocket.send_json(
+                    {
+                        "id": message.get("id"),
+                        "error": {"code": -32601, "message": f"Method not found: {method}"},
+                    }
+                )
 
     except WebSocketDisconnect:
         pass
@@ -423,6 +413,7 @@ async def mcp_websocket(websocket: WebSocket):
 # ============================================
 # Health & Info
 # ============================================
+
 
 @app.get("/health")
 async def health():
@@ -441,13 +432,14 @@ async def root():
         "transport": "SSE + WebSocket",
         "tools_count": len(mcp_server.tools),
         "resources_count": len(mcp_server.resources),
-        "prompts_count": len(mcp_server.prompts)
+        "prompts_count": len(mcp_server.prompts),
     }
 
 
 # ============================================
 # Main
 # ============================================
+
 
 def main():
     """Inicia o servidor MCP com SSE."""

@@ -1,4 +1,5 @@
 """Teste rápido das Fases 5-6: Intent LLM + Tools."""
+
 import asyncio
 from datetime import datetime, timezone
 
@@ -30,7 +31,7 @@ async def test_question_ram():
         print(f"\nResposta:\n{result.get('response')}")
 
         # Verificar se executou tool
-        if result.get('intent') == 'question' and result.get('action_required'):
+        if result.get("intent") == "question" and result.get("action_required"):
             print("\n✅ PASSOU: Pergunta reconhecida e ação requerida!")
         else:
             print("\n❌ FALHOU: Esperava question + action_required")
@@ -38,6 +39,7 @@ async def test_question_ram():
     except Exception as e:
         print(f"\n❌ ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -62,7 +64,7 @@ async def test_command_status():
         print(f"Confiança: {result.get('intent_confidence')}")
         print(f"\nResposta:\n{result.get('response')}")
 
-        if result.get('intent') == 'command':
+        if result.get("intent") == "command":
             print("\n✅ PASSOU: Comando reconhecido!")
         else:
             print("\n❌ FALHOU: Esperava 'command'")
@@ -70,6 +72,7 @@ async def test_command_status():
     except Exception as e:
         print(f"\n❌ ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -95,7 +98,7 @@ async def test_chat():
         print(f"Ação requerida: {result.get('action_required')}")
         print(f"\nResposta:\n{result.get('response')}")
 
-        if result.get('intent') == 'chat' and not result.get('action_required'):
+        if result.get("intent") == "chat" and not result.get("action_required"):
             print("\n✅ PASSOU: Chat reconhecido, sem ação requerida!")
         else:
             print("\n❌ FALHOU: Esperava 'chat' sem ação")
@@ -103,6 +106,7 @@ async def test_chat():
     except Exception as e:
         print(f"\n❌ ERRO: {e}")
         import traceback
+
         traceback.print_exc()
 
 

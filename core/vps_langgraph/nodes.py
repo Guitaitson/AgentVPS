@@ -130,7 +130,9 @@ def node_plan(state: AgentState) -> AgentState:
         if tool_suggestion:
             skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
             if skill:
-                logger.info("node_plan_task_from_llm", skill=skill.name, tool_suggestion=tool_suggestion)
+                logger.info(
+                    "node_plan_task_from_llm", skill=skill.name, tool_suggestion=tool_suggestion
+                )
                 return {
                     **state,
                     "plan": [{"type": "skill", "action": skill.name, "raw_message": user_message}],
@@ -191,7 +193,13 @@ def node_plan(state: AgentState) -> AgentState:
             if tool_suggestion in command_map:
                 return {
                     **state,
-                    "plan": [{"type": "command", "action": command_map[tool_suggestion], "raw_message": user_message}],
+                    "plan": [
+                        {
+                            "type": "command",
+                            "action": command_map[tool_suggestion],
+                            "raw_message": user_message,
+                        }
+                    ],
                     "current_step": 0,
                     "tools_needed": [],
                 }
@@ -371,6 +379,7 @@ async def node_execute(state: AgentState) -> AgentState:
             detect_missing_skill_keywords,
             generate_smart_unavailable_response,
         )
+
         detected = detect_missing_skill_keywords(user_message.lower())
 
         # Listar skills disponíveis para o usuário
@@ -383,11 +392,17 @@ async def node_execute(state: AgentState) -> AgentState:
         if available_skills:
             response += f"\n\n📋 Skills disponíveis: {skills_list}"
 
-        logger.warning("node_execute_no_skill_found", message=user_message[:50], available=len(available_skills))
+        logger.warning(
+            "node_execute_no_skill_found",
+            message=user_message[:50],
+            available=len(available_skills),
+        )
         return {**state, "execution_result": response}
 
     except Exception as e:
-        wrapped = wrap_error(e, metadata={"skill": tool_suggestion, "action": action if 'action' in dir() else None})
+        wrapped = wrap_error(
+            e, metadata={"skill": tool_suggestion, "action": action if "action" in dir() else None}
+        )
         logger.error("node_execute_error", error=str(e))
         return {
             **state,
@@ -400,6 +415,7 @@ async def node_execute(state: AgentState) -> AgentState:
 def get_async_tool(name: str):
     """Fallback para compatibilidade com código legado."""
     from ..tools.system_tools import get_async_tool as legacy_get_async_tool
+
     return legacy_get_async_tool(name)
 
 
@@ -430,7 +446,11 @@ async def node_generate_response(state: AgentState) -> AgentState:
     if execution_result is not None:
         # Verificar se é uma mensagem de "não implementado"
         result_str = str(execution_result).lower()
-        if "não implementado" in result_str or "não encontrado" in result_str or "not implemented" in result_str:
+        if (
+            "não implementado" in result_str
+            or "não encontrado" in result_str
+            or "not implemented" in result_str
+        ):
             # Gerar resposta smarter com plano de ação
             detected = detect_missing_skill_keywords(user_message.lower())
             response = generate_smart_unavailable_response(

@@ -161,9 +161,7 @@ class DatabasePool:
         async with self.acquire() as conn:
             return await conn.fetchrow(query, *args, timeout=timeout)
 
-    async def fetchval(
-        self, query: str, *args, timeout: Optional[float] = None
-    ) -> Any:
+    async def fetchval(self, query: str, *args, timeout: Optional[float] = None) -> Any:
         """
         Execute a SELECT query and return single value.
 
@@ -178,9 +176,7 @@ class DatabasePool:
         async with self.acquire() as conn:
             return await conn.fetchval(query, *args, timeout=timeout)
 
-    async def execute(
-        self, query: str, *args, timeout: Optional[float] = None
-    ) -> str:
+    async def execute(self, query: str, *args, timeout: Optional[float] = None) -> str:
         """
         Execute a query (INSERT, UPDATE, DELETE).
 

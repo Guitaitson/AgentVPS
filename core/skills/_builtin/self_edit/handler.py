@@ -56,7 +56,7 @@ class SelfEditSkill(SkillBase):
 
         return {
             "valid": False,
-            "error": "Path não permitido. Apenas arquivos em /opt/vps-agent/ são permitidos."
+            "error": "Path não permitido. Apenas arquivos em /opt/vps-agent/ são permitidos.",
         }
 
     async def _edit_file(self, file_path: str, content: str, mode: str) -> str:

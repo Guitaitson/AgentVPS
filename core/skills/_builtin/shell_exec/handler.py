@@ -116,9 +116,17 @@ class ShellExecSkill(SkillBase):
 
         # Limpar prefixos comuns (apenas para raw_input fallback)
         command_clean = command.strip()
-        for prefix in ["execute ", "executar ", "rodar ", "run ", "me mostra ", "mostre ", "liste "]:
+        for prefix in [
+            "execute ",
+            "executar ",
+            "rodar ",
+            "run ",
+            "me mostra ",
+            "mostre ",
+            "liste ",
+        ]:
             if command_clean.lower().startswith(prefix):
-                command_clean = command_clean[len(prefix):].strip()
+                command_clean = command_clean[len(prefix) :].strip()
                 break
 
         if command_clean != command:

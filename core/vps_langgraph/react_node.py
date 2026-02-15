@@ -7,7 +7,6 @@ Substitui: node_classify_intent + node_plan + interpretação do shell_exec.
 Este é o núcleo da mudança de "botões pré-codificados" para "inteligência real".
 """
 
-
 import structlog
 
 from ..skills.registry import get_skill_registry

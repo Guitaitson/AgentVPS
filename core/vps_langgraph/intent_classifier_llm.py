@@ -22,44 +22,46 @@ class IntentClassification(BaseModel):
     intent: str = Field(
         ...,
         enum=["command", "task", "question", "chat", "self_improve"],
-        description="Tipo de intenção do usuário"
+        description="Tipo de intenção do usuário",
     )
-    confidence: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Confiança da classificação (0-1)"
-    )
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confiança da classificação (0-1)")
     entities: list[str] = Field(
-        default=[],
-        description="Entidades detectadas (ex: ['ram', 'docker']"
+        default=[], description="Entidades detectadas (ex: ['ram', 'docker']"
     )
-    action_required: bool = Field(
-        default=False,
-        description="Se requer ação/execução na VPS"
-    )
+    action_required: bool = Field(default=False, description="Se requer ação/execução na VPS")
     tool_suggestion: str = Field(
-        default="",
-        description="Tool sugerida para executar (ex: 'get_ram', 'list_containers')"
+        default="", description="Tool sugerida para executar (ex: 'get_ram', 'list_containers')"
     )
-    reasoning: str = Field(
-        ...,
-        description="Explicação breve da classificação"
-    )
+    reasoning: str = Field(..., description="Explicação breve da classificação")
 
 
 # Mensagens curtas que DEVEM ser classificadas como chat
 _FORCE_CHAT_MESSAGES = {
-    "oi", "olá", "ola", "hi", "hello", "hey", "e ai", "eai",
-    "bom dia", "boa tarde", "boa noite", "td bem", "tudo bem",
-    "blz", "blz?", "salve", "alô", "alo", "oi?", "ola?"
+    "oi",
+    "olá",
+    "ola",
+    "hi",
+    "hello",
+    "hey",
+    "e ai",
+    "eai",
+    "bom dia",
+    "boa tarde",
+    "boa noite",
+    "td bem",
+    "tudo bem",
+    "blz",
+    "blz?",
+    "salve",
+    "alô",
+    "alo",
+    "oi?",
+    "ola?",
 }
 
 
 async def classify_intent_llm(
-    message: str,
-    conversation_history: list[dict] = None,
-    llm_client=None
+    message: str, conversation_history: list[dict] = None, llm_client=None
 ) -> dict[str, Any]:
     """
     Classifica intent usando LLM com structured output.
@@ -80,21 +82,16 @@ async def classify_intent_llm(
 
     # Se é uma saudação curta (≤15 chars), FORÇAR chat
     if len(message) <= 15 and any(
-        msg_lower == sauda or sauda in msg_lower
-        for sauda in _FORCE_CHAT_MESSAGES
+        msg_lower == sauda or sauda in msg_lower for sauda in _FORCE_CHAT_MESSAGES
     ):
-        logger.info(
-            "intent_forced_chat",
-            message=message,
-            reason="saudacao_curta"
-        )
+        logger.info("intent_forced_chat", message=message, reason="saudacao_curta")
         return {
             "intent": "chat",
             "confidence": 0.95,
             "entities": [],
             "action_required": False,
             "tool_suggestion": "",
-            "reasoning": "Saudação curta detectada - forçar chat"
+            "reasoning": "Saudação curta detectada - forçar chat",
         }
 
     try:
@@ -142,7 +139,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             "entities": [],
             "action_required": True,
             "tool_suggestion": cmd,
-            "reasoning": "Comando direto detectado"
+            "reasoning": "Comando direto detectado",
         }
 
     # ========================================
@@ -150,14 +147,46 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
     # ========================================
     # Padrões mais comuns que indicam tasks
     task_starters = [
-        "execute ", "executa ", "executar ", "rode ", "roda ", "rodar ",
-        "rode ", "roda ", "run ", "rode ",
-        "pesquise ", "busque ", "buscar ", "search ", "procure ",
-        "liste ", "listar ", "mostre ", "mostrar ", "exiba ", "exibir ",
-        "leia ", "ler ", "abri ", "abrir ",
-        "crie ", "criar ", "criar ", "adicione ", "add ",
-        "verifique ", "check ", "verifica ",
-        "inicie ", "pare ", "pare ", "reinicie ", "restart ", "start ", "stop ",
+        "execute ",
+        "executa ",
+        "executar ",
+        "rode ",
+        "roda ",
+        "rodar ",
+        "rode ",
+        "roda ",
+        "run ",
+        "rode ",
+        "pesquise ",
+        "busque ",
+        "buscar ",
+        "search ",
+        "procure ",
+        "liste ",
+        "listar ",
+        "mostre ",
+        "mostrar ",
+        "exiba ",
+        "exibir ",
+        "leia ",
+        "ler ",
+        "abri ",
+        "abrir ",
+        "crie ",
+        "criar ",
+        "criar ",
+        "adicione ",
+        "add ",
+        "verifique ",
+        "check ",
+        "verifica ",
+        "inicie ",
+        "pare ",
+        "pare ",
+        "reinicie ",
+        "restart ",
+        "start ",
+        "stop ",
     ]
 
     for pattern in task_starters:
@@ -170,16 +199,24 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                     "entities": ["web_search"],
                     "action_required": True,
                     "tool_suggestion": "web_search",
-                    "reasoning": f"Task de busca detectada: {pattern.strip()}"
+                    "reasoning": f"Task de busca detectada: {pattern.strip()}",
                 }
-            elif pattern.strip() in ["execute", "executa", "executar", "rode", "roda", "rodar", "run"]:
+            elif pattern.strip() in [
+                "execute",
+                "executa",
+                "executar",
+                "rode",
+                "roda",
+                "rodar",
+                "run",
+            ]:
                 return {
                     "intent": "task",
                     "confidence": 0.95,
                     "entities": ["shell_exec"],
                     "action_required": True,
                     "tool_suggestion": "shell_exec",
-                    "reasoning": f"Task de execução detectada: {pattern.strip()}"
+                    "reasoning": f"Task de execução detectada: {pattern.strip()}",
                 }
             elif pattern.strip() in ["leia", "ler", "abri", "abrir"]:
                 return {
@@ -188,7 +225,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                     "entities": ["file_manager"],
                     "action_required": True,
                     "tool_suggestion": "file_manager",
-                    "reasoning": f"Task de leitura de arquivo: {pattern.strip()}"
+                    "reasoning": f"Task de leitura de arquivo: {pattern.strip()}",
                 }
             elif pattern.strip() in ["liste", "listar", "mostre", "mostrar", "exiba", "exibir"]:
                 return {
@@ -197,7 +234,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                     "entities": ["shell_exec"],
                     "action_required": True,
                     "tool_suggestion": "shell_exec",
-                    "reasoning": f"Task de listagem: {pattern.strip()}"
+                    "reasoning": f"Task de listagem: {pattern.strip()}",
                 }
             else:
                 return {
@@ -206,16 +243,24 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                     "entities": [],
                     "action_required": True,
                     "tool_suggestion": "",
-                    "reasoning": f"Task detectada: {pattern.strip()}"
+                    "reasoning": f"Task detectada: {pattern.strip()}",
                 }
 
     # Detectar tarefas no meio da frase
     task_keywords = [
-        ("pesquise", "web_search"), ("busque", "web_search"), ("pesquisar", "web_search"),
-        ("execute", "shell_exec"), ("executar", "shell_exec"), ("rode", "shell_exec"),
-        ("rode ", "shell_exec"), ("roda ", "shell_exec"),
-        ("leia", "file_manager"), ("ler", "file_manager"), ("arquivo", "file_manager"),
-        ("crie", "shell_exec"), ("criar", "shell_exec"),
+        ("pesquise", "web_search"),
+        ("busque", "web_search"),
+        ("pesquisar", "web_search"),
+        ("execute", "shell_exec"),
+        ("executar", "shell_exec"),
+        ("rode", "shell_exec"),
+        ("rode ", "shell_exec"),
+        ("roda ", "shell_exec"),
+        ("leia", "file_manager"),
+        ("ler", "file_manager"),
+        ("arquivo", "file_manager"),
+        ("crie", "shell_exec"),
+        ("criar", "shell_exec"),
     ]
 
     for keyword, tool in task_keywords:
@@ -226,7 +271,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "entities": [tool],
                 "action_required": True,
                 "tool_suggestion": tool,
-                "reasoning": f"Keyword de task detectado: {keyword}"
+                "reasoning": f"Keyword de task detectado: {keyword}",
             }
 
     # ========================================
@@ -235,20 +280,36 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
     # Perguntas que DEVEM executar ação (action_required=True)
     question_with_action = [
         # Memória
-        "memoria", "memória", "memory",
+        "memoria",
+        "memória",
+        "memory",
         # Containers
-        "quantos containers", "quantos docker",
+        "quantos containers",
+        "quantos docker",
         # Status
-        "como está", "estado do",
+        "como está",
+        "estado do",
         # Disco
-        "quanto espaço", "quanto disco",
+        "quanto espaço",
+        "quanto disco",
         # Serviços
-        "quantos serviços", "quais serviços",
+        "quantos serviços",
+        "quais serviços",
         # Instalação - ESTE É O CASO CRÍTICO!
-        "tem instalado", "o que tem instalado", "quais programas", "tem o",
-        "tem o claude", "tem o docker", "tem o postgres", "tem o redis",
-        "esta instalado", "está instalado", "está instalados",
-        "como ver", "como verificar", "como saber",
+        "tem instalado",
+        "o que tem instalado",
+        "quais programas",
+        "tem o",
+        "tem o claude",
+        "tem o docker",
+        "tem o postgres",
+        "tem o redis",
+        "esta instalado",
+        "está instalado",
+        "está instalados",
+        "como ver",
+        "como verificar",
+        "como saber",
     ]
 
     for pattern in question_with_action:
@@ -278,7 +339,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "entities": entities,
                 "action_required": True,
                 "tool_suggestion": tool,
-                "reasoning": f"Pergunta sobre sistema detectada: {pattern}"
+                "reasoning": f"Pergunta sobre sistema detectada: {pattern}",
             }
 
     # ========================================
@@ -308,15 +369,19 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "entities": [tool],
                 "action_required": True,
                 "tool_suggestion": tool,
-                "reasoning": f"Comando Telegram detectado: {cmd_pattern}"
+                "reasoning": f"Comando Telegram detectado: {cmd_pattern}",
             }
 
     # ========================================
     # PRIORIDADE 5: Self-Improve
     # ========================================
     improve_patterns = [
-        "crie um agente", "novo agente", "adicionar funcionalidade",
-        "integre com", "implemente", "desenvolva"
+        "crie um agente",
+        "novo agente",
+        "adicionar funcionalidade",
+        "integre com",
+        "implemente",
+        "desenvolva",
     ]
 
     for pattern in improve_patterns:
@@ -327,7 +392,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "entities": [],
                 "action_required": False,
                 "tool_suggestion": "",
-                "reasoning": "Pedido de auto-melhoria detectado"
+                "reasoning": "Pedido de auto-melhoria detectado",
             }
 
     # ========================================
@@ -339,7 +404,7 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
         "entities": [],
         "action_required": False,
         "tool_suggestion": "",
-        "reasoning": "Conversa natural"
+        "reasoning": "Conversa natural",
     }
 
 
@@ -361,17 +426,13 @@ def classify_intent_with_llm(message: str, **kwargs) -> tuple:
                 "entities": result["entities"],
                 "action_required": result["action_required"],
                 "tool_suggestion": result["tool_suggestion"],
-                "reasoning": result["reasoning"]
-            }
+                "reasoning": result["reasoning"],
+            },
         )
     except Exception:
         # Fallback total: usar inferência local (não depende de intent_classifier.py)
         result = infer_intent_from_message(message)
-        return (
-            result["intent"],
-            result["confidence"],
-            result
-        )
+        return (result["intent"], result["confidence"], result)
 
 
 __all__ = [

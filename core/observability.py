@@ -23,41 +23,62 @@ try:
         OTLPSpanExporter,
     )
     from opentelemetry.trace import Status, StatusCode
+
     _OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     _OPENTELEMETRY_AVAILABLE = False
+
     # Stub para quando não tiver opentelemetry
     class MockSpan:
-        def __enter__(self): return self
-        def __exit__(self, *args): pass
-        def set_status(self, *args, **kwargs): pass
-        def record_exception(self, *args): pass
-        def set_attribute(self, *args, **kwargs): pass
-        def add_event(self, *args, **kwargs): pass
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def set_status(self, *args, **kwargs):
+            pass
+
+        def record_exception(self, *args):
+            pass
+
+        def set_attribute(self, *args, **kwargs):
+            pass
+
+        def add_event(self, *args, **kwargs):
+            pass
 
     class MockTracer:
-        def start_as_current_span(self, name): return MockSpan()
-        def start_span(self, name): return MockSpan()
+        def start_as_current_span(self, name):
+            return MockSpan()
+
+        def start_span(self, name):
+            return MockSpan()
 
     class MockTrace:
-        def get_tracer(self, *args): return MockTracer()
+        def get_tracer(self, *args):
+            return MockTracer()
 
     trace = MockTrace()
+
     # Tipos para compatibilidade - devem ser callable
     class MockStatus:
         def __init__(self, code=None, description=None):
             pass
-        OK = 'ok'
-        ERROR = 'error'
+
+        OK = "ok"
+        ERROR = "error"
 
     def make_status(code):
         return MockStatus(code)
 
     Status = make_status
     StatusCode = MockStatus()
+
     # Mock Tracer type
     class MockTracerClass:
         pass
+
     trace.Tracer = MockTracerClass
 
 
@@ -87,10 +108,12 @@ def init_observability(
         return
 
     # Criar resource
-    resource = Resource.create({
-        SERVICE_NAME: service_name,
-        "service.version": "2.0.0",
-    })
+    resource = Resource.create(
+        {
+            SERVICE_NAME: service_name,
+            "service.version": "2.0.0",
+        }
+    )
 
     # Configurar provider
     provider = TracerProvider(resource=resource)
@@ -125,6 +148,7 @@ def trace_async(name: str = None):
         async def minha_funcao():
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -142,6 +166,7 @@ def trace_async(name: str = None):
                     raise
 
         return wrapper
+
     return decorator
 
 
@@ -154,6 +179,7 @@ def trace_sync(name: str = None):
         def minha_funcao():
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -171,6 +197,7 @@ def trace_sync(name: str = None):
                     raise
 
         return wrapper
+
     return decorator
 
 
@@ -244,6 +271,7 @@ class LangGraphObserver:
 # Convenience functions
 def trace_llm_call(model: str, prompt_tokens: int = None, completion_tokens: int = None):
     """Decorator específico para calls de LLM."""
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -259,12 +287,15 @@ def trace_llm_call(model: str, prompt_tokens: int = None, completion_tokens: int
                     span.set_attribute("llm.completion_tokens", completion_tokens)
 
                 return result
+
         return wrapper
+
     return decorator
 
 
 def trace_tool_call(tool_name: str):
     """Decorator específico para calls de tools."""
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -277,7 +308,9 @@ def trace_tool_call(tool_name: str):
 
                 span.set_attribute("tool.completed", True)
                 return result
+
         return wrapper
+
     return decorator
 
 

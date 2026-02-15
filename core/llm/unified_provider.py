@@ -28,6 +28,7 @@ TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "60"))
 @dataclass
 class LLMResponse:
     """Resposta padronizada do LLM."""
+
     content: str
     tool_calls: Optional[list[dict]] = None
     usage: Optional[dict] = None
@@ -39,6 +40,7 @@ class LLMResponse:
 @dataclass
 class IntentClassification:
     """Resultado da classificação de intent."""
+
     intent: str  # command, task, question, chat, self_improve
     confidence: float
     action_required: bool
@@ -227,23 +229,34 @@ class UnifiedLLMProvider:
 
         # Padrões que DEVEM executar ação (não podem ser classificados como chat)
         force_action_patterns = [
-            "tem o", "tem installed", "esta instalado", "está instalado",
-            "como ver", "como verificar", "como saber", "como instalar",
-            "tem docker", "tem postgres", "tem redis", "tem o claude",
-            "execute ", "rode ", "pesquise ", "busque ",
+            "tem o",
+            "tem installed",
+            "esta instalado",
+            "está instalado",
+            "como ver",
+            "como verificar",
+            "como saber",
+            "como instalar",
+            "tem docker",
+            "tem postgres",
+            "tem redis",
+            "tem o claude",
+            "execute ",
+            "rode ",
+            "pesquise ",
+            "busque ",
         ]
 
-        use_regex_fallback = any(
-            pattern in msg_lower for pattern in force_action_patterns
-        )
+        use_regex_fallback = any(pattern in msg_lower for pattern in force_action_patterns)
 
         if use_regex_fallback:
             logger.info(
                 "intent_forced_regex_fallback",
                 message=message[:50],
-                reason="force_action_pattern_detected"
+                reason="force_action_pattern_detected",
             )
             from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
+
             result = infer_intent_from_message(message)
             return IntentClassification(**result)
 
@@ -304,6 +317,7 @@ Retorne EXATAMENTE este formato JSON:
             )
             # Fallback para regex
             from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
+
             result = infer_intent_from_message(message)
             return IntentClassification(**result)
 
@@ -335,6 +349,7 @@ Retorne EXATAMENTE este formato JSON:
             )
             # Fallback para regex
             from ..vps_langgraph.intent_classifier_llm import infer_intent_from_message
+
             result = infer_intent_from_message(message)
             return IntentClassification(**result)
 

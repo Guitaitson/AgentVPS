@@ -30,12 +30,7 @@ def get_installed_packages() -> str:
 
     # Método 1: dpkg (Debian/Ubuntu)
     try:
-        result = subprocess.run(
-            ["dpkg", "-l"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["dpkg", "-l"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             lines = result.stdout.strip().split("\n")[:20]  # Primeiros 20
             results.append("📦 **Pacotes (dpkg):**\n")
@@ -52,10 +47,7 @@ def get_installed_packages() -> str:
     # Método 2: apt list
     try:
         result = subprocess.run(
-            ["apt", "list", "--installed"],
-            capture_output=True,
-            text=True,
-            timeout=10
+            ["apt", "list", "--installed"], capture_output=True, text=True, timeout=10
         )
         if result.returncode == 0:
             lines = result.stdout.strip().split("\n")[:15]
@@ -71,28 +63,55 @@ def get_installed_packages() -> str:
     # Método 3: Verificar comandos comuns + CLIs modernos
     common_commands = [
         # Comandos tradicionais
-        "python3", "python", "node", "npm", "docker", "docker-compose",
-        "git", "ssh", "curl", "wget", "nginx", "apache2", "mysql", "psql",
-        "redis-cli", "mongo", "java", "javac", "go", "rustc", "cargo",
+        "python3",
+        "python",
+        "node",
+        "npm",
+        "docker",
+        "docker-compose",
+        "git",
+        "ssh",
+        "curl",
+        "wget",
+        "nginx",
+        "apache2",
+        "mysql",
+        "psql",
+        "redis-cli",
+        "mongo",
+        "java",
+        "javac",
+        "go",
+        "rustc",
+        "cargo",
         # CLIs modernos de IA/Agent
-        "claude", "cline", "openai", "anthropic",
+        "claude",
+        "cline",
+        "openai",
+        "anthropic",
         # Tools modernas
-        "bun", "pnpm", "yarn", "pnpm",
+        "bun",
+        "pnpm",
+        "yarn",
+        "pnpm",
         # Cloud CLIs
-        "aws", "gcloud", "az", "kubectl", "terraform", "helm",
+        "aws",
+        "gcloud",
+        "az",
+        "kubectl",
+        "terraform",
+        "helm",
         # DevOps
-        "docker", "podman", "docker-compose", "docker-compose",
+        "docker",
+        "podman",
+        "docker-compose",
+        "docker-compose",
     ]
 
     found = []
     for cmd in common_commands:
         try:
-            result = subprocess.run(
-                ["which", cmd],
-                capture_output=True,
-                text=True,
-                timeout=2
-            )
+            result = subprocess.run(["which", cmd], capture_output=True, text=True, timeout=2)
             if result.returncode == 0:
                 found.append(cmd)
         except Exception:
@@ -105,12 +124,7 @@ def get_installed_packages() -> str:
 
     # Método 4: Snap packages
     try:
-        result = subprocess.run(
-            ["snap", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["snap", "list"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             lines = result.stdout.strip().split("\n")[1:10]  # Primeiros 10
             results.append("📦 **Snap Packages:**\n")
@@ -146,12 +160,7 @@ def check_command_available(command: str) -> str:
     """
     try:
         # Verificar se existe
-        result = subprocess.run(
-            ["which", command],
-            capture_output=True,
-            text=True,
-            timeout=3
-        )
+        result = subprocess.run(["which", command], capture_output=True, text=True, timeout=3)
 
         if result.returncode != 0:
             return f"❌ Comando '{command}' não encontrado"
@@ -165,10 +174,7 @@ def check_command_available(command: str) -> str:
         for flag in version_flags:
             try:
                 ver_result = subprocess.run(
-                    [command, flag],
-                    capture_output=True,
-                    text=True,
-                    timeout=3
+                    [command, flag], capture_output=True, text=True, timeout=3
                 )
                 if ver_result.returncode == 0:
                     version = ver_result.stdout.strip().split("\n")[0]
@@ -207,12 +213,7 @@ def get_system_info() -> str:
 
     # Kernel
     try:
-        result = subprocess.run(
-            ["uname", "-r"],
-            capture_output=True,
-            text=True,
-            timeout=3
-        )
+        result = subprocess.run(["uname", "-r"], capture_output=True, text=True, timeout=3)
         if result.returncode == 0:
             info.append(f"🔧 **Kernel:** {result.stdout.strip()}")
     except Exception:
@@ -220,12 +221,7 @@ def get_system_info() -> str:
 
     # Arquitetura
     try:
-        result = subprocess.run(
-            ["uname", "-m"],
-            capture_output=True,
-            text=True,
-            timeout=3
-        )
+        result = subprocess.run(["uname", "-m"], capture_output=True, text=True, timeout=3)
         if result.returncode == 0:
             info.append(f"⚙️ **Arquitetura:** {result.stdout.strip()}")
     except Exception:
@@ -247,9 +243,7 @@ def get_system_info() -> str:
 
 
 def execute_discovered_command(
-    command: str,
-    args: Optional[list[str]] = None,
-    timeout: int = 10
+    command: str, args: Optional[list[str]] = None, timeout: int = 10
 ) -> str:
     """
     Executa um comando descoberto dinamicamente.
@@ -271,12 +265,7 @@ def execute_discovered_command(
         return f"⛔ Comando '{command}' bloqueado por segurança"
 
     try:
-        result = subprocess.run(
-            [command] + args,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
+        result = subprocess.run([command] + args, capture_output=True, text=True, timeout=timeout)
 
         output = result.stdout.strip()
         if result.stderr:
@@ -286,10 +275,7 @@ def execute_discovered_command(
         if len(output) > 2000:
             output = output[:2000] + "\n... (truncado)"
 
-        return (
-            f"✅ Comando: `{command} {' '.join(args)}`\n"
-            f"```\n{output}\n```"
-        )
+        return f"✅ Comando: `{command} {' '.join(args)}`\n```\n{output}\n```"
 
     except subprocess.TimeoutExpired:
         return f"⏱️ Timeout ao executar '{command}'"
@@ -361,9 +347,7 @@ async def get_system_info_async() -> str:
 
 
 async def execute_discovered_command_async(
-    command: str,
-    args: Optional[list[str]] = None,
-    timeout: int = 10
+    command: str, args: Optional[list[str]] = None, timeout: int = 10
 ) -> str:
     """Async version."""
     return await asyncio.to_thread(execute_discovered_command, command, args, timeout)
@@ -381,9 +365,7 @@ DISCOVERY_TOOLS_REGISTRY = {
         "function": check_command_available,
         "async_function": check_command_available_async,
         "description": "Verifica se um comando específico está disponível",
-        "parameters": {
-            "command": "Nome do comando a verificar"
-        },
+        "parameters": {"command": "Nome do comando a verificar"},
     },
     "get_system_info": {
         "function": get_system_info,

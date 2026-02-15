@@ -18,7 +18,7 @@ class RedisSkill(SkillBase):
                 port=int(os.getenv("REDIS_PORT", 6379)),
                 password=os.getenv("REDIS_PASSWORD") or None,
                 socket_timeout=5,
-                socket_connect_timeout=5
+                socket_connect_timeout=5,
             )
 
             # Test connection
