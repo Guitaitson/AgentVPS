@@ -117,7 +117,7 @@ class AgentLogger:
 # Context manager para logging automático
 # ============================================
 
-class log_agent_flow:
+class LogAgentFlow:
     """Context manager para logging automático do fluxo do agente."""
 
     def __init__(self, request_id: Optional[str] = None):
@@ -194,7 +194,7 @@ def log_llm_call(prompt: str, response: str, model: str, tokens: int = None):
 
 __all__ = [
     "AgentLogger",
-    "log_agent_flow",
+    "LogAgentFlow",
     "log_intentclassification",
     "log_plan_creation",
     "log_skill_execution",

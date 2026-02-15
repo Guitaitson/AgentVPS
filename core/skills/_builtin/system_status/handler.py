@@ -37,7 +37,7 @@ class SystemStatusSkill(SkillBase):
                     checks.append(("✅ RAM", f"{usage_pct:.0f}% - OK"))
             else:
                 checks.append(("❌ RAM", "Não disponível"))
-        except:
+        except Exception:
             checks.append(("❌ RAM", "Não disponível"))
 
         # Check Disk
@@ -58,7 +58,7 @@ class SystemStatusSkill(SkillBase):
                 checks.append(("⚠️  Disco", f"{usage}% - Alto"))
             else:
                 checks.append(("✅ Disco", f"{usage}% - OK"))
-        except:
+        except Exception:
             checks.append(("❌ Disco", "Não disponível"))
 
         # Check Docker
@@ -74,7 +74,7 @@ class SystemStatusSkill(SkillBase):
                 checks.append(("✅ Docker", f"v{version}"))
             else:
                 checks.append(("❌ Docker", "Indisponível"))
-        except:
+        except Exception:
             checks.append(("❌ Docker", "Não instalado"))
 
         # Format output

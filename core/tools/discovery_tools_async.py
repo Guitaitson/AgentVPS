@@ -41,7 +41,7 @@ async def _run_command(cmd: list[str], timeout: int = 10) -> tuple[int, str, str
         try:
             proc.kill()
             await proc.wait()
-        except:
+        except Exception:
             pass
         return -1, "", "Timeout"
     except Exception as e:
@@ -152,7 +152,7 @@ async def get_system_info_async() -> str:
                 os_name = line.split("=")[1].strip('"')
                 info.append(f"🖥️ **Sistema:** {os_name}")
                 break
-    except:
+    except Exception:
         info.append("🖥️ **Sistema:** Linux")
 
     # Kernel e Arquitetura (em paralelo)
@@ -173,7 +173,7 @@ async def get_system_info_async() -> str:
             uptime_seconds = float(f.read().split()[0])
             uptime_hours = uptime_seconds / 3600
             info.append(f"⏱️ **Uptime:** {uptime_hours:.1f} horas")
-    except:
+    except Exception:
         pass
 
     # Usuário

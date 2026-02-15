@@ -113,7 +113,7 @@ def close_checkpointer():
     if _checkpointer_instance is not None:
         try:
             _checkpointer_instance.conn.close()
-        except:
+        except Exception:
             pass
         _checkpointer_instance = None
 

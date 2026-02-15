@@ -364,7 +364,7 @@ def classify_intent_with_llm(message: str, **kwargs) -> tuple:
                 "reasoning": result["reasoning"]
             }
         )
-    except:
+    except Exception:
         # Fallback total: usar inferência local (não depende de intent_classifier.py)
         result = infer_intent_from_message(message)
         return (

@@ -95,7 +95,7 @@ def get_installed_packages() -> str:
             )
             if result.returncode == 0:
                 found.append(cmd)
-        except:
+        except Exception:
             pass
 
     if found:
@@ -173,7 +173,7 @@ def check_command_available(command: str) -> str:
                 if ver_result.returncode == 0:
                     version = ver_result.stdout.strip().split("\n")[0]
                     break
-            except:
+            except Exception:
                 continue
 
         if version:
@@ -202,7 +202,7 @@ def get_system_info() -> str:
                 os_name = line.split("=")[1].strip('"')
                 info.append(f"🖥️ **Sistema:** {os_name}")
                 break
-    except:
+    except Exception:
         info.append("🖥️ **Sistema:** Linux (detalhes não disponíveis)")
 
     # Kernel
@@ -215,7 +215,7 @@ def get_system_info() -> str:
         )
         if result.returncode == 0:
             info.append(f"🔧 **Kernel:** {result.stdout.strip()}")
-    except:
+    except Exception:
         pass
 
     # Arquitetura
@@ -228,7 +228,7 @@ def get_system_info() -> str:
         )
         if result.returncode == 0:
             info.append(f"⚙️ **Arquitetura:** {result.stdout.strip()}")
-    except:
+    except Exception:
         pass
 
     # Uptime
@@ -237,7 +237,7 @@ def get_system_info() -> str:
             uptime_seconds = float(f.read().split()[0])
             uptime_hours = uptime_seconds / 3600
             info.append(f"⏱️ **Uptime:** {uptime_hours:.1f} horas")
-    except:
+    except Exception:
         pass
 
     # Usuário atual
