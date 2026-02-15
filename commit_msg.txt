@@ -1,0 +1,5 @@
+feat: Use LLM to interpret natural language into shell commands
+
+Replaces hardcoded mappings with intelligent LLM-based interpretation.
+The shell_exec skill now uses the LLM to understand any question
+and generate the appropriate shell command automatically.

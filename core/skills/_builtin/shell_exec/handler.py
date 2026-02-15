@@ -175,9 +175,13 @@ class ShellExecSkill(SkillBase):
         
         user_input_lower = user_input.lower().strip()
         
+        # ============================================================
+        # HEURÍSTICAS RÁPIDAS - casos comuns que não precisam de LLM
+        # ============================================================
+        
         # Se já parece um comando shell válido, não precisa interpretar
         # (começa com palavras-chave comuns de shell)
-        shell_keywords = ["ls", "cd", "cat", "grep", "find", "docker", "apt", "pip", "git", "curl", "wget", "which", "psql", "redis"]
+        shell_keywords = ["ls", "cd", "cat", "grep", "find", "docker", "apt", "pip", "git", "curl", "wget", "which", "psql", "redis", "free", "df", "ps", "whoami", "hostname", "uptime"]
         if any(user_input_lower.startswith(kw) for kw in shell_keywords):
             return user_input
         
@@ -186,7 +190,65 @@ class ShellExecSkill(SkillBase):
             if user_input_lower.startswith(prefix):
                 return user_input[len(prefix):].strip()
         
-        # Usar LLM para interpretar a pergunta
+        # ============================================================
+        # PERGUNTAS COMUNS - mapear diretamente para comandos
+        # ============================================================
+        
+        # Detectar perguntas sobre instalação
+        if "tem o" in user_input_lower or "tem " in user_input_lower or "esta instalado" in user_input_lower or "está instalado" in user_input_lower:
+            # Extrair nome do programa
+            programa = None
+            
+            # Tentar extrair nome após "tem o" ou "tem "
+            if "tem o " in user_input_lower:
+                parte = user_input_lower.split("tem o ")[1]
+                programa = parte.split()[0].rstrip("?")
+            elif "tem " in user_input_lower:
+                parte = user_input_lower.split("tem ")[1]
+                programa = parte.split()[0].rstrip("?")
+            elif "esta instalado" in user_input_lower or "está instalado" in user_input_lower:
+                parte = user_input_lower.split("instalado")[0]
+                programa = parte.split()[-1]
+            
+            if programa:
+                # Limpar programa (remover pontuação)
+                programa = programa.strip("?.!,")
+                if programa and len(programa) > 1:
+                    logger.info("shell_heuristic_installed", programa=programa)
+                    return f"which {programa}"
+        
+        # Detectar perguntas sobre RAM
+        if any(p in user_input_lower for p in ["memoria", "memória", "ram", "quanta ram", "quanto ram", "como está a memoria"]):
+            return "free -h"
+        
+        # Detectar perguntas sobre containers
+        if any(p in user_input_lower for p in ["container", "docker", "quantos container", "quantos docker"]):
+            return "docker ps"
+        
+        # Detectar perguntas sobre disco
+        if any(p in user_input_lower for p in ["disco", "espaço", "hd", "quanto espaç"]):
+            return "df -h"
+        
+        # Detectar perguntas sobre processos
+        if any(p in user_input_lower for p in ["processo", "processos", "rodando"]):
+            return "ps aux"
+        
+        # Detectar perguntas sobre hostname
+        if any(p in user_input_lower for p in ["hostname", "nome da maquina", "nome da máquina"]):
+            return "hostname"
+        
+        # Detectar perguntas sobre usuário
+        if any(p in user_input_lower for p in ["quem sou", "qual usuario", "qual usuário"]):
+            return "whoami"
+        
+        # Detectar perguntas sobre uptime
+        if any(p in user_input_lower for p in ["uptime", "tempo ligado", "quanto tempo"]):
+            return "uptime"
+        
+        # ============================================================
+        # LLM - para casos não cobertos pelas heurísticas
+        # ============================================================
+        
         try:
             from core.llm.unified_provider import get_llm_provider
             
