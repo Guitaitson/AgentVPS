@@ -277,7 +277,9 @@ class AutonomousLoop:
             conn.commit()
             conn.close()
 
-    async def create_proposal(self, trigger_name: str, condition_data: dict, suggested_action: dict, priority: int = 5) -> int:
+    async def create_proposal(
+        self, trigger_name: str, condition_data: dict, suggested_action: dict, priority: int = 5
+    ) -> int:
         """Cria uma proposal no PostgreSQL (PROPOSE step)."""
         try:
             conn = self._get_conn()
@@ -295,7 +297,7 @@ class AutonomousLoop:
 
             logger.info("proposal_created", trigger=trigger_name, proposal_id=proposal_id)
 
-            #FILTER: verificar cap gates
+            # FILTER: verificar cap gates
             await self._check_cap_gates(proposal_id, suggested_action)
 
             return proposal_id
@@ -502,7 +504,9 @@ def get_autonomous_loop() -> AutonomousLoop:
         async def ram_high_action(engine: AutonomousLoop):
             suggested_action = {
                 "action": "shell_exec",
-                "args": {"command": "docker ps -a --filter 'status=exited' --format '{{.ID}}' | head -5"},
+                "args": {
+                    "command": "docker ps -a --filter 'status=exited' --format '{{.ID}}' | head -5"
+                },
                 "description": "Limpar containers Docker inativos",
             }
             await engine.create_proposal(
