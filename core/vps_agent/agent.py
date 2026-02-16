@@ -57,11 +57,28 @@ async def process_message_async(user_id: str, message: str) -> str:
 
     # Criar estado inicial com mensagem no formato LangGraph
     # O campo messages com add_messages reducer acumula entre invocações via MemorySaver
+    # TODOS os campos de output são resetados explicitamente para evitar state pollution:
+    # sem isso, o MemorySaver carrega o checkpoint anterior e campos como "response"
+    # persistem da mensagem N para N+1, causando respostas stale e loops infinitos.
     initial_state = {
         "user_id": user_id,
         "user_message": message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "messages": [HumanMessage(content=message)],
+        # Reset de campos de output — evitar state pollution via checkpoint
+        "response": "",
+        "execution_result": None,
+        "blocked_by_security": False,
+        "error": None,
+        "security_check": {},
+        "plan": None,
+        "current_step": 0,
+        "tool_suggestion": None,
+        "tools_needed": [],
+        "action_required": False,
+        "intent": "",
+        "should_save_memory": False,
+        "memory_updates": [],
     }
 
     try:
