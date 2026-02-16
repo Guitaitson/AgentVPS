@@ -405,13 +405,29 @@ async def node_generate_response(state: AgentState) -> AgentState:
 
 
 def node_save_memory(state: AgentState) -> AgentState:
-    """Salva atualizações na memória."""
+    """Salva conversas e fatos na memória persistente."""
     user_id = state["user_id"]
-    updates = state.get("memory_updates", [])
+    user_message = state.get("user_message", "")
+    response = state.get("response", "")
 
+    # Persistir turnos da conversa no conversation_log
+    if user_message:
+        memory.save_conversation(user_id, "user", user_message)
+    if response:
+        memory.save_conversation(user_id, "assistant", response)
+
+    # Salvar fatos como antes
+    updates = state.get("memory_updates", [])
     for update in updates:
         key = update["key"]
         value = update["value"]
         memory.save_fact(user_id, key, value)
+
+    logger.info(
+        "node_save_memory",
+        user_id=user_id,
+        saved_conversation=bool(user_message and response),
+        facts_saved=len(updates),
+    )
 
     return state

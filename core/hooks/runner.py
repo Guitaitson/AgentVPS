@@ -71,15 +71,18 @@ class HookRunner:
 
 
 async def logging_hook(ctx: HookContext):
-    """Hook: Logging estruturado de execucoes."""
-    if ctx.result is not None:
-        logger.info(
-            "skill_executed",
-            skill=ctx.skill_name,
-            duration_ms=ctx.duration_ms,
-            success=ctx.error is None,
-            user_id=ctx.user_id,
-        )
+    """Hook: Logging estruturado completo de execucoes (para auto-diagnostico)."""
+    logger.info(
+        "skill_executed",
+        skill=ctx.skill_name,
+        args=str(ctx.args)[:200],
+        duration_ms=ctx.duration_ms,
+        success=ctx.error is None,
+        user_id=ctx.user_id,
+        result_preview=str(ctx.result)[:300] if ctx.result else None,
+        error=ctx.error,
+        warning=ctx.metadata.get("warning"),
+    )
 
 
 async def feedback_pre_hook(ctx: HookContext):

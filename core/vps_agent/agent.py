@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 import structlog
+from langchain_core.messages import HumanMessage
 
 logger = structlog.get_logger()
 
@@ -54,11 +55,13 @@ async def process_message_async(user_id: str, message: str) -> str:
 
     logger.info("processando_mensagem", user_id=user_id, message=message[:100])
 
-    # Criar estado inicial
+    # Criar estado inicial com mensagem no formato LangGraph
+    # O campo messages com add_messages reducer acumula entre invocações via MemorySaver
     initial_state = {
         "user_id": user_id,
         "user_message": message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "messages": [HumanMessage(content=message)],
     }
 
     try:

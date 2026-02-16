@@ -1,0 +1,35 @@
+name: log_reader
+description: "Lê logs internos do agente: erros recentes, estatísticas de skills e histórico de execuções. Ferramenta de auto-diagnóstico."
+version: "1.0.0"
+security_level: safe
+triggers:
+  - logs
+  - erros recentes
+  - erros
+  - debug
+  - diagnostico
+  - o que aconteceu
+  - meus erros
+  - recent errors
+  - skill stats
+parameters:
+  query_type:
+    type: string
+    required: true
+    description: "Tipo de consulta: 'recent_errors', 'skill_stats', 'all_recent'"
+  limit:
+    type: string
+    required: false
+    description: "Número de entradas (default: 10)"
+parameters_schema:
+  query_type:
+    type: string
+    description: "Tipo: 'recent_errors' (erros recentes), 'skill_stats' (estatísticas), 'all_recent' (resumo geral)"
+    required: true
+  limit:
+    type: string
+    description: "Número de entradas a retornar (default: 10)"
+    required: false
+max_output_chars: 3000
+timeout_seconds: 10
+enabled: true
