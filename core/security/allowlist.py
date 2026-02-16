@@ -215,9 +215,30 @@ def create_default_allowlist() -> SecurityAllowlist:
         AllowlistRule(
             name="safe_system_commands",
             resource_type=ResourceType.COMMAND,
-            pattern=r"^(df -h|uptime|whoami|pwd|ls -la|cat /proc/meminfo)$",
+            pattern=r"^(df|uptime|whoami|pwd|ls|cat|head|tail|free|ps|uname|date|hostname|wc|grep|echo|id|find|du|stat|file|lsb_release|lscpu|lsblk|getent)\b",
             permission=PermissionLevel.ALLOW,
             description="Comandos de sistema seguros (leitura apenas)",
+        ),
+        AllowlistRule(
+            name="safe_query_commands",
+            resource_type=ResourceType.COMMAND,
+            pattern=r"^(which|type|command -v|dpkg -l|dpkg --list|apt list|pip list|pip3 list|pip show|pip3 show|npm list|node --version|python3? --version|env|printenv|ss|ip addr|ip route|ip link)\b",
+            permission=PermissionLevel.ALLOW,
+            description="Comandos de consulta e verificação de instalação (read-only)",
+        ),
+        AllowlistRule(
+            name="safe_version_check",
+            resource_type=ResourceType.COMMAND,
+            pattern=r"^.+\s+--version$",
+            permission=PermissionLevel.ALLOW,
+            description="Verificação de versão de qualquer programa",
+        ),
+        AllowlistRule(
+            name="safe_service_status",
+            resource_type=ResourceType.COMMAND,
+            pattern=r"^systemctl\s+(status|is-active|is-enabled|list-units)\b",
+            permission=PermissionLevel.ALLOW,
+            description="Consulta de status de serviços (read-only)",
         ),
         # Comandos que requerem aprovação
         AllowlistRule(

@@ -23,7 +23,7 @@ def node_load_context(state: AgentState) -> AgentState:
     user_facts = memory.get_user_facts(user_id)
 
     # Histórico recente
-    history = memory.get_conversation_history(user_id, limit=5)
+    history = memory.get_conversation_history(user_id, limit=20)
 
     logger.info(
         "node_load_context",
@@ -279,6 +279,11 @@ async def node_generate_response(state: AgentState) -> AgentState:
         has_execution_result=execution_result is not None,
         has_response=state.get("response") is not None,
     )
+
+    # Se bloqueado por segurança, usar a mensagem de bloqueio como resposta
+    if state.get("blocked_by_security") and execution_result:
+        logger.info("node_generate_response_blocked", preview=str(execution_result)[:100])
+        return {**state, "response": execution_result}
 
     # Se react_node ou format_response já definiu response, usar diretamente
     existing_response = state.get("response")
