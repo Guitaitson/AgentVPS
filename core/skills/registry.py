@@ -174,6 +174,30 @@ class SkillRegistry:
             logger.error("skill_execution_error", skill=name, error=str(e))
             return f"❌ Erro ao executar skill '{name}': {e}"
 
+    def get_security_level(self, name: str, args: dict = None) -> str:
+        """Retorna nível de segurança para executar este skill com estes args.
+
+        Para shell_exec, classifica o comando específico.
+        Para outros skills, retorna o security_level do config.yaml.
+        """
+        skill = self.get(name)
+        if not skill:
+            return "moderate"  # Default seguro para skills desconhecidos
+
+        base_level = skill.config.security_level.value  # "safe", "moderate", "dangerous"
+
+        # Para shell_exec, classificar o comando específico
+        if name == "shell_exec" and args and args.get("command"):
+            try:
+                from .._builtin.shell_exec.handler import classify_command
+
+                cmd_level = classify_command(args["command"])
+                return cmd_level.value
+            except Exception:
+                return "moderate"
+
+        return base_level
+
     @property
     def count(self) -> int:
         return len(self._skills)

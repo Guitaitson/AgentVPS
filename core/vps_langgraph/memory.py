@@ -114,8 +114,9 @@ class AgentMemory:
         conn.commit()
         conn.close()
 
-        # Invalida cache
-        self._redis.delete(f"conv_history:{user_id}:*")
+        # Invalida cache de histórico (scan_iter porque DELETE não suporta glob)
+        for key in self._redis.scan_iter(f"conv_history:{user_id}:*"):
+            self._redis.delete(key)
 
     # --- Memória global ---
 

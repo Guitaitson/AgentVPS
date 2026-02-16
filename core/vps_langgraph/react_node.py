@@ -1,11 +1,16 @@
 """
 ReAct Node — O cérebro inteligente do agente.
 
-Usa function calling para que o LLM decida qual tool usar.
-Substitui: node_classify_intent + node_plan + interpretação do shell_exec.
+Usa function calling com loop iterativo para que o LLM:
+1. Decida qual tool usar
+2. Observe o resultado
+3. Decida se precisa de outra tool ou se pode responder
 
+Substitui: node_classify_intent + node_plan + interpretação do shell_exec.
 Este é o núcleo da mudança de "botões pré-codificados" para "inteligência real".
 """
+
+import json
 
 import structlog
 
@@ -14,38 +19,52 @@ from .state import AgentState
 
 logger = structlog.get_logger()
 
-SYSTEM_PROMPT = """Você é o VPS-Agent, um assistente autônomo rodando em um servidor VPS Ubuntu.
+MAX_REACT_STEPS = 3  # Máximo de iterações tool→observation→thought
 
-Você tem acesso a ferramentas (tools) para executar ações no servidor. Use-as quando necessário.
 
-Regras:
-1. Para perguntas sobre o servidor (RAM, disco, processos, Docker, arquivos), USE uma tool.
-2. Para perguntas gerais de conhecimento, responda diretamente SEM usar tools.
-3. Para buscas na internet, use a tool web_search.
-4. Para ler/criar/editar arquivos, use a tool file_manager.
-5. Sempre responda em português brasileiro de forma concisa e natural.
-6. Quando usar uma tool, interprete o resultado e responda de forma conversacional.
+def build_react_system_prompt() -> str:
+    """Constrói system prompt dinâmico com identidade + skills reais."""
+    from ..llm.agent_identity import get_full_system_prompt
 
-Exemplos de quando usar tools:
-- "quanta RAM?" → use get_ram
-- "tem docker?" → use shell_exec com command="which docker"
-- "liste os containers" → use list_containers
-- "leia o arquivo X" → use file_manager com operation="read"
-- "busque sobre Y" → use web_search com query="Y"
+    identity = get_full_system_prompt()
 
-Exemplos de quando NÃO usar tools:
-- "o que é Python?" → responda diretamente
-- "olá, tudo bem?" → responda diretamente
-- "me ajude com um código" → responda diretamente
+    # Listar skills reais do registry
+    registry = get_skill_registry()
+    skills_info = []
+    for skill_data in registry.list_skills():
+        name = skill_data["name"]
+        desc = skill_data["description"]
+        level = skill_data["security_level"]
+        skills_info.append(f"- **{name}** ({level}): {desc}")
+
+    skills_section = "\n".join(skills_info) if skills_info else "Nenhum skill registrado."
+
+    return f"""{identity}
+
+## Suas Ferramentas Reais (disponíveis agora)
+{skills_section}
+
+## Regras ReAct (IMPORTANTE)
+1. Voce TEM acesso direto ao servidor Ubuntu. Use shell_exec para qualquer verificacao.
+2. Para verificar se algo esta instalado: use shell_exec com "which <programa>" ou "<programa> --version".
+3. Se uma ferramenta falhar, TENTE de outra forma. Nunca diga "nao consigo" sem ter tentado.
+4. Use web_search para buscar informacoes na internet.
+5. Use file_manager para ler, criar ou editar arquivos no servidor.
+6. Sempre responda em portugues brasileiro de forma concisa e natural.
+7. Quando usar uma tool, interprete o resultado e responda de forma conversacional.
+8. Para perguntas gerais de conhecimento (sem relacao com o servidor), responda diretamente SEM tools.
+9. Nunca diga que voce e "um modelo de linguagem". Voce e o VPS-Agent.
+10. Se o usuario referenciar algo da conversa anterior, USE o historico para responder.
 """
 
 
 async def node_react(state: AgentState) -> AgentState:
     """
-    Nó ReAct: LLM decide se usa tool ou responde diretamente.
+    Nó ReAct com loop iterativo: Thought → Action → Observation → Thought.
 
-    Este nó substitui node_classify_intent + node_plan em uma única chamada LLM.
-    O LLM recebe a lista de tools e decide qual usar (ou nenhuma).
+    - Skills SAFE: executados inline, resultado alimentado de volta ao LLM.
+    - Skills MODERATE/DANGEROUS: roteados para security_check → execute (path do grafo).
+    - Máximo MAX_REACT_STEPS iterações para evitar loops infinitos.
     """
     from ..llm.unified_provider import get_llm_provider
 
@@ -62,53 +81,128 @@ async def node_react(state: AgentState) -> AgentState:
     )
 
     provider = get_llm_provider()
+    system_prompt = build_react_system_prompt()
 
-    # Primeira chamada: LLM decide se usa tool ou responde
-    response = await provider.generate(
-        user_message=user_message,
-        system_prompt=SYSTEM_PROMPT,
-        history=conversation_history[-5:] if conversation_history else None,
-        tools=tools,
-    )
+    # Construir mensagens para multi-turn
+    messages = [{"role": "system", "content": system_prompt}]
 
-    if not response.success:
-        logger.error("react_llm_failed", error=response.error)
-        return {
-            **state,
-            "intent": "chat",
-            "response": "Desculpe, tive um problema ao processar sua mensagem. Tente novamente.",
-        }
+    # Adicionar histórico de conversa
+    if conversation_history:
+        for msg in conversation_history[-5:]:
+            messages.append(
+                {
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", ""),
+                }
+            )
 
-    # Se LLM retornou tool_calls
-    if response.tool_calls:
-        tool_call = response.tool_calls[0]  # Processar primeira tool
+    # Mensagem atual do usuário
+    messages.append({"role": "user", "content": user_message})
+
+    last_result = None
+
+    for step in range(MAX_REACT_STEPS):
+        response = await provider.generate(messages=messages, tools=tools)
+
+        if not response.success:
+            logger.error("react_llm_failed", error=response.error, step=step)
+            return {
+                **state,
+                "intent": "chat",
+                "response": "Desculpe, tive um problema ao processar sua mensagem. Tente novamente.",
+            }
+
+        # Se LLM respondeu diretamente (sem tool call) → pronto
+        if not response.tool_calls:
+            logger.info("react_direct_response", step=step)
+            return {
+                **state,
+                "intent": "chat",
+                "action_required": False,
+                "response": response.content,
+                "plan": None,
+            }
+
+        # LLM quer usar uma tool
+        tool_call = response.tool_calls[0]
         tool_name = tool_call.get("name", "")
         tool_args = tool_call.get("arguments", {})
+        call_id = tool_call.get("id", f"call_{step}")
+
+        logger.info("react_tool_call", tool=tool_name, args=str(tool_args)[:200], step=step)
+
+        # Verificar nível de segurança
+        security_level = registry.get_security_level(tool_name, tool_args)
+
+        # MODERATE/DANGEROUS → rotear para security_check (path do grafo)
+        if security_level in ("moderate", "dangerous", "forbidden"):
+            logger.info(
+                "react_route_to_graph",
+                tool=tool_name,
+                security=security_level,
+                step=step,
+            )
+            return {
+                **state,
+                "intent": "task",
+                "action_required": True,
+                "tool_suggestion": tool_name,
+                "plan": [{"type": "skill", "action": tool_name, "args": tool_args}],
+                "current_step": 0,
+                "tools_needed": [tool_name],
+                "execution_result": None,
+            }
+
+        # SAFE → executar inline e alimentar resultado ao LLM
+        try:
+            result = await registry.execute_skill(tool_name, tool_args)
+            last_result = str(result)
+        except Exception as e:
+            last_result = f"Erro ao executar {tool_name}: {e}"
+            logger.error("react_inline_error", tool=tool_name, error=str(e), step=step)
 
         logger.info(
-            "react_tool_call",
+            "react_inline_executed",
             tool=tool_name,
-            args=tool_args,
+            result_preview=last_result[:200] if last_result else "",
+            step=step,
         )
 
-        return {
-            **state,
-            "intent": "task",
-            "action_required": True,
-            "tool_suggestion": tool_name,
-            "plan": [{"type": "skill", "action": tool_name, "args": tool_args}],
-            "current_step": 0,
-            "tools_needed": [tool_name],
-            "execution_result": None,  # Será preenchido pelo node_execute
-        }
+        # Adicionar tool call + resultado ao contexto para próxima iteração
+        # Formato OpenRouter/OpenAI para multi-turn tool calling
+        messages.append(
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "arguments": json.dumps(tool_args)
+                            if isinstance(tool_args, dict)
+                            else str(tool_args),
+                        },
+                    }
+                ],
+            }
+        )
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": call_id,
+                "content": last_result,
+            }
+        )
 
-    # Se LLM respondeu diretamente
-    logger.info("react_direct_response")
+    # Esgotou MAX_REACT_STEPS — retornar último resultado formatado
+    logger.warning("react_max_steps_reached", steps=MAX_REACT_STEPS)
     return {
         **state,
-        "intent": "chat",
+        "intent": "task",
         "action_required": False,
-        "response": response.content,
+        "response": last_result or "Executei múltiplas ações mas não consegui uma resposta final.",
         "plan": None,
     }
 

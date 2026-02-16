@@ -108,13 +108,39 @@ class UnifiedLLMProvider:
 
         return messages
 
+    def _normalize_tool_calls(self, raw_tool_calls: list[dict]) -> list[dict]:
+        """Normaliza tool_calls de diferentes formatos de API para formato flat."""
+        normalized = []
+        for tc in raw_tool_calls:
+            if "function" in tc:
+                # Formato OpenRouter/OpenAI: {"id": "...", "type": "function", "function": {"name": ..., "arguments": ...}}
+                func = tc["function"]
+                args = func.get("arguments", "{}")
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
+                normalized.append(
+                    {
+                        "id": tc.get("id", ""),
+                        "name": func.get("name", ""),
+                        "arguments": args,
+                    }
+                )
+            else:
+                # Formato já normalizado
+                normalized.append(tc)
+        return normalized
+
     async def generate(
         self,
-        user_message: str,
+        user_message: str = "",
         system_prompt: Optional[str] = None,
         history: Optional[list[dict]] = None,
         tools: Optional[list[dict]] = None,
         json_mode: bool = False,
+        messages: Optional[list[dict]] = None,
     ) -> LLMResponse:
         """
         Gera resposta do LLM.
@@ -125,6 +151,7 @@ class UnifiedLLMProvider:
             history: Histórico de conversa
             tools: Tools disponíveis para function calling
             json_mode: Se True, força saída JSON
+            messages: Lista de mensagens pré-construídas (alternativa a user_message+history)
 
         Returns:
             LLMResponse padronizada
@@ -137,11 +164,15 @@ class UnifiedLLMProvider:
                 error="API key não configurada ou inválida",
             )
 
-        messages = self._build_messages(user_message, system_prompt, history)
+        # Usar mensagens pré-construídas se fornecidas (para ReAct loop)
+        if messages:
+            final_messages = messages
+        else:
+            final_messages = self._build_messages(user_message, system_prompt, history)
 
         payload = {
             "model": self.model,
-            "messages": messages,
+            "messages": final_messages,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
@@ -178,13 +209,13 @@ class UnifiedLLMProvider:
                 choice = data["choices"][0]
                 message = choice["message"]
 
-                # Extrair tool calls se presentes
+                # Extrair e normalizar tool calls se presentes
                 tool_calls = None
-                if "tool_calls" in message:
-                    tool_calls = message["tool_calls"]
+                if "tool_calls" in message and message["tool_calls"]:
+                    tool_calls = self._normalize_tool_calls(message["tool_calls"])
 
                 return LLMResponse(
-                    content=message.get("content", ""),
+                    content=message.get("content", "") or "",
                     tool_calls=tool_calls,
                     usage=data.get("usage"),
                     model=data.get("model", self.model),
