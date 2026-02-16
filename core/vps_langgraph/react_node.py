@@ -227,8 +227,15 @@ async def node_format_response(state: AgentState) -> AgentState:
     user_message = state.get("user_message", "")
     tool_name = state.get("tool_suggestion", "")
 
-    if not execution_result:
+    # Se nenhum tool foi executado, skip
+    if execution_result is None and not tool_name:
         return state
+
+    # Se tool foi executado mas resultado é vazio, informar ao LLM
+    if not execution_result and tool_name:
+        execution_result = (
+            f"O comando '{tool_name}' foi executado mas não retornou output (saída vazia)."
+        )
 
     provider = get_llm_provider()
 

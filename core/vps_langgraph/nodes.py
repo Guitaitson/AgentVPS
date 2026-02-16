@@ -285,9 +285,11 @@ async def node_generate_response(state: AgentState) -> AgentState:
         logger.info("node_generate_response_blocked", preview=str(execution_result)[:100])
         return {**state, "response": execution_result}
 
-    # Se react_node ou format_response já definiu response, usar diretamente
+    # Se react_node definiu response NESTA mensagem (intent=chat, sem action pendente)
+    # Com state reset em agent.py, response="" no início de cada mensagem.
+    # Se response não é vazia aqui, foi definida pelo react nesta execução.
     existing_response = state.get("response")
-    if existing_response:
+    if existing_response and state.get("intent") == "chat" and not state.get("action_required"):
         logger.info("node_generate_response_from_react", preview=str(existing_response)[:100])
         return state
 
