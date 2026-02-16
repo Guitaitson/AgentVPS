@@ -99,7 +99,7 @@ class UnifiedLLMProvider:
             messages.append({"role": "system", "content": system_prompt})
 
         if history:
-            for msg in history[-5:]:  # Últimas 5 mensagens
+            for msg in history[-20:]:  # Últimas 20 mensagens
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
                 messages.append({"role": role, "content": content})
