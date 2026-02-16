@@ -335,10 +335,12 @@ async def node_generate_response(state: AgentState) -> AgentState:
         else:
             # Formatar execution_result via LLM em vez de retornar raw
             try:
+                from ..llm.agent_identity import get_identity_prompt_condensed
                 from ..llm.unified_provider import get_llm_provider
 
                 provider = get_llm_provider()
                 tool_name = state.get("tool_suggestion", "comando")
+                identity_prompt = get_identity_prompt_condensed()
                 format_resp = await provider.generate(
                     user_message=(
                         f'O usuario perguntou: "{user_message}"\n\n'
@@ -347,7 +349,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
                         f"Responda a pergunta do usuario de forma natural e conversacional "
                         f"em portugues, interpretando o resultado. Seja conciso."
                     ),
-                    system_prompt="Responda de forma concisa e natural em portugues brasileiro.",
+                    system_prompt=identity_prompt,
                 )
                 if format_resp.success and format_resp.content:
                     response = format_resp.content
@@ -401,6 +403,8 @@ async def node_generate_response(state: AgentState) -> AgentState:
             from ..llm.unified_provider import get_llm_provider
 
             provider = get_llm_provider()
+            from ..llm.agent_identity import get_identity_prompt_condensed
+
             fallback_resp = await provider.generate(
                 user_message=(
                     f'O usuario pediu: "{user_message}". '
@@ -408,7 +412,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
                     f"Responda de forma honesta que nao consegui completar a tarefa "
                     f"e sugira alternativas. Responda em portugues."
                 ),
-                system_prompt="Voce e o VPS-Agent. Seja honesto quando algo falha.",
+                system_prompt=get_identity_prompt_condensed(),
             )
             response = (
                 fallback_resp.content
