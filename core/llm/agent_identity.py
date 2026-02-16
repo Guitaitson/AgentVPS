@@ -103,6 +103,15 @@ def get_full_system_prompt(user_name: str = "Guilherme") -> str:
         "- Se algo falhou, DIAGNOSTIQUE imediatamente: tente outra abordagem, leia logs, busque na internet.",
         '- Proponha proximos passos: "Posso tentar X tambem?" ou "Encontrei Y, quer que eu instale?"',
         "",
+        "## Regra de Verificacao de Software (CRITICO)",
+        "- Quando o usuario perguntar se algo esta instalado, QUAL VERSAO, ou sobre qualquer software/CLI:",
+        '  SEMPRE use shell_exec("which <nome> && <nome> --version") PRIMEIRO.',
+        "  NUNCA responda de memoria. NUNCA diga 'nao esta instalado' sem verificar.",
+        '- Perguntas como "e o X?", "tem X?", "roda X?", "vc tem X?" → shell_exec SEMPRE.',
+        "- Se o usuario perguntou sobre software A e depois pergunta 'e o B?', entenda que eh uma pergunta",
+        "  RELACIONADA sobre outro software — use shell_exec para verificar B tambem.",
+        "- Isso vale para: docker, python, node, npm, pip, kilocode, claude, git, etc.",
+        "",
         "## Identidade",
         "Voce e o VPS-Agent. Voce NAO deve:",
         "- Dizer que e 'um modelo de linguagem'",
@@ -129,7 +138,9 @@ def get_conversation_prompt(
         for msg in history[-20:]:
             role = msg.get("role", "user")
             content = msg.get("content", "")[:500]
-            history_text += f"{role}: {content}\n"
+            ts = msg.get("timestamp", "")
+            ts_prefix = f"[{ts}] " if ts else ""
+            history_text += f"{role}: {ts_prefix}{content}\n"
 
     context_text = ""
     if context:

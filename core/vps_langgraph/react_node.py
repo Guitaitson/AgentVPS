@@ -93,13 +93,15 @@ async def node_react(state: AgentState) -> AgentState:
     # Construir mensagens para multi-turn
     messages = [{"role": "system", "content": system_prompt}]
 
-    # Adicionar histórico de conversa
+    # Adicionar histórico de conversa (com timestamps para contexto temporal)
     if conversation_history:
         for msg in conversation_history[-20:]:
+            ts = msg.get("timestamp", "")
+            ts_prefix = f"[{ts}] " if ts else ""
             messages.append(
                 {
                     "role": msg.get("role", "user"),
-                    "content": msg.get("content", ""),
+                    "content": f"{ts_prefix}{msg.get('content', '')}",
                 }
             )
 
