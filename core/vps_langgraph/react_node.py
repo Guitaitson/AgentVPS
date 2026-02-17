@@ -115,7 +115,7 @@ async def node_react(state: AgentState) -> AgentState:
             role = msg.get("role", "user")
             messages.append({"role": role, "content": content})
             if ts:
-                temporal_entries.append(f"msg{i+1}({role}): {ts}")
+                temporal_entries.append(f"msg{i + 1}({role}): {ts}")
 
     # Adicionar contexto temporal discreto ao system prompt (não polui mensagens)
     if temporal_entries:
@@ -123,7 +123,20 @@ async def node_react(state: AgentState) -> AgentState:
         messages[0]["content"] += temporal_block
 
     # T4: Detectar feedback negativo do usuário e registrar learning
-    negative_indicators = ["errado", "nao eh", "não é", "tem certeza", "incorreto", "wrong", "nao foi isso", "não foi isso", "ta errado", "tá errado", "voce errou", "você errou"]
+    negative_indicators = [
+        "errado",
+        "nao eh",
+        "não é",
+        "tem certeza",
+        "incorreto",
+        "wrong",
+        "nao foi isso",
+        "não foi isso",
+        "ta errado",
+        "tá errado",
+        "voce errou",
+        "você errou",
+    ]
     msg_lower = user_message.lower()
     if any(ind in msg_lower for ind in negative_indicators) and conversation_history:
         try:

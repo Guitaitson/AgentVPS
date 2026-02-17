@@ -149,9 +149,7 @@ class WebSearchSkill(SkillBase):
         title_pattern = re.compile(
             r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', re.DOTALL
         )
-        snippet_pattern = re.compile(
-            r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>', re.DOTALL
-        )
+        snippet_pattern = re.compile(r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>', re.DOTALL)
 
         # Dividir por blocos de resultado
         result_blocks = re.split(r'<div[^>]*class="[^"]*result[^"]*"', html)
@@ -176,11 +174,13 @@ class WebSearchSkill(SkillBase):
                         url = unquote(real_url_match.group(1))
 
                 if title:
-                    results.append({
-                        "title": title[:100],
-                        "snippet": snippet[:200],
-                        "url": url,
-                    })
+                    results.append(
+                        {
+                            "title": title[:100],
+                            "snippet": snippet[:200],
+                            "url": url,
+                        }
+                    )
 
             if len(results) >= 5:
                 break

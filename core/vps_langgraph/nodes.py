@@ -430,10 +430,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
 
     # Se nenhuma resposta foi definida (safety net)
     if response is None:
-        response = (
-            "Entendi sua mensagem. Como VPS-Agent, estou pronto para ajudar. "
-            "O que precisa?"
-        )
+        response = "Entendi sua mensagem. Como VPS-Agent, estou pronto para ajudar. O que precisa?"
 
     # Salvar memória se foi uma interação significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50
