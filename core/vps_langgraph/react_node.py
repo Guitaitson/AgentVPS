@@ -90,18 +90,71 @@ async def node_react(state: AgentState) -> AgentState:
     provider = get_llm_provider()
     system_prompt = build_react_system_prompt()
 
+    # T4: Consultar learnings relevantes antes de responder
+    try:
+        from .learnings import learnings_manager
+
+        recent_lessons = learnings_manager.search_learnings(user_message[:80], limit=3)
+        if recent_lessons:
+            lessons_text = "\n".join([f"- {lesson['lesson']}" for lesson in recent_lessons])
+            system_prompt += f"\n\n## Licoes Aprendidas (evite repetir estes erros)\n{lessons_text}"
+            logger.info("react_learnings_injected", count=len(recent_lessons))
+    except Exception as e:
+        logger.debug("react_learnings_skip", error=str(e))
+
     # Construir mensagens para multi-turn
     messages = [{"role": "system", "content": system_prompt}]
 
-    # Adicionar histórico de conversa
+    # Adicionar histórico de conversa (SEM timestamp no content — evita LLM repetir timestamps)
+    # Timestamps vão em bloco separado no system prompt para contexto temporal
+    temporal_entries = []
     if conversation_history:
-        for msg in conversation_history[-20:]:
-            messages.append(
-                {
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", ""),
-                }
-            )
+        for i, msg in enumerate(conversation_history[-20:]):
+            ts = msg.get("timestamp", "")
+            content = msg.get("content", "")
+            role = msg.get("role", "user")
+            messages.append({"role": role, "content": content})
+            if ts:
+                temporal_entries.append(f"msg{i + 1}({role}): {ts}")
+
+    # Adicionar contexto temporal discreto ao system prompt (não polui mensagens)
+    if temporal_entries:
+        temporal_block = "\n## Contexto Temporal da Conversa\n" + ", ".join(temporal_entries[-5:])
+        messages[0]["content"] += temporal_block
+
+    # T4: Detectar feedback negativo do usuário e registrar learning
+    negative_indicators = [
+        "errado",
+        "nao eh",
+        "não é",
+        "tem certeza",
+        "incorreto",
+        "wrong",
+        "nao foi isso",
+        "não foi isso",
+        "ta errado",
+        "tá errado",
+        "voce errou",
+        "você errou",
+    ]
+    msg_lower = user_message.lower()
+    if any(ind in msg_lower for ind in negative_indicators) and conversation_history:
+        try:
+            from .learnings import learnings_manager
+
+            last_assistant = [m for m in conversation_history if m.get("role") == "assistant"]
+            if last_assistant:
+                prev_response = last_assistant[-1].get("content", "")[:200]
+                learnings_manager.add_learning(
+                    category="user_feedback",
+                    trigger=user_message[:200],
+                    lesson=f"Resposta rejeitada pelo usuario. Resposta errada: '{prev_response}'. Correcao do usuario: '{user_message[:200]}'",
+                    success=False,
+                    metadata={"user_id": state.get("user_id", "unknown")},
+                )
+                logger.info("react_user_correction_captured", trigger=user_message[:50])
+        except Exception as e:
+            logger.debug("react_user_correction_skip", error=str(e))
 
     # Mensagem atual do usuário
     messages.append({"role": "user", "content": user_message})
@@ -239,6 +292,11 @@ async def node_format_response(state: AgentState) -> AgentState:
 
     provider = get_llm_provider()
 
+    # Usar identidade condensada para que o LLM NUNCA esqueça que é o VPS-Agent
+    from ..llm.agent_identity import get_identity_prompt_condensed
+
+    identity_prompt = get_identity_prompt_condensed()
+
     format_prompt = f"""O usuário perguntou: "{user_message}"
 
 Você usou a ferramenta '{tool_name}' e obteve este resultado:
@@ -250,7 +308,7 @@ interpretando o resultado acima. Seja conciso."""
 
     response = await provider.generate(
         user_message=format_prompt,
-        system_prompt="Responda de forma concisa e natural em português brasileiro.",
+        system_prompt=identity_prompt,
     )
 
     if response.success and response.content:

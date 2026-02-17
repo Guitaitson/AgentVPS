@@ -259,11 +259,19 @@ async def node_execute(state: AgentState) -> AgentState:
 
 
 async def node_generate_response(state: AgentState) -> AgentState:
-    """Gera resposta final ao usuário com identidade VPS-Agent."""
+    """
+    Gera resposta final ao usuário com identidade VPS-Agent.
+
+    Prioridade de resposta (Sprint 07):
+    1. Bloqueio de segurança → mensagem de bloqueio
+    2. response já definida neste ciclo (por format_response ou react_node) → preservar
+    3. execution_result presente → formatar via LLM (nunca retornar raw)
+    4. intent chat/question → LLM com identidade
+    5. Fallback contextual via LLM (nunca hardcoded)
+    """
     from .smart_responses import (
         detect_missing_skill_keywords,
         generate_smart_unavailable_response,
-        get_capabilities_summary,
     )
 
     intent = state.get("intent")
@@ -277,47 +285,83 @@ async def node_generate_response(state: AgentState) -> AgentState:
         "node_generate_response_start",
         intent=intent,
         has_execution_result=execution_result is not None,
-        has_response=state.get("response") is not None,
+        has_response=bool(state.get("response")),
+        response_preview=str(state.get("response", ""))[:80],
     )
 
-    # Se bloqueado por segurança, usar a mensagem de bloqueio como resposta
+    # --- Prioridade 1: Bloqueio de segurança ---
     if state.get("blocked_by_security") and execution_result:
         logger.info("node_generate_response_blocked", preview=str(execution_result)[:100])
         return {**state, "response": execution_result}
 
-    # Se react_node definiu response NESTA mensagem (intent=chat, sem action pendente)
+    # --- Prioridade 2: response já definida neste ciclo ---
     # Com state reset em agent.py, response="" no início de cada mensagem.
-    # Se response não é vazia aqui, foi definida pelo react nesta execução.
+    # Se response não é vazia aqui, foi definida pelo react_node ou format_response NESTA execução.
+    # Preservar SEMPRE — não sobrescrever com execution_result raw.
     existing_response = state.get("response")
-    if existing_response and state.get("intent") == "chat" and not state.get("action_required"):
-        logger.info("node_generate_response_from_react", preview=str(existing_response)[:100])
-        return state
+    if existing_response and existing_response.strip():
+        logger.info("node_generate_response_preserved", preview=str(existing_response)[:100])
+
+        # Salvar memória
+        should_save = intent in ["command", "task"] or len(user_message) > 50
+        return {
+            **state,
+            "should_save_memory": should_save,
+            "memory_updates": [
+                {
+                    "key": "last_interaction",
+                    "value": {"type": intent, "time": datetime.now().isoformat()},
+                }
+            ]
+            if should_save
+            else [],
+        }
 
     response = None
 
-    # Se há resultado de execução, usar diretamente (MESMO que seja string vazia)
+    # --- Prioridade 3: execution_result presente → formatar via LLM ---
     if execution_result is not None:
-        # Verificar se é uma mensagem de "não implementado"
         result_str = str(execution_result).lower()
         if (
             "não implementado" in result_str
             or "não encontrado" in result_str
             or "not implemented" in result_str
         ):
-            # Gerar resposta smarter com plano de ação
             detected = detect_missing_skill_keywords(user_message.lower())
             response = generate_smart_unavailable_response(
                 user_message, detected_skills=detected, intent=intent
             )
             logger.info("node_generate_response_unimplemented")
         else:
-            response = str(execution_result)
-            logger.info(
-                "node_generate_response_from_execution",
-                response_preview=str(response)[:100] if response else "None",
-            )
+            # Formatar execution_result via LLM em vez de retornar raw
+            try:
+                from ..llm.agent_identity import get_identity_prompt_condensed
+                from ..llm.unified_provider import get_llm_provider
 
-    # Para self_improve com capacidades faltantes
+                provider = get_llm_provider()
+                tool_name = state.get("tool_suggestion", "comando")
+                identity_prompt = get_identity_prompt_condensed()
+                format_resp = await provider.generate(
+                    user_message=(
+                        f'O usuario perguntou: "{user_message}"\n\n'
+                        f'Voce usou a ferramenta "{tool_name}" e obteve este resultado:\n\n'
+                        f"{execution_result}\n\n"
+                        f"Responda a pergunta do usuario de forma natural e conversacional "
+                        f"em portugues, interpretando o resultado. Seja conciso."
+                    ),
+                    system_prompt=identity_prompt,
+                )
+                if format_resp.success and format_resp.content:
+                    response = format_resp.content
+                    logger.info("node_generate_response_formatted_by_llm")
+                else:
+                    response = str(execution_result)
+                    logger.warning("node_generate_response_llm_format_failed_using_raw")
+            except Exception as e:
+                response = str(execution_result)
+                logger.error("node_generate_response_format_error", error=str(e))
+
+    # --- Prioridade 4: self_improve ---
     elif intent == "self_improve" and missing_capabilities:
         response = generate_smart_unavailable_response(
             user_message,
@@ -326,66 +370,67 @@ async def node_generate_response(state: AgentState) -> AgentState:
         )
         logger.info("node_generate_response_self_improve")
 
-    # Para conversas e perguntas, usar LLM com identidade VPS-Agent
+    # --- Prioridade 5: chat/question → LLM com identidade ---
     elif intent in ["chat", "question"]:
         logger.info("node_generate_response_using_llm", intent=intent)
         try:
             from ..llm.openrouter_client import generate_response
 
-            # Chamar LLM com contexto completo de identidade (versão async)
             response = await generate_response(
                 user_message=user_message,
                 conversation_history=conversation_history,
                 user_context=user_context,
             )
 
-            # Fallback se LLM falhou
             if not response:
-                if intent == "chat":
-                    response = (
-                        "Oi! Sou o VPS-Agent! 😊\n\n"
-                        "Seu assistente autônomo rodando na VPS.\n\n"
-                        "Posso ajudar com:\n"
-                        "• Gerenciamento da VPS (RAM, containers, serviços)\n"
-                        "• Criação de novos agentes\n"
-                        "• Integração de ferramentas\n"
-                        "• E muito mais!\n\n"
-                        "O que você precisa hoje?"
-                    )
-                else:
-                    response = (
-                        f"Sobre '{user_message}':\n\n"
-                        "Posso ajudar! Como VPS-Agent, tenho acesso a várias ferramentas.\n\n"
-                        f"{get_capabilities_summary()}"
-                    )
+                response = (
+                    f"Entendi sua mensagem sobre '{user_message[:50]}'. "
+                    f"Como VPS-Agent, posso ajudar com gerenciamento do servidor, "
+                    f"busca na internet, e mais. O que precisa?"
+                )
 
         except Exception as e:
             logger.error("node_generate_response_llm_error", error=str(e))
             response = (
-                "Sou o VPS-Agent! 😊\n\n"
-                "Entendi sua mensagem.\n\n"
-                "O que eu posso fazer:\n"
-                "• Gerenciar sua VPS (RAM, containers)\n"
-                "• Criar novos agentes\n"
-                "• Integrar ferramentas\n\n"
-                f"{get_capabilities_summary()}"
+                "Entendi sua mensagem. Como VPS-Agent, posso ajudar "
+                "com gerenciamento do servidor e mais. O que precisa?"
             )
 
+    # --- Prioridade 6: Fallback contextual (NUNCA hardcoded) ---
     else:
-        response = "Comando executado com sucesso! ✅"
-        logger.info("node_generate_response_default")
+        logger.warning("node_generate_response_fallback", intent=intent)
+        try:
+            from ..llm.unified_provider import get_llm_provider
 
-    # Se nenhuma resposta foi definida, usar fallback
+            provider = get_llm_provider()
+            from ..llm.agent_identity import get_identity_prompt_condensed
+
+            fallback_resp = await provider.generate(
+                user_message=(
+                    f'O usuario pediu: "{user_message}". '
+                    f"Tentei executar mas nao obtive resultado. "
+                    f"Responda de forma honesta que nao consegui completar a tarefa "
+                    f"e sugira alternativas. Responda em portugues."
+                ),
+                system_prompt=get_identity_prompt_condensed(),
+            )
+            response = (
+                fallback_resp.content
+                if fallback_resp.success and fallback_resp.content
+                else (
+                    f"Nao consegui completar sua solicitacao sobre "
+                    f"'{user_message[:50]}'. Posso tentar de outra forma?"
+                )
+            )
+        except Exception:
+            response = (
+                f"Nao consegui completar sua solicitacao sobre "
+                f"'{user_message[:50]}'. Posso tentar de outra forma?"
+            )
+
+    # Se nenhuma resposta foi definida (safety net)
     if response is None:
-        response = (
-            "Sou o VPS-Agent! 😊\n\n"
-            "Entendi sua mensagem. Como posso ajudar?\n\n"
-            "Comandos disponíveis:\n"
-            "• /status - Status da VPS\n"
-            "• /ram - Memória RAM\n"
-            "• /containers - Containers Docker\n"
-            "• /health - Health check"
-        )
+        response = "Entendi sua mensagem. Como VPS-Agent, estou pronto para ajudar. O que precisa?"
 
     # Salvar memória se foi uma interação significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50
@@ -395,7 +440,6 @@ async def node_generate_response(state: AgentState) -> AgentState:
         response_preview=str(response)[:100] if response else "None",
     )
 
-    # CORREÇÃO: Retornar dict (AgentState), não string!
     return {
         **state,
         "response": response,

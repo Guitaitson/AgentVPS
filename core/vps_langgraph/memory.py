@@ -93,7 +93,14 @@ class AgentMemory:
             "WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
             (user_id, limit),
         )
-        history = [{"role": row["role"], "content": row["content"]} for row in cur.fetchall()]
+        history = [
+            {
+                "role": row["role"],
+                "content": row["content"],
+                "timestamp": row["timestamp"].isoformat() if row.get("timestamp") else None,
+            }
+            for row in cur.fetchall()
+        ]
         conn.close()
         history.reverse()  # chronological order
 
@@ -128,8 +135,13 @@ class AgentMemory:
 
         conn = self._get_conn()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT key, value FROM system_state")
-        state = {row["key"]: row["value"] for row in cur.fetchall()}
+        cur.execute("SELECT component, state, updated_at FROM system_state")
+        state = {}
+        for row in cur.fetchall():
+            state[row["component"]] = {
+                "state": row["state"],
+                "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+            }
         conn.close()
 
         self._redis.setex("system_state", 60, json.dumps(state))
@@ -141,9 +153,9 @@ class AgentMemory:
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO system_state (key, value)
+            INSERT INTO system_state (component, state)
             VALUES (%s, %s)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            ON CONFLICT (component) DO UPDATE SET state = EXCLUDED.state
             """,
             (key, Json(value)),
         )
