@@ -1,121 +1,144 @@
 # Changelog
 
-Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
+Baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
+Adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
-e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
+---
 
-## [Unreleased]
+## [Unreleased] — Sprint 09: Integração OpenClaw + Hardening
 
 ### Adicionado
-- Gateway FastAPI com endpoints REST
-- Sistema de allowlist de segurança
-- Circuit breaker para resiliência
-- Health check modular
-- Rate limiter no gateway
-- Session manager para estado de conversas
-- **Sprint 1 — Estabilização de Tools (2025-02-10)**
-  - Logging estruturado em todos os nodes do grafo (structlog)
-  - Checkpointing PostgreSQL integrado ao LangGraph com fallback para MemorySaver
-  - Async tools modernizadas usando `asyncio.to_thread()` (Python 3.9+)
-  - Singleton do grafo via `get_agent_graph()` para performance
-  - Thread ID por usuário para persistência de conversa
+- **Skill `openclaw_exec` v2.0.0**: controla OpenClaw via `docker exec repo-openclaw-gateway-1 node /app/dist/entry.js`
+  - Ações: `health`, `status`, `agent`, `agents`, `channels`, `approvals`
+  - Substituiu abordagem CLI quebrada (binário não existe no host)
+- **Anti-prompt-injection**: output do OpenClaw envolvido com marcadores `[DADO EXTERNO OPENCLAW]`
+- **Skill `log_reader`**: leitura de logs da VPS
+- **Skill `notify_handler`**: notificações via Telegram
+- **Auto-planejamento**: trigger autônomo para manutenção proativa
+- **Self-edit real**: skill `self_edit` com validação de patch antes de aplicar
 
-### Mudado
-- Estrutura de pacotes reorganizada (Fase 0.5)
-- CI/CD modernizado para usar `pip install -e ".[dev]"`
-- Imports padronizados sem `sys.path.insert`
-- **Correções críticas no fluxo de execução de tools:**
-  - `node_generate_response` agora usa `execution_result is not None` em vez de truthy check
-  - `node_plan` cria plano do tipo `"tool"` quando `tool_suggestion` está presente
-  - `node_security_check` permite tools do tipo `"tool"` (não apenas command/execute)
+### Alterado
+- Modelo LLM: `minimax/minimax-m2.5` (padrão para AgentVPS e OpenClaw)
+- `OPENROUTER_MAX_TOKENS`: 256 → 2048
+- `OPENROUTER_TIMEOUT`: 10 → 30 segundos
+- `.env.example`: sanitizado (sem tokens reais, valores de produção corrigidos)
 
-## [2.0.0] - 2025-02-09
+### Corrigido
+- `openclaw_exec`: handler reescrito — subprocess CLI (FileNotFoundError) → docker exec correto
+- Config do modelo no `.env`: removido `google/gemini-2.5-flash-lite` que alucinou código Python
 
-### Fase 0.5 — Foundation e Estrutura ✅
-
-#### Resumo
-Reestruturação completa da base de código para seguir padrões profissionais Python, eliminando anti-padrões e estabelecendo foundation sólida para evolução.
-
-#### Mudanças
-
-**Estrutura de Pacotes**
-- `telegram-bot/` → `telegram_bot/` (PEP 8)
-- `resource-manager/` → `core/resource_manager/`
-- Adicionado `pyproject.toml` como pacote Python profissional
-- Scripts de entry point configurados:
-  - `vps-agent` → `telegram_bot.bot:main`
-  - `vps-mcp` → `core.mcp_server:main`
-  - `vps-gateway` → `core.gateway.main:run_server`
-
-**Qualidade de Código**
-- 1.202 erros de lint (W293) corrigidos
-- 158 erros em docstrings corrigidos
-- 43 arquivos formatados com ruff
-- Configuração ruff em `pyproject.toml`:
-  - Target: Python 3.12
-  - Line length: 100
-  - Select: F, E, W, I, N
-
-**CI/CD**
-- Workflow atualizado para `pip install -e ".[dev]"`
-- Testes em Python 3.11 e 3.12
-- Lint e format check com ruff
-- Docker build e security scan com Trivy
-- Release automático em pushes para main
-
-**Scripts de Deploy**
-- `scripts/deploy.sh` — deploy local e status
-- `scripts/deploy-vps.sh` — deploy na VPS
-- `scripts/setup-vps.sh` — setup inicial da VPS
-- Todos atualizados para novo structure
-
-#### Commits
-- `dcee9a0` — Correções finais de imports e estrutura
-- `3a2ac13` — CI/CD e scripts atualizados
-- `6a1fe74` — Reorganização inicial de pacotes
+### Segurança
+- Token Telegram removido de `archive/plans/` e `.env.example`
+- Separação de API keys por serviço (AgentVPS e OpenClaw com chaves independentes)
 
 ---
 
-## [1.9.0] - 2025-02-08
+## [3.0.0] — Sprint 08: Consciência e Aprendizado Real
 
-### Fase 0 — Estabilização v1 ✅
+### Adicionado
+- Aprendizado real: erros registrados no PostgreSQL via `learning_hook`, consultados antes de repetir
+- Proatividade avançada: Engine detecta padrões de uso e propõe melhorias
+- Consciência de estado: agente ciente do próprio histórico de execuções
 
-- Cleanup de código (duplicatas removidas)
-- Fix Graph Flow self_improve
-- Fix timezone import
-- Telegram Log Handler implementado
+---
+
+## [2.9.0] — Sprint 07: Formatação e Busca Web
+
+### Adicionado
+- Formatação inteligente: resposta adaptada ao tipo de conteúdo (código, lista, texto)
+- Web search fallback: DuckDuckGo quando OpenRouter não tem info recente
+- Contexto temporal: agente ciente da data/hora atual
+
+---
+
+## [2.8.0] — Sprint 06: Estabilidade e Correções
+
+### Corrigido
+- State reset entre conversas (vazamento de contexto entre usuários)
+- Resultado vazio não mais exibido ao usuário
+- Proatividade não mais disparada em conversas normais
+
+### Alterado
+- Modelo: MiniMax M2.5 via OpenRouter
+
+---
+
+## [2.7.0] — Sprint 05: Inteligência Desbloqueada
+
+### Adicionado
+- ReAct loop multi-step: agente executa múltiplas tools por mensagem quando necessário
+- Self-awareness: agente conhece suas próprias skills e limitações
+
+### Corrigido
+- Security check bloqueando tools legítimas (tipo `"tool"` agora permitido)
+- Response preservada em casos de execução sem resultado
+
+---
+
+## [2.6.0] — Sprint 04: Memória e Observabilidade
+
+### Adicionado
+- Persistência de memória no PostgreSQL (fatos do usuário, histórico de conversas)
+- Self-awareness: agente carrega contexto de sessões anteriores
+- Observabilidade: métricas de execução em cada nó do grafo
+
+### Alterado
+- `AgentMemory` migrado para PostgreSQL com fallback graceful
+
+---
+
+## [2.5.0] — Sprint 03: Arquitetura ReAct
+
+### Adicionado
+- **Grafo LangGraph de 7 nós**: `load_context → react → security_check → execute → format_response → respond → save_memory`
+- **Hook system** (`core/hooks/runner.py`): pre/post hooks para skills
+  - `logging_hook`: timing e structured logging
+  - `feedback_pre_hook`: consulta learnings antes de executar
+  - `learning_hook`: registra erros no PostgreSQL
+- **6 triggers autônomos** com condições reais (era 5 lambdas retornando True)
+- Comandos Telegram: `/proposals`, `/approve <id>`, `/reject <id>`
+
+### Removido
+- `core/tools/system_tools.py` (426 linhas de dead code)
+- `core/vps_langgraph/intent_classifier.py` (42 linhas — substituído por LLM)
+- `core/vps_agent/semantic_memory.py` (9 linhas — arquivo vazio)
+- Nós deletados do grafo: `node_classify_intent`, `node_plan`, `node_check_capabilities`, `node_self_improve`, `node_implement_capability`
+
+### Alterado
+- `react_node.py` substitui todo o fluxo heurístico por LLM com function calling
+
+---
+
+## [2.0.0] — Sprints 01-02: Foundation
+
+### Sprint 02 — ReAct Design
+
+- Arquitetura ReAct + function calling projetada e documentada
+- Skill Registry com auto-discovery via `config.yaml + handler.py`
+- Avaliações v3 e v4 com design decisions
+
+### Sprint 01 — Estabilização
+
+- Logging estruturado (structlog) em todos os nós do grafo
+- Checkpointing PostgreSQL no LangGraph com fallback MemorySaver
+- Async tools via `asyncio.to_thread()` (Python 3.9+)
+- Singleton do grafo via `get_agent_graph()` para performance
+- Thread ID por usuário para persistência de conversa
+
+---
+
+## [1.9.0] — Fase 0.5: Foundation e Estrutura
+
+- Eliminação de todos `sys.path.insert` → pacote Python profissional
+- Reorganização: `telegram-bot/` → `telegram_bot/`, etc.
+- CI/CD com `pip install -e ".[dev]"`
+- 1.202 erros lint corrigidos (ruff)
+- Todos commits verdes no CI ✅
+
+---
+
+## [1.0.0] — Fase 0: Estabilização v1
+
+- Cleanup de código e remoção de duplicatas
+- Telegram Log Handler
 - Testes end-to-end (5/5 passaram)
-
----
-
-## Roadmap Preview
-
-### Fase 1.0 — Documentação e Sync VPS 🔄
-- [ ] Atualizar docs/ARCHITECTURE.md
-- [ ] Sync VPS via SSH
-- [ ] CHANGELOG.md criado ✅
-
-### Fase 1.1 — Connection Pooling Async
-- asyncpg com pool de conexões
-- AgentMemory async
-
-### Fase 1.2 — Allowlist no Grafo
-- Nó de segurança no LangGraph
-- Bloqueio de comandos perigosos
-
-### Fase 1.3 — Gateway Auth Real
-- API Key via environment variable
-- Remover modo "development:unauthenticated"
-
----
-
-## Como Contribuir
-
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre como contribuir para o projeto.
-
-## Referências
-
-- [Plano de Implementação](plans/plano-implementacao-vps-agente-v2.md)
-- [Deployment Tracker](plans/deployment-tracker.md)
-- [ADR Index](docs/adr/README.md)
