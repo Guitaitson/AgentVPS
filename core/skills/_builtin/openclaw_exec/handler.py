@@ -37,10 +37,10 @@ OPENCLAW_ENTRY = "/app/dist/entry.js"
 
 # Mapeamento de ações para comandos CLI do OpenClaw
 ACTION_COMMANDS: Dict[str, list] = {
-    "health":    ["gateway", "health"],
-    "status":    ["gateway", "status", "--json"],
-    "agents":    ["agents", "list"],
-    "channels":  ["channels", "status"],
+    "health": ["gateway", "health"],
+    "status": ["gateway", "status", "--json"],
+    "agents": ["agents", "list"],
+    "channels": ["channels", "status"],
     "approvals": ["approvals", "list"],
 }
 
