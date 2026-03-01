@@ -87,6 +87,32 @@ async def node_react(state: AgentState) -> AgentState:
         tools_count=len(tools),
     )
 
+    # ── Pre-check: intent classifier ja identificou uma safe tool ──────────
+    # Quando o classificador de intent (pre-LLM) detecta a tool correta, nao
+    # ha necessidade de chamar o LLM de novo — executar diretamente.
+    pre_suggestion = state.get("tool_suggestion", "")
+    pre_intent = state.get("intent", "")
+    if pre_suggestion and pre_intent == "task":
+        pre_skill = registry.get(pre_suggestion)
+        if pre_skill and registry.get_security_level(pre_suggestion, {}) == "safe":
+            logger.info("react_pre_suggestion_execute", tool=pre_suggestion)
+            try:
+                pre_result = await registry.execute_skill(
+                    pre_suggestion,
+                    {"raw_input": user_message, "query": user_message},
+                )
+                return {
+                    **state,
+                    "intent": "task",
+                    "action_required": False,
+                    "response": str(pre_result),
+                    "plan": None,
+                }
+            except Exception as pre_err:
+                logger.error("react_pre_suggestion_error", tool=pre_suggestion, error=str(pre_err))
+                # Se falhar, continua para o loop LLM normal
+    # ───────────────────────────────────────────────────────────────────────
+
     provider = get_llm_provider()
     system_prompt = build_react_system_prompt()
 

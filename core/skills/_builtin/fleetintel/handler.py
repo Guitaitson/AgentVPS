@@ -47,7 +47,9 @@ class FleetIntelSkill(SkillBase):
         raw_input = args.get("raw_input", args.get("query", ""))
 
         if not raw_input:
-            return "❓ Qual dado de frota você quer consultar? Ex: 'market share de caminhões em 2024'"
+            return (
+                "❓ Qual dado de frota você quer consultar? Ex: 'market share de caminhões em 2024'"
+            )
 
         logger.info("fleetintel_execute", query=raw_input[:100])
 
@@ -75,64 +77,146 @@ class FleetIntelSkill(SkillBase):
         msg = message.lower().strip()
 
         # 1. Estatísticas gerais
-        if any(p in msg for p in [
-            "estatística", "estatistica", "quantos veículo", "quantos veiculo",
-            "total de ", "quantos no banco", "quantos registro", "resumo geral",
-            "quantas empresa", "quantos emplacamento", "total geral", "stats"
-        ]):
+        if any(
+            p in msg
+            for p in [
+                "estatística",
+                "estatistica",
+                "quantos veículo",
+                "quantos veiculo",
+                "total de ",
+                "quantos no banco",
+                "quantos registro",
+                "resumo geral",
+                "quantas empresa",
+                "quantos emplacamento",
+                "total geral",
+                "stats",
+            ]
+        ):
             # Se menciona empresa específica, vai para count_empresa
             empresa = self._extract_empresa(msg)
-            if empresa and any(p in msg for p in ["emplacou", "emplacaram", "comprou", "comprou", "adquiriu", "quantos da"]):
+            if empresa and any(
+                p in msg
+                for p in ["emplacou", "emplacaram", "comprou", "comprou", "adquiriu", "quantos da"]
+            ):
                 return "count_empresa_registrations", self._build_count_empresa_args(msg, empresa)
             return "get_stats", {}
 
         # 2. Market share / participação de mercado
-        if any(p in msg for p in [
-            "market share", "participação de mercado", "participacao de mercado",
-            "cota de mercado", "fatia de mercado", "share", "percentual de mercado"
-        ]):
+        if any(
+            p in msg
+            for p in [
+                "market share",
+                "participação de mercado",
+                "participacao de mercado",
+                "cota de mercado",
+                "fatia de mercado",
+                "share",
+                "percentual de mercado",
+            ]
+        ):
             return "get_market_share", self._build_market_share_args(msg)
 
         # 3. Top empresas / Ranking de compradores
-        if any(p in msg for p in [
-            "top ", "ranking", "maiores compradores", "quem mais comprou",
-            "maiores frotas", "maiores clientes", "top 10", "top 5",
-            "quais empresas mais", "empresas que mais"
-        ]):
+        if any(
+            p in msg
+            for p in [
+                "top ",
+                "ranking",
+                "maiores compradores",
+                "quem mais comprou",
+                "maiores frotas",
+                "maiores clientes",
+                "top 10",
+                "top 5",
+                "quais empresas mais",
+                "empresas que mais",
+            ]
+        ):
             return "top_empresas_by_registrations", self._build_top_empresas_args(msg)
 
         # 4. Count de uma empresa específica
         empresa = self._extract_empresa(msg)
-        if empresa and any(p in msg for p in [
-            "emplacou", "emplacaram", "comprou", "adquiriu", "quantos da",
-            "quantas da", "quantos caminhões da", "quantos caminh"
-        ]):
+        if empresa and any(
+            p in msg
+            for p in [
+                "emplacou",
+                "emplacaram",
+                "comprou",
+                "adquiriu",
+                "quantos da",
+                "quantas da",
+                "quantos caminhões da",
+                "quantos caminh",
+            ]
+        ):
             return "count_empresa_registrations", self._build_count_empresa_args(msg, empresa)
 
         # 5. Busca de empresa por nome
-        if any(p in msg for p in [
-            "encontre a empresa", "busca a empresa", "dados da empresa",
-            "informações da empresa", "informacoes da empresa", "cnpj",
-            "procure a empresa", "pesquise a empresa"
-        ]):
+        if any(
+            p in msg
+            for p in [
+                "encontre a empresa",
+                "busca a empresa",
+                "dados da empresa",
+                "informações da empresa",
+                "informacoes da empresa",
+                "cnpj",
+                "procure a empresa",
+                "pesquise a empresa",
+            ]
+        ):
             return "search_empresas", self._build_search_empresas_args(msg)
 
         # 6. Busca de veículo específico
-        if any(p in msg for p in [
-            "chassi", "placa", "buscar veículo", "buscar veiculo",
-            "encontrar caminhão", "encontrar caminhao"
-        ]):
+        if any(
+            p in msg
+            for p in [
+                "chassi",
+                "placa",
+                "buscar veículo",
+                "buscar veiculo",
+                "encontrar caminhão",
+                "encontrar caminhao",
+            ]
+        ):
             return "search_vehicles", self._build_search_vehicles_args(msg)
 
         # 7. Busca de emplacamentos por período/estado/preço
-        if any(p in msg for p in [
-            "emplacamentos em ", "emplacados em ", "emplacado em ",
-            "emplacamentos do mês", "emplacamentos de ", "em janeiro", "em fevereiro",
-            "em março", "em abril", "em maio", "em junho", "em julho",
-            "em agosto", "em setembro", "em outubro", "em novembro", "em dezembro",
-            "no paraná", "em são paulo", "no rio", "em minas", "no rs", "em sp",
-            "em sc", "no rj", "acima de r$", "abaixo de r$", "entre r$"
-        ]):
+        if any(
+            p in msg
+            for p in [
+                "emplacamentos em ",
+                "emplacados em ",
+                "emplacado em ",
+                "emplacamentos do mês",
+                "emplacamentos de ",
+                "em janeiro",
+                "em fevereiro",
+                "em março",
+                "em abril",
+                "em maio",
+                "em junho",
+                "em julho",
+                "em agosto",
+                "em setembro",
+                "em outubro",
+                "em novembro",
+                "em dezembro",
+                "no paraná",
+                "em são paulo",
+                "no rio",
+                "em minas",
+                "no rs",
+                "em sp",
+                "em sc",
+                "no rj",
+                "acima de r$",
+                "abaixo de r$",
+                "entre r$",
+            ]
+        ):
             return "search_registrations", self._build_search_registrations_args(msg)
 
         # 8. Fallback: se menciona empresa, tenta count; senão tenta stats
@@ -148,27 +232,49 @@ class FleetIntelSkill(SkillBase):
 
     def _extract_year(self, msg: str) -> Optional[int]:
         """Extrai ano da mensagem (2020-2026)."""
-        match = re.search(r'\b(20[0-2][0-9])\b', msg)
+        match = re.search(r"\b(20[0-2][0-9])\b", msg)
         return int(match.group(1)) if match else None
 
     def _extract_uf(self, msg: str) -> Optional[str]:
         """Extrai UF da mensagem."""
         uf_map = {
-            "são paulo": "SP", "sao paulo": "SP", " sp ": "SP",
-            "rio de janeiro": "RJ", " rj ": "RJ",
-            "minas gerais": "MG", "minas ": "MG", " mg ": "MG",
-            "paraná": "PR", "parana": "PR", " pr ": "PR",
-            "rio grande do sul": "RS", " rs ": "RS",
-            "santa catarina": "SC", " sc ": "SC",
-            "bahia": "BA", " ba ": "BA",
-            "goiás": "GO", "goias": "GO", " go ": "GO",
-            "mato grosso do sul": "MS", " ms ": "MS",
-            "mato grosso": "MT", " mt ": "MT",
-            "pernambuco": "PE", " pe ": "PE",
-            "ceará": "CE", "ceara": "CE", " ce ": "CE",
-            "amazonas": "AM", " am ": "AM",
-            "pará": "PA", "para ": "PA", " pa ": "PA",
-            "espírito santo": "ES", "espirito santo": "ES", " es ": "ES",
+            "são paulo": "SP",
+            "sao paulo": "SP",
+            " sp ": "SP",
+            "rio de janeiro": "RJ",
+            " rj ": "RJ",
+            "minas gerais": "MG",
+            "minas ": "MG",
+            " mg ": "MG",
+            "paraná": "PR",
+            "parana": "PR",
+            " pr ": "PR",
+            "rio grande do sul": "RS",
+            " rs ": "RS",
+            "santa catarina": "SC",
+            " sc ": "SC",
+            "bahia": "BA",
+            " ba ": "BA",
+            "goiás": "GO",
+            "goias": "GO",
+            " go ": "GO",
+            "mato grosso do sul": "MS",
+            " ms ": "MS",
+            "mato grosso": "MT",
+            " mt ": "MT",
+            "pernambuco": "PE",
+            " pe ": "PE",
+            "ceará": "CE",
+            "ceara": "CE",
+            " ce ": "CE",
+            "amazonas": "AM",
+            " am ": "AM",
+            "pará": "PA",
+            "para ": "PA",
+            " pa ": "PA",
+            "espírito santo": "ES",
+            "espirito santo": "ES",
+            " es ": "ES",
         }
         msg_padded = f" {msg} "
         for state_name, uf_code in uf_map.items():
@@ -180,26 +286,26 @@ class FleetIntelSkill(SkillBase):
         """Tenta extrair nome de empresa da mensagem."""
         # Padrões: "a empresa X", "a X", "da empresa X", "da X"
         patterns = [
-            r'a empresa ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)',
-            r'da empresa ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou)',
-            r'da ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)',
-            r'a ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:emplacou|emplacaram|comprou|adquiriu)',
+            r"a empresa ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)",
+            r"da empresa ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou)",
+            r"da ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)",
+            r"a ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:emplacou|emplacaram|comprou|adquiriu)",
         ]
         for pattern in patterns:
             match = re.search(pattern, msg, re.IGNORECASE)
             if match:
                 empresa = match.group(1).strip()
                 # Filtrar artigos e preposições soltos
-                if len(empresa) > 2 and empresa.lower() not in ['que', 'qual', 'quem', 'quanto']:
+                if len(empresa) > 2 and empresa.lower() not in ["que", "qual", "quem", "quanto"]:
                     return empresa
         return None
 
     def _extract_limit(self, msg: str, default: int = 10) -> int:
         """Extrai número de resultados desejados."""
-        match = re.search(r'top\s+(\d+)', msg)
+        match = re.search(r"top\s+(\d+)", msg)
         if match:
             return min(int(match.group(1)), 50)
-        match = re.search(r'(\d+)\s+(?:maiores|principais|empresas|primeiros)', msg)
+        match = re.search(r"(\d+)\s+(?:maiores|principais|empresas|primeiros)", msg)
         if match:
             return min(int(match.group(1)), 50)
         return default
@@ -247,13 +353,23 @@ class FleetIntelSkill(SkillBase):
     def _build_search_vehicles_args(self, msg: str) -> Dict:
         # Parâmetros reais da tool: chassi, placa, marca, modelo, ano_fabricacao_min, ano_fabricacao_max, limit
         args = {}
-        chassi_match = re.search(r'\b([A-HJ-NPR-Z0-9]{17})\b', msg.upper())
+        chassi_match = re.search(r"\b([A-HJ-NPR-Z0-9]{17})\b", msg.upper())
         if chassi_match:
             args["chassi"] = chassi_match.group(1)
-        placa_match = re.search(r'\b([A-Z]{3}[\-\s]?[0-9][A-Z0-9][0-9]{2})\b', msg.upper())
+        placa_match = re.search(r"\b([A-Z]{3}[\-\s]?[0-9][A-Z0-9][0-9]{2})\b", msg.upper())
         if placa_match:
             args["placa"] = placa_match.group(1).replace("-", "").replace(" ", "")
-        for marca in ["scania", "volvo", "mercedes", "volkswagen", "iveco", "ford", "daf", "hyundai", "vw"]:
+        for marca in [
+            "scania",
+            "volvo",
+            "mercedes",
+            "volkswagen",
+            "iveco",
+            "ford",
+            "daf",
+            "hyundai",
+            "vw",
+        ]:
             if marca in msg:
                 args["marca"] = marca.upper().replace("VW", "VW")
                 break
@@ -275,7 +391,7 @@ class FleetIntelSkill(SkillBase):
         uf = self._extract_uf(msg)
         if uf:
             args["uf_emplacamento"] = uf
-        preco_match = re.search(r'acima de r\$\s*([\d\.]+)', msg)
+        preco_match = re.search(r"acima de r\$\s*([\d\.]+)", msg)
         if preco_match:
             args["preco_min"] = float(preco_match.group(1).replace(".", ""))
         args["limit"] = 50
@@ -310,10 +426,14 @@ class FleetIntelSkill(SkillBase):
                     "clientInfo": {"name": "agenvps-fleetintel", "version": "1.0"},
                 },
             }
-            init_resp = await client.post(FLEETINTEL_MCP_URL, json=init_payload, headers=base_headers)
+            init_resp = await client.post(
+                FLEETINTEL_MCP_URL, json=init_payload, headers=base_headers
+            )
 
             if init_resp.status_code != 200:
-                raise RuntimeError(f"MCP initialize falhou HTTP {init_resp.status_code}: {init_resp.text[:200]}")
+                raise RuntimeError(
+                    f"MCP initialize falhou HTTP {init_resp.status_code}: {init_resp.text[:200]}"
+                )
 
             session_id = init_resp.headers.get("mcp-session-id")
             if not session_id:
@@ -330,10 +450,14 @@ class FleetIntelSkill(SkillBase):
                     "arguments": tool_args,
                 },
             }
-            tool_resp = await client.post(FLEETINTEL_MCP_URL, json=tool_payload, headers=tool_headers)
+            tool_resp = await client.post(
+                FLEETINTEL_MCP_URL, json=tool_payload, headers=tool_headers
+            )
 
         if tool_resp.status_code != 200:
-            raise RuntimeError(f"MCP tools/call retornou HTTP {tool_resp.status_code}: {tool_resp.text[:200]}")
+            raise RuntimeError(
+                f"MCP tools/call retornou HTTP {tool_resp.status_code}: {tool_resp.text[:200]}"
+            )
 
         # O MCP pode retornar SSE ou JSON puro
         content_type = tool_resp.headers.get("content-type", "")
@@ -437,10 +561,14 @@ class FleetIntelSkill(SkillBase):
         if isinstance(r, str):
             return f"📈 **Market Share**\n\n{r}"
         # Resposta real: {"marcas": [{"marca": "VW", "total_emplacamentos": 27622, "market_share_pct": 26.14}]}
-        items = r if isinstance(r, list) else r.get("marcas", r.get("market_share", r.get("data", [])))
+        items = (
+            r if isinstance(r, list) else r.get("marcas", r.get("market_share", r.get("data", [])))
+        )
         ano = r.get("ano", "") if isinstance(r, dict) else ""
         uf = r.get("uf", "") if isinstance(r, dict) else ""
-        header = f"📈 **Market Share — Caminhões{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}**\n"
+        header = (
+            f"📈 **Market Share — Caminhões{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}**\n"
+        )
         if not items:
             return f"{header}\n⚠️ Sem dados de market share para este período."
         lines = [header]
