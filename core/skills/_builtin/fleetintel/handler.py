@@ -205,81 +205,76 @@ class FleetIntelSkill(SkillBase):
         return default
 
     def _build_market_share_args(self, msg: str) -> Dict:
-        args = {}
+        # Parâmetros reais da tool: ano (required), uf (optional), top_n (optional)
         year = self._extract_year(msg)
-        if year:
-            args["year"] = year
-        else:
-            args["year"] = 2024  # default sensato
+        args = {"ano": year if year else 2024}
         uf = self._extract_uf(msg)
         if uf:
             args["uf"] = uf
-        # Segmento
-        for seg in ["caminhão", "caminhao", "onibus", "ônibus", "implemento"]:
-            if seg in msg:
-                args["segmento"] = seg.replace("ã", "a").replace("ô", "o")
-                break
+        limit = self._extract_limit(msg, default=0)
+        if limit:
+            args["top_n"] = limit
         return args
 
     def _build_top_empresas_args(self, msg: str) -> Dict:
-        args = {"limit": self._extract_limit(msg)}
+        # Parâmetros reais da tool: ano (required), uf (optional), top_n (optional)
         year = self._extract_year(msg)
-        args["year"] = year if year else 2024
+        args = {"ano": year if year else 2024}
+        limit = self._extract_limit(msg, default=10)
+        args["top_n"] = limit
         uf = self._extract_uf(msg)
         if uf:
             args["uf"] = uf
         return args
 
     def _build_count_empresa_args(self, msg: str, empresa: str) -> Dict:
-        args = {"empresa_nome": empresa}
+        # Parâmetros reais da tool: razao_social (required), ano (optional)
+        args = {"razao_social": empresa}
         year = self._extract_year(msg)
         if year:
-            args["year"] = year
+            args["ano"] = year
         return args
 
     def _build_search_empresas_args(self, msg: str) -> Dict:
+        # Parâmetros reais da tool: cnpj, razao_social, nome_fantasia, segmento_cliente, grupo_locadora, limit
         args = {}
         empresa = self._extract_empresa(msg)
         if empresa:
             args["razao_social"] = empresa
-        uf = self._extract_uf(msg)
-        if uf:
-            args["uf"] = uf
         args["limit"] = 5
         return args
 
     def _build_search_vehicles_args(self, msg: str) -> Dict:
+        # Parâmetros reais da tool: chassi, placa, marca, modelo, ano_fabricacao_min, ano_fabricacao_max, limit
         args = {}
-        # Chassi (17 chars alfanuméricos)
         chassi_match = re.search(r'\b([A-HJ-NPR-Z0-9]{17})\b', msg.upper())
         if chassi_match:
             args["chassi"] = chassi_match.group(1)
-        # Placa (ABC-1234 ou ABC1D23)
         placa_match = re.search(r'\b([A-Z]{3}[\-\s]?[0-9][A-Z0-9][0-9]{2})\b', msg.upper())
         if placa_match:
             args["placa"] = placa_match.group(1).replace("-", "").replace(" ", "")
-        # Marca
-        for marca in ["scania", "volvo", "mercedes", "volkswagen", "iveco", "ford", "daf", "hyundai"]:
+        for marca in ["scania", "volvo", "mercedes", "volkswagen", "iveco", "ford", "daf", "hyundai", "vw"]:
             if marca in msg:
-                args["marca"] = marca.upper()
+                args["marca"] = marca.upper().replace("VW", "VW")
                 break
         year = self._extract_year(msg)
         if year:
-            args["ano_min"] = year
-            args["ano_max"] = year
+            args["ano_fabricacao_min"] = year
+            args["ano_fabricacao_max"] = year
         args["limit"] = 10
         return args
 
     def _build_search_registrations_args(self, msg: str) -> Dict:
+        # Parâmetros reais da tool: data_emplacamento_inicio, data_emplacamento_fim,
+        # municipio_emplacamento, uf_emplacamento, preco_min, preco_max, marca, modelo, limit
         args = {}
         year = self._extract_year(msg)
         if year:
-            args["data_inicio"] = f"{year}-01-01"
-            args["data_fim"] = f"{year}-12-31"
+            args["data_emplacamento_inicio"] = f"{year}-01-01"
+            args["data_emplacamento_fim"] = f"{year}-12-31"
         uf = self._extract_uf(msg)
         if uf:
-            args["uf"] = uf
-        # Preço mínimo
+            args["uf_emplacamento"] = uf
         preco_match = re.search(r'acima de r\$\s*([\d\.]+)', msg)
         if preco_match:
             args["preco_min"] = float(preco_match.group(1).replace(".", ""))
@@ -441,36 +436,45 @@ class FleetIntelSkill(SkillBase):
     def _fmt_market_share(self, r: Any) -> str:
         if isinstance(r, str):
             return f"📈 **Market Share**\n\n{r}"
-        items = r if isinstance(r, list) else r.get("market_share", r.get("data", []))
+        # Resposta real: {"marcas": [{"marca": "VW", "total_emplacamentos": 27622, "market_share_pct": 26.14}]}
+        items = r if isinstance(r, list) else r.get("marcas", r.get("market_share", r.get("data", [])))
+        ano = r.get("ano", "") if isinstance(r, dict) else ""
+        uf = r.get("uf", "") if isinstance(r, dict) else ""
+        header = f"📈 **Market Share — Caminhões{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}**\n"
         if not items:
-            return "⚠️ Sem dados de market share para este período."
-        lines = [f"📈 **Market Share — Caminhões**\n"]
+            return f"{header}\n⚠️ Sem dados de market share para este período."
+        lines = [header]
         for i, item in enumerate(items[:15], 1):
             marca = item.get("marca", item.get("brand", "?"))
-            total = item.get("total", item.get("count", 0))
-            share = item.get("share_pct", item.get("share", 0))
-            lines.append(f"{i}. **{marca}**: {total:,} un. ({share:.1f}%)".replace(",", "."))
+            total = item.get("total_emplacamentos", item.get("total", item.get("count", 0)))
+            share = item.get("market_share_pct", item.get("share_pct", item.get("share", 0)))
+            lines.append(f"{i}. **{marca}**: {int(total):,} un. ({share:.1f}%)".replace(",", "."))
         return "\n".join(lines)
 
     def _fmt_top_empresas(self, r: Any) -> str:
         if isinstance(r, str):
             return f"🏆 **Top Empresas**\n\n{r}"
+        # Resposta real: {"empresas": [{"razao_social": "...", "total_registrations": 2426}], "ano": 2024}
         items = r if isinstance(r, list) else r.get("empresas", r.get("data", []))
+        ano = r.get("ano", "") if isinstance(r, dict) else ""
+        uf = r.get("uf", "") if isinstance(r, dict) else ""
+        header = f"🏆 **Top Empresas — Emplacamentos{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}**\n"
         if not items:
-            return "⚠️ Sem dados de ranking para este período."
-        lines = ["🏆 **Top Empresas — Emplacamentos**\n"]
+            return f"{header}\n⚠️ Sem dados de ranking para este período."
+        lines = [header]
         for i, item in enumerate(items[:15], 1):
             nome = item.get("razao_social", item.get("nome", item.get("empresa", "?")))
-            total = item.get("total", item.get("count", item.get("registrations", 0)))
-            lines.append(f"{i}. **{nome[:40]}**: {total:,} un.".replace(",", "."))
+            total = item.get("total_registrations", item.get("total", item.get("count", 0)))
+            lines.append(f"{i}. **{nome[:45]}**: {int(total):,} un.".replace(",", "."))
         return "\n".join(lines)
 
     def _fmt_count_empresa(self, r: Any) -> str:
         if isinstance(r, str):
             return f"🚛 **Emplacamentos da Empresa**\n\n{r}"
-        count = r.get("total", r.get("count", r.get("registrations", "?")))
-        empresa = r.get("empresa", r.get("razao_social", r.get("nome", "empresa")))
-        year = r.get("year", "")
+        # Resposta real: {"total": N, "razao_social": "...", "ano": 2024}
+        count = r.get("total", r.get("count", r.get("total_registrations", "?")))
+        empresa = r.get("razao_social", r.get("empresa", r.get("nome", "empresa")))
+        year = r.get("ano", r.get("year", ""))
         year_str = f" em {year}" if year else ""
         return f"🚛 **{empresa}**{year_str}\n\n📋 Emplacamentos: **{count}**"
 
