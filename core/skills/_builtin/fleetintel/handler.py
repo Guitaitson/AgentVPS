@@ -291,35 +291,61 @@ class FleetIntelSkill(SkillBase):
     # ─────────────────────────────────────────────
 
     async def _call_mcp(self, tool_name: str, tool_args: Dict) -> Any:
-        """Chama uma tool no FleetIntel MCP server."""
-        payload = {
-            "jsonrpc": "2.0",
-            "id": "1",
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": tool_args,
-            },
-        }
+        """Chama uma tool no FleetIntel MCP server.
 
-        headers = {
+        O protocolo MCP streamable-http requer dois passos:
+        1. POST initialize → obter mcp-session-id
+        2. POST tools/call com mcp-session-id no header
+        """
+        base_headers = {
             "Authorization": f"Bearer {FLEETINTEL_MCP_TOKEN}",
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(FLEETINTEL_MCP_URL, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            # ── Passo 1: Initialize — obter session ID ──────────────────
+            init_payload = {
+                "jsonrpc": "2.0",
+                "id": "init-1",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "agenvps-fleetintel", "version": "1.0"},
+                },
+            }
+            init_resp = await client.post(FLEETINTEL_MCP_URL, json=init_payload, headers=base_headers)
 
-        if resp.status_code != 200:
-            raise RuntimeError(f"MCP server retornou HTTP {resp.status_code}: {resp.text[:200]}")
+            if init_resp.status_code != 200:
+                raise RuntimeError(f"MCP initialize falhou HTTP {init_resp.status_code}: {init_resp.text[:200]}")
+
+            session_id = init_resp.headers.get("mcp-session-id")
+            if not session_id:
+                raise RuntimeError("MCP server não retornou mcp-session-id no initialize")
+
+            # ── Passo 2: Chamar a tool com o session ID ─────────────────
+            tool_headers = {**base_headers, "mcp-session-id": session_id}
+            tool_payload = {
+                "jsonrpc": "2.0",
+                "id": "call-1",
+                "method": "tools/call",
+                "params": {
+                    "name": tool_name,
+                    "arguments": tool_args,
+                },
+            }
+            tool_resp = await client.post(FLEETINTEL_MCP_URL, json=tool_payload, headers=tool_headers)
+
+        if tool_resp.status_code != 200:
+            raise RuntimeError(f"MCP tools/call retornou HTTP {tool_resp.status_code}: {tool_resp.text[:200]}")
 
         # O MCP pode retornar SSE ou JSON puro
-        content_type = resp.headers.get("content-type", "")
+        content_type = tool_resp.headers.get("content-type", "")
         if "text/event-stream" in content_type:
-            return self._parse_sse(resp.text)
+            return self._parse_sse(tool_resp.text)
         else:
-            data = resp.json()
+            data = tool_resp.json()
             return self._extract_mcp_result(data)
 
     def _parse_sse(self, sse_text: str) -> Any:
@@ -388,17 +414,28 @@ class FleetIntelSkill(SkillBase):
         if isinstance(r, str):
             return f"📊 **Estatísticas FleetIntel**\n\n{r}"
         r = r if isinstance(r, dict) else {}
+        # A resposta real do servidor tem formato: {"stats": {...}, "timestamp": "..."}
+        data = r.get("stats", r)
         lines = ["📊 **Estatísticas — Base de Frota**\n"]
-        if "total_vehicles" in r:
-            lines.append(f"🚛 Veículos: **{r['total_vehicles']:,}**".replace(",", "."))
-        if "total_empresas" in r:
-            lines.append(f"🏢 Empresas: **{r['total_empresas']:,}**".replace(",", "."))
-        if "total_registrations" in r:
-            lines.append(f"📋 Emplacamentos: **{r['total_registrations']:,}**".replace(",", "."))
-        if "total_marcas" in r:
-            lines.append(f"🔖 Marcas: **{r['total_marcas']}**")
-        if "total_modelos" in r:
-            lines.append(f"📐 Modelos: **{r['total_modelos']}**")
+        # Suporte aos dois formatos de campo (stats nested ou flat)
+        vehicles = data.get("vehicles", data.get("total_vehicles"))
+        empresas = data.get("empresas", data.get("total_empresas"))
+        registrations = data.get("registrations", data.get("total_registrations"))
+        marcas = data.get("marcas", data.get("total_marcas"))
+        modelos = data.get("modelos", data.get("total_modelos"))
+        if vehicles is not None:
+            lines.append(f"🚛 Veículos: **{int(vehicles):,}**".replace(",", "."))
+        if empresas is not None:
+            lines.append(f"🏢 Empresas: **{int(empresas):,}**".replace(",", "."))
+        if registrations is not None:
+            lines.append(f"📋 Emplacamentos: **{int(registrations):,}**".replace(",", "."))
+        if marcas is not None:
+            lines.append(f"🔖 Marcas: **{marcas}**")
+        if modelos is not None:
+            lines.append(f"📐 Modelos: **{modelos}**")
+        if r.get("timestamp"):
+            ts = r["timestamp"][:10]
+            lines.append(f"\n_Atualizado: {ts}_")
         return "\n".join(lines) if len(lines) > 1 else f"📊 {r}"
 
     def _fmt_market_share(self, r: Any) -> str:
