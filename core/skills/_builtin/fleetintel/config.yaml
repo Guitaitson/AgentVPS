@@ -1,0 +1,55 @@
+name: fleetintel
+description: "Consulta dados de emplacamentos de veículos pesados do Brasil (caminhões, ônibus, implementos). Use para perguntas sobre frotas, emplacamentos, market share, empresas que compraram caminhões, ranking de compradores, estatísticas do setor."
+version: "1.0.0"
+security_level: safe
+triggers:
+  - caminhão
+  - caminhao
+  - caminhões
+  - caminhoes
+  - emplacamento
+  - emplacamentos
+  - emplacou
+  - emplacaram
+  - ônibus
+  - onibus
+  - frota
+  - frotas
+  - veículo pesado
+  - veiculo pesado
+  - veículos pesados
+  - veiculos pesados
+  - implemento
+  - implementos
+  - comprou caminhão
+  - comprou caminhao
+  - comprou veículo
+  - comprou veiculo
+  - market share
+  - participação de mercado
+  - participacao de mercado
+  - cota de mercado
+  - top empresas
+  - maiores compradores
+  - quem mais comprou
+  - ranking de compradores
+  - ranking de compras
+  - quantos emplacamentos
+  - quantas empresas
+  - base de frota
+  - dados de frota
+  - fleetintel
+  - fleet intel
+parameters:
+  query:
+    type: string
+    required: true
+    description: "Pergunta sobre dados de frota/emplacamentos"
+parameters_schema:
+  query:
+    type: string
+    description: "Pergunta sobre emplacamentos de veículos pesados"
+    required: true
+max_output_chars: 3000
+timeout_seconds: 20
+enabled: true

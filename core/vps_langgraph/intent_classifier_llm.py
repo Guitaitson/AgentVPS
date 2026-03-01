@@ -373,6 +373,31 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
             }
 
     # ========================================
+    # PRIORIDADE 4.5: FleetIntel — Dados de frota
+    # ========================================
+    fleet_patterns = [
+        "caminhão", "caminhao", "caminhões", "caminhoes",
+        "emplacamento", "emplacamentos", "emplacou", "emplacaram",
+        "frota", "frotas", "veículo pesado", "veiculo pesado",
+        "market share", "participação de mercado", "cota de mercado",
+        "top empresas", "maiores compradores", "ranking de compras",
+        "quem mais comprou", "fleet", "fleetintel",
+        "implemento", "implementos", "ônibus pesado", "onibus pesado",
+        "comprou caminhão", "comprou caminhao", "adquiriu caminhão",
+        "quantos emplacamentos", "base de frota", "dados de frota",
+    ]
+    for pattern in fleet_patterns:
+        if pattern in msg_lower:
+            return {
+                "intent": "task",
+                "confidence": 0.95,
+                "entities": ["fleetintel"],
+                "action_required": True,
+                "tool_suggestion": "fleetintel",
+                "reasoning": f"Consulta de dados de frota detectada: {pattern}",
+            }
+
+    # ========================================
     # PRIORIDADE 5: Self-Improve
     # ========================================
     improve_patterns = [
