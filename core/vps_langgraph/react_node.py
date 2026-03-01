@@ -87,30 +87,68 @@ async def node_react(state: AgentState) -> AgentState:
         tools_count=len(tools),
     )
 
-    # ── Pre-check: intent classifier ja identificou uma safe tool ──────────
-    # Quando o classificador de intent (pre-LLM) detecta a tool correta, nao
-    # ha necessidade de chamar o LLM de novo — executar diretamente.
-    pre_suggestion = state.get("tool_suggestion", "")
-    pre_intent = state.get("intent", "")
-    if pre_suggestion and pre_intent == "task":
-        pre_skill = registry.get(pre_suggestion)
-        if pre_skill and registry.get_security_level(pre_suggestion, {}) == "safe":
-            logger.info("react_pre_suggestion_execute", tool=pre_suggestion)
+    # ── Pre-check: detectar consultas de frota ANTES do LLM ────────────────
+    # O LLM (Gemini Flash) gera texto Python em vez de tool_calls estruturados
+    # para skills novas. Detectamos keywords de frota direto no user_message
+    # e executamos fleetintel inline, sem passar pelo LLM.
+    _fleet_triggers = [
+        "caminhão",
+        "caminhao",
+        "caminhões",
+        "caminhoes",
+        "emplacamento",
+        "emplacamentos",
+        "emplacou",
+        "emplacaram",
+        "frota",
+        "frotas",
+        "veículo pesado",
+        "veiculo pesado",
+        "veículos pesados",
+        "veiculos pesados",
+        "market share",
+        "participação de mercado",
+        "participacao de mercado",
+        "cota de mercado",
+        "top empresas",
+        "maiores compradores",
+        "quem mais comprou",
+        "ranking de compradores",
+        "fleetintel",
+        "implemento",
+        "implementos",
+        "comprou caminhão",
+        "comprou caminhao",
+        "quantos emplacamentos",
+        "base de frota",
+        "dados de frota",
+        "banco de frota",
+        "estatísticas de frota",
+        "estatisticas de frota",
+        "adquiriu caminhão",
+        "adquiriu caminhao",
+    ]
+    _msg_lower = user_message.lower()
+    _fleet_kw = next((kw for kw in _fleet_triggers if kw in _msg_lower), None)
+    if _fleet_kw:
+        _fleet_skill = registry.get("fleetintel")
+        if _fleet_skill:
+            logger.info("react_fleet_shortcut", keyword=_fleet_kw)
             try:
-                pre_result = await registry.execute_skill(
-                    pre_suggestion,
+                _fleet_result = await registry.execute_skill(
+                    "fleetintel",
                     {"raw_input": user_message, "query": user_message},
                 )
                 return {
                     **state,
                     "intent": "task",
                     "action_required": False,
-                    "response": str(pre_result),
+                    "response": str(_fleet_result),
                     "plan": None,
                 }
-            except Exception as pre_err:
-                logger.error("react_pre_suggestion_error", tool=pre_suggestion, error=str(pre_err))
-                # Se falhar, continua para o loop LLM normal
+            except Exception as _fleet_err:
+                logger.error("react_fleet_shortcut_error", error=str(_fleet_err))
+                # Falhou — continua para o loop LLM normal
     # ───────────────────────────────────────────────────────────────────────
 
     provider = get_llm_provider()
