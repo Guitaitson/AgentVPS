@@ -35,74 +35,68 @@ class TestIntegrationFlow:
             "timestamp": "2026-02-13T12:00:00Z",
         }
 
-    def test_intent_classification_command(self, mock_state):
-        """Testa classificação de intent para comando."""
-        # Arrange
-        from core.vps_langgraph.intent_classifier import classify_intent
+    def test_react_node_import(self, mock_state):
+        """Testa que react_node pode ser importado (substitui intent_classifier)."""
+        from core.vps_langgraph.react_node import node_react, route_after_react
 
-        # Act
-        result = classify_intent("/status")
+        assert node_react is not None
+        assert route_after_react is not None
 
-        # Assert
-        assert result["intent"] == "command"
-        assert result["confidence"] > 0.8
+    def test_route_after_react_tool_call(self, mock_state):
+        """Testa roteamento para tool call."""
+        from core.vps_langgraph.react_node import route_after_react
 
-    def test_intent_classification_question(self, mock_state):
-        """Testa classificação de intent para pergunta."""
-        from core.vps_langgraph.intent_classifier import classify_intent
+        state = {
+            "action_required": True,
+            "plan": [{"type": "skill", "action": "get_ram", "args": {}}],
+            "current_step": 0,
+        }
+        assert route_after_react(state) == "security_check"
 
-        result = classify_intent("quanto RAM estamos usando?")
+    def test_route_after_react_direct(self, mock_state):
+        """Testa roteamento para resposta direta."""
+        from core.vps_langgraph.react_node import route_after_react
 
-        assert result["intent"] == "question"
-        assert result["confidence"] > 0.7
-
-    def test_intent_classification_task(self, mock_state):
-        """Testa classificação de intent para tarefa."""
-        from core.vps_langgraph.intent_classifier import classify_intent
-
-        result = classify_intent("liste meus containers")
-
-        assert result["intent"] in ["command", "task"]
-        assert result["confidence"] > 0.6
+        state = {"action_required": False, "response": "Ola!"}
+        assert route_after_react(state) == "respond"
 
 
-class TestToolsIntegration:
-    """Testes de integração das tools do sistema."""
+class TestSkillRegistryIntegration:
+    """Testes de integração do Skill Registry (substitui system_tools)."""
 
-    def test_system_tools_available(self):
-        """Verifica que todas as tools estão disponíveis."""
-        from core.tools.system_tools import TOOLS_REGISTRY
+    def test_skill_registry_available(self):
+        """Verifica que o skill registry carrega skills."""
+        from core.skills.registry import get_skill_registry
 
-        expected_tools = [
-            "get_ram",
-            "list_containers",
-            "get_system_status",
-            "check_postgres",
-            "check_redis",
-        ]
+        registry = get_skill_registry()
+        skills = registry.list_skills()
 
-        for tool in expected_tools:
-            assert tool in TOOLS_REGISTRY, f"Tool {tool} não encontrada"
+        assert len(skills) > 0, "Nenhum skill registrado"
 
-    def test_tool_execution_get_ram(self):
-        """Testa execução da tool get_ram."""
-        from core.tools.system_tools import get_ram_usage
+    def test_skill_registry_has_core_skills(self):
+        """Verifica que skills core estao registrados."""
+        from core.skills.registry import get_skill_registry
 
-        result = get_ram_usage()
+        registry = get_skill_registry()
+        # Pelo menos shell_exec deve existir
+        shell = registry.get("shell_exec")
+        assert shell is not None, "shell_exec skill nao encontrado"
 
-        # Verifica que retornou algo estruturado
-        assert isinstance(result, str)
-        assert "RAM" in result or "MB" in result or "meminfo" in result
+    def test_skill_registry_tool_schemas(self):
+        """Verifica que tool schemas sao gerados para function calling."""
+        from core.skills.registry import get_skill_registry
 
-    def test_tool_execution_check_postgres(self):
-        """Testa execução da tool check_postgres."""
-        from core.tools.system_tools import check_postgres
+        registry = get_skill_registry()
+        schemas = registry.list_tool_schemas()
 
-        result = check_postgres()
-
-        # Verifica que retornou algo
-        assert isinstance(result, str)
-        assert "PostgreSQL" in result or "Error" in result
+        assert len(schemas) > 0, "Nenhum tool schema gerado"
+        # Cada schema tem formato OpenAI function calling
+        for schema in schemas:
+            assert "type" in schema
+            assert schema["type"] == "function"
+            assert "function" in schema
+            assert "name" in schema["function"]
+            assert "description" in schema["function"]
 
 
 class TestMemoryIntegration:

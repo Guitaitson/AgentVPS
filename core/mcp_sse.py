@@ -182,38 +182,32 @@ class MCPServer:
         self.tools[name]
 
         try:
-            # Executa a tool
-            if name == "get_ram":
-                from core.tools.system_tools import get_ram_usage
+            # Executar via Skill Registry
+            import asyncio
 
-                result = get_ram_usage()
-            elif name == "list_containers":
-                from core.tools.system_tools import list_docker_containers
+            from core.skills.registry import get_skill_registry
 
-                result = list_docker_containers()
-            elif name == "get_system_status":
-                from core.tools.system_tools import get_system_status
+            registry = get_skill_registry()
 
-                result = get_system_status()
-            elif name == "check_postgres":
-                from core.tools.system_tools import check_postgres
+            # Mapear nomes MCP para nomes de skills
+            skill_map = {
+                "get_ram": "get_ram",
+                "list_containers": "list_containers",
+                "get_system_status": "get_system_status",
+                "check_postgres": "check_postgres",
+                "check_redis": "check_redis",
+                "execute_command": "shell_exec",
+            }
 
-                result = check_postgres()
-            elif name == "check_redis":
-                from core.tools.system_tools import check_redis
+            skill_name = skill_map.get(name, name)
+            skill = registry.get(skill_name)
 
-                result = check_redis()
-            elif name == "execute_command":
-                import subprocess
-
-                cmd = arguments.get("command", "")
-                timeout = arguments.get("timeout", 30)
-                result = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            if skill:
+                result = asyncio.get_event_loop().run_until_complete(
+                    registry.execute_skill(skill_name, arguments or {})
                 )
-                result = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
             else:
-                result = f"Tool '{name}' executed"
+                result = f"Tool '{name}' not found in skill registry"
 
             return {"content": [{"type": "text", "text": str(result)}]}
         except Exception as e:

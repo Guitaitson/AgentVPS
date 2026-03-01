@@ -184,7 +184,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /help — ajuda."""
     help_text = """
-🤖 **VPS-Agent v2 — Ajuda**
+🤖 **VPS-Agent v3 — Ajuda**
 
 **Comandos disponíveis:**
 - `/start` — Iniciar conversa
@@ -192,12 +192,132 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - `/ram` — Uso de memória por container
 - `/containers` — Lista de containers ativos
 - `/health` — Health check completo
+- `/proposals` — Lista proposals autonomas pendentes
+- `/approve <id>` — Aprova proposal autonoma
+- `/reject <id>` — Rejeita proposal autonoma
 - `/help` — Esta ajuda
 
 **Sobre:**
-Este bot controla o VPS-Agent, um agente autônomo que roda na VPS.
+Este bot controla o VPS-Agent, um agente autonomo com ReAct + function calling.
     """
     await update.message.reply_text(help_text, parse_mode="Markdown")
+
+
+@authorized_only
+async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /proposals — lista proposals pendentes."""
+    try:
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, trigger_name, suggested_action, created_at
+            FROM agent_proposals
+            WHERE status = 'pending' AND requires_approval = TRUE
+            ORDER BY priority ASC, created_at ASC
+            LIMIT 10"""
+        )
+        proposals = cur.fetchall()
+        conn.close()
+
+        if not proposals:
+            await update.message.reply_text("Nenhuma proposal pendente de aprovacao.")
+            return
+
+        import json
+
+        lines = ["Proposals pendentes:\n"]
+        for p_id, trigger, action_json, created in proposals:
+            action = json.loads(action_json)
+            desc = action.get("description", action.get("action", "?"))
+            lines.append(f"#{p_id} [{trigger}] {desc}\n  /approve {p_id} | /reject {p_id}")
+
+        await update.message.reply_text("\n".join(lines))
+    except Exception as e:
+        logger.error("cmd_proposals_error", error=str(e))
+        await update.message.reply_text(f"Erro ao listar proposals: {str(e)[:100]}")
+
+
+@authorized_only
+async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /approve <id> — aprova proposal."""
+    if not context.args:
+        await update.message.reply_text("Uso: /approve <id>")
+        return
+
+    try:
+        proposal_id = int(context.args[0])
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute(
+            """UPDATE agent_proposals
+            SET status = 'approved', approval_note = 'Aprovado via Telegram'
+            WHERE id = %s AND status = 'pending'""",
+            (proposal_id,),
+        )
+        affected = cur.rowcount
+        conn.commit()
+        conn.close()
+
+        if affected:
+            await update.message.reply_text(
+                f"Proposal #{proposal_id} aprovada. Sera executada no proximo ciclo."
+            )
+        else:
+            await update.message.reply_text(
+                f"Proposal #{proposal_id} nao encontrada ou ja processada."
+            )
+    except ValueError:
+        await update.message.reply_text("ID invalido. Uso: /approve <numero>")
+    except Exception as e:
+        logger.error("cmd_approve_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
+async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /reject <id> — rejeita proposal."""
+    if not context.args:
+        await update.message.reply_text("Uso: /reject <id>")
+        return
+
+    try:
+        proposal_id = int(context.args[0])
+        note = " ".join(context.args[1:]) if len(context.args) > 1 else "Rejeitado via Telegram"
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute(
+            """UPDATE agent_proposals
+            SET status = 'rejected', approval_note = %s
+            WHERE id = %s AND status = 'pending'""",
+            (note, proposal_id),
+        )
+        affected = cur.rowcount
+        conn.commit()
+        conn.close()
+
+        if affected:
+            await update.message.reply_text(f"Proposal #{proposal_id} rejeitada.")
+        else:
+            await update.message.reply_text(
+                f"Proposal #{proposal_id} nao encontrada ou ja processada."
+            )
+    except ValueError:
+        await update.message.reply_text("ID invalido. Uso: /reject <numero>")
+    except Exception as e:
+        logger.error("cmd_reject_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+async def send_notification(message: str):
+    """Envia notificacao para todos os usuarios autorizados."""
+    import telegram
+
+    bot = telegram.Bot(token=TOKEN)
+    for user_id in ALLOWED_USERS:
+        try:
+            await bot.send_message(chat_id=user_id, text=message)
+        except Exception as e:
+            logger.error("send_notification_error", user_id=user_id, error=str(e))
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -240,6 +360,9 @@ def main():
     app.add_handler(CommandHandler("containers", cmd_containers))
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("proposals", cmd_proposals))
+    app.add_handler(CommandHandler("approve", cmd_approve))
+    app.add_handler(CommandHandler("reject", cmd_reject))
 
     # Handler para mensagens gerais (LangGraph)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

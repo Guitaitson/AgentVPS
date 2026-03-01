@@ -118,7 +118,7 @@
 | IP VPS | 107.175.1.42 |
 | Porta SSH | 22 |
 | Usuário | root |
-| Telegram Bot Token | `8152703152:AAE9vT-O8CMGjrmNYp_WHjOYj3eZB3WKfSA` |
+| Telegram Bot Token | `SEU_BOT_TOKEN_AQUI` |
 | Telegram User ID | 504326069 |
 
 ---

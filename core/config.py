@@ -81,10 +81,10 @@ class OpenRouterSettings(BaseSettings):
     )
 
     api_key: Optional[str] = Field(default=None, description="Chave API do OpenRouter")
-    model: str = Field(default="google/gemini-2.5-flash-lite", description="Modelo LLM padrão")
-    max_tokens: int = Field(default=256, description="Máximo de tokens na resposta")
+    model: str = Field(default="minimax/minimax-m2.5", description="Modelo LLM padrão")
+    max_tokens: int = Field(default=8192, description="Máximo de tokens na resposta")
     temperature: float = Field(default=0.7, description="Temperatura do LLM")
-    timeout: int = Field(default=10, description="Timeout em segundos")
+    timeout: int = Field(default=60, description="Timeout em segundos")
 
 
 class QdrantSettings(BaseSettings):

@@ -1,427 +1,235 @@
-# Arquitetura do VPS-Agent v2
+# Arquitetura do AgentVPS — Sprint 09
 
 ## Visão Geral
 
-O VPS-Agent é um sistema de agente autônomo projetado para operar em uma VPS com recursos limitados (2.4 GB RAM). A arquitetura segue princípios de modularidade, resiliência e eficiência de recursos.
-
-## Diagrama de Componentes
+AgentVPS é um agente autônomo que roda em VPS com recursos limitados (~2 GB RAM). Usa LangGraph para orquestração, padrão ReAct com function calling real para decisões inteligentes, e se integra ao OpenClaw para delegação de sub-tarefas.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      VPS-Agent v2                           │
-│                    (2.4 GB RAM Total)                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              SEMPRE LIGADOS (~750 MB)              │   │
-│  │                                                     │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │   Telegram  │◄──►│      Telegram Bot       │    │   │
-│  │  │    Bot      │    │    (telegram_bot/)      │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                              │                      │   │
-│  │                              ▼                      │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │   Gateway   │◄──►│   FastAPI Gateway       │    │   │
-│  │  │    HTTP     │    │    (core/gateway/)      │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                              │                      │   │
-│  │                              ▼                      │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │ LangGraph   │◄──►│   VPS Agent Graph       │    │   │
-│  │  │  Workflow   │    │ (core/vps_langgraph/)   │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │           │                    │                    │   │
-│  │           ▼                    ▼                    │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │   Memory    │◄──►│  AgentMemory (PostgreSQL)│   │   │
-│  │  │  (PSQL)     │    │  (core/vps_langgraph/)   │   │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                                                     │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │   Redis     │◄──►│   Cache & Sessions      │    │   │
-│  │  │   (Cache)   │    │    (core/gateway/)      │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                                                     │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │  PostgreSQL │◄──►│   Structured Storage    │    │   │
-│  │  │   (PSQL)    │    │    (PostgreSQL 16)      │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                                                     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │           SOB DEMANDA (~1650 MB livre)             │   │
-│  │                                                     │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │   Qdrant    │◄──►│  Semantic Memory        │    │   │
-│  │  │  (Vector)   │    │  (Vector Search)        │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                                                     │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │     n8n     │◄──►│  Workflow Automation    │    │   │
-│  │  │  (Low-code) │    │  (Node-based flows)     │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   ││  │                                                     │   │
-│  │  ┌─────────────┐    ┌─────────────────────────┐    │   │
-│  │  │   Flowise   │◄──►│  LLM Workflows          │    │   │
-│  │  │  (Chatflow) │    │  (Visual builder)       │    │   │
-│  │  └─────────────┘    └─────────────────────────┘    │   │
-│  │                                                     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+Usuário (Telegram)
+       │
+       ▼
+  AgentVPS (Python / LangGraph)
+       │
+       ├── PostgreSQL  — memória estruturada, learnings, proposals
+       ├── Redis       — cache e filas
+       │
+       └── OpenClaw (Node.js, docker exec) — sub-agente opcional
 ```
 
-## Camadas da Arquitetura
+---
+
+## Grafo LangGraph (7 nós)
+
+```
+START
+  │
+  ▼
+load_context ──── Carrega histórico e fatos do usuário (PostgreSQL)
+  │
+  ▼
+react ──────────── LLM com function calling decide:
+  │                  tool_call → security_check
+  │                  resposta direta → respond
+  ├──────────────┐
+  ▼              ▼
+security_check  respond ──── Resposta direta ao usuário
+  │
+  ▼
+execute ─────────── Executa skill via registry + hook system
+  │
+  ▼
+format_response ─── LLM formata resultado em linguagem natural
+  │
+  ▼
+respond
+  │
+  ▼
+save_memory ──────── Persiste contexto no PostgreSQL
+  │
+  ▼
+END
+```
+
+---
+
+## Camadas
 
 ### 1. Interface Layer
 
-**Responsabilidade:** Comunicação com usuários externos
+| Componente | Localização | Descrição |
+|---|---|---|
+| Telegram Bot | `telegram_bot/bot.py` | Interface principal + `/approve`, `/reject`, `/proposals` |
+| Gateway HTTP | `core/gateway/main.py` | API REST FastAPI |
+| MCP Server | `core/mcp_server.py` | Model Context Protocol (SSE + WebSocket) |
+
+### 2. Orquestração Layer (ReAct)
 
 | Componente | Localização | Descrição |
-|------------|-------------|-----------|
-| Telegram Bot | `telegram_bot/bot.py` | Interface principal via Telegram |
-| Gateway HTTP | `core/gateway/main.py` | API REST para integrações |
-| Webhook Handler | `core/gateway/adapters.py` | Adaptadores para webhooks |
+|---|---|---|
+| Graph | `core/vps_langgraph/graph.py` | Definição do grafo de 7 nós |
+| React Node | `core/vps_langgraph/react_node.py` | LLM com function calling (ReAct) |
+| Nodes | `core/vps_langgraph/nodes.py` | load_context, security_check, execute, respond, save_memory |
+| State | `core/vps_langgraph/state.py` | `AgentState` TypedDict |
 
-### 2. Orquestração Layer
-
-**Responsabilidade:** Fluxo de decisão e processamento
-
-| Componente | Localização | Descrição |
-|------------|-------------|-----------|
-| LangGraph | `core/vps_langgraph/graph.py` | Grafo de estado do agente |
-| Nodes | `core/vps_langgraph/nodes.py` | Nós de processamento |
-| State | `core/vps_langgraph/state.py` | Definição de estado |
-| Intent Classifier | `core/vps_langgraph/intent_classifier.py` | Classificação de intenções |
-
-### 3. Serviços Core
-
-**Responsabilidade:** Lógica de negócio e capacidades
+### 3. Skill Registry
 
 | Componente | Localização | Descrição |
-|------------|-------------|-----------|
-| VPS Agent | `core/vps_agent/agent.py` | Agente principal |
-| Semantic Memory | `core/vps_agent/semantic_memory.py` | Memória vetorial |
-| Capabilities | `core/capabilities/registry.py` | Registro de capacidades |
-| Resource Manager | `core/resource_manager/manager.py` | Gerenciamento de recursos |
+|---|---|---|
+| Registry | `core/skills/registry.py` | Auto-discovery via `config.yaml + handler.py` |
+| Base | `core/skills/base.py` | `SkillBase` — interface que todas as skills implementam |
+| Tool Schemas | `registry.list_tool_schemas()` | JSON Schema para function calling |
 
-### 4. Infraestrutura Layer
+**Skills disponíveis (12):**
 
-**Responsabilidade:** Persistência, segurança e resiliência
+| Skill | Nível | Descrição |
+|-------|-------|-----------|
+| `shell_exec` | dangerous | Executa comandos shell na VPS |
+| `get_ram` | safe | Uso de memória RAM |
+| `list_containers` | safe | Lista containers Docker |
+| `get_system_status` | safe | Status geral do sistema |
+| `check_postgres` | safe | Health do PostgreSQL |
+| `check_redis` | safe | Health do Redis |
+| `file_manager` | normal | Lê e escreve arquivos |
+| `memory_query` | safe | Consulta memória persistida (PostgreSQL) |
+| `web_search` | normal | Busca web (DuckDuckGo fallback) |
+| `self_edit` | dangerous | Auto-edição de código da VPS |
+| `log_reader` | safe | Leitura de logs da VPS |
+| `openclaw_exec` | dangerous | Controla OpenClaw via docker exec |
+
+Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (`on-dangerous`).
+
+### 4. Hook System
 
 | Componente | Localização | Descrição |
-|------------|-------------|-----------|
-| Agent Memory | `core/vps_langgraph/memory.py` | Persistência PostgreSQL |
-| Allowlist | `core/security/allowlist.py` | Segurança de comandos |
-| Circuit Breaker | `core/resilience/circuit_breaker.py` | Resiliência |
-| Rate Limiter | `core/gateway/rate_limiter.py` | Limitação de taxa |
-| Session Manager | `core/gateway/session_manager.py` | Gestão de sessões |
+|---|---|---|
+| HookRunner | `core/hooks/runner.py` | Executa hooks pre/post para cada skill |
+| `logging_hook` | builtin | Structured logging com duração de execução |
+| `feedback_pre_hook` | builtin | Consulta learnings antes de executar |
+| `learning_hook` | builtin | Registra erros no PostgreSQL para aprendizado |
 
-### 5. LLM Layer
-
-**Responsabilidade:** Abstração de modelos de linguagem
+### 5. Autonomous Loop
 
 | Componente | Localização | Descrição |
-|------------|-------------|-----------|
-| LLM Provider | `core/llm/provider.py` | Interface unificada LLM |
-| OpenRouter Client | `core/llm/openrouter_client.py` | Cliente OpenRouter |
-| Prompt Composer | `core/llm/prompt_composer.py` | Composição de prompts |
-| Agent Identity | `core/llm/agent_identity.py` | Personalidade do agente |
+|---|---|---|
+| Engine | `core/autonomous/engine.py` | Loop com 6 triggers com condições reais |
+| Cap Gates | `core/autonomous/engine.py` | Rate limit, RAM threshold, security level |
+| Proposals | PostgreSQL `agent_proposals` | Proposals persistidas com approval workflow |
+| Missions | PostgreSQL `agent_missions` | Execuções rastreadas |
 
-## Fluxo de Processamento
+**Blueprint:** DETECT → PROPOSE → FILTER (Cap Gates) → APPROVE (Telegram) → EXECUTE → COMPLETE
 
-### Fluxo Principal (Mensagem)
+### 6. LLM Layer
+
+| Componente | Localização | Descrição |
+|---|---|---|
+| Provider | `core/llm/provider.py` | Interface unificada |
+| OpenRouter | `core/llm/openrouter_client.py` | Cliente OpenRouter |
+| Modelo padrão | `OPENROUTER_MODEL` env | `minimax/minimax-m2.5` |
+
+### 7. Segurança
+
+| Componente | Localização | Descrição |
+|---|---|---|
+| Allowlist | `core/security/allowlist.py` | Whitelist de comandos permitidos |
+| Cap Gates | `core/autonomous/engine.py` | Rate limit + RAM + security level |
+| Telegram Approval | `telegram_bot/bot.py` | `/approve`, `/reject` para proposals DANGEROUS |
+| Anti-injection | `core/skills/_builtin/openclaw_exec/handler.py` | Output externo marcado como não-confiável |
+
+---
+
+## Integração OpenClaw
+
+OpenClaw é um app Node.js rodando no container `repo-openclaw-gateway-1`, **separado** do AgentVPS.
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Usuário   │────►│  Telegram   │────►│  Telegram   │
-│  (Mensagem) │     │    Bot      │     │   Handler   │
-└─────────────┘     └─────────────┘     └──────┬──────┘
-                                                │
-                                                ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Resposta  │◄────│   Agent     │◄────│   Gateway   │
-│  (Formatada)│     │   Graph     │     │  (process)  │
-└─────────────┘     └──────┬──────┘     └─────────────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌─────────┐  ┌─────────┐  ┌─────────┐
-        │ Intent  │  │  Plan   │  │ Execute │
-        │Classify │  │         │  │         │
-        └─────────┘  └─────────┘  └─────────┘
+AgentVPS (vps-core-network: 172.28.0.0/16)
+    │
+    │  [skill openclaw_exec]
+    │  docker exec repo-openclaw-gateway-1 node /app/dist/entry.js <cmd>
+    ▼
+OpenClaw (repo_default: 172.18.0.0/16)
+    │
+    └── Gateway WebSocket: ws://127.0.0.1:18789
 ```
 
-### Grafo LangGraph (Detalhado)
+**Modelo de segurança — unidirecional por design:**
+- AgentVPS → OpenClaw: sim (via skill `openclaw_exec`)
+- OpenClaw → AgentVPS: **NÃO** (redes separadas, sem credenciais cruzadas)
+
+**Comandos disponíveis:**
+
+| Ação | Comando interno |
+|------|----------------|
+| `health` | `gateway health` |
+| `status` | `gateway status --json` |
+| `agent` | `agent --message "..." --json` |
+| `agents` | `agents list` |
+| `channels` | `channels status` |
+| `approvals` | `approvals list` |
+
+---
+
+## Fluxo de Dados
 
 ```
-                    ┌─────────────┐
-                    │   START     │
-                    └──────┬──────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-              ┌────│  classify   │────┐
-              │    │   intent    │    │
-              │    └─────────────┘    │
-              │           │           │
-              │           ▼           │
-              │    ┌─────────────┐    │
-              │    │load_context │    │
-              │    └──────┬──────┘    │
-              │           │           │
-              │           ▼           │
-              │    ┌─────────────┐    │
-              └────│    plan     │────┘
-                   └──────┬──────┘
-                          │
-              ┌───────────┼───────────┐
-              ▼           ▼           ▼
-        ┌─────────┐ ┌─────────┐ ┌─────────┐
-        │ command │ │  task   │ │  chat   │
-        │  ─────► │ │  ─────► │ │  ─────► │
-        │ execute │ │ execute │ │ respond │
-        └────┬────┘ └────┬────┘ └────┬────┘
-             │           │           │
-             └───────────┼───────────┘
-                         ▼
-                  ┌─────────────┐
-                  │save_memory  │
-                  └──────┬──────┘
-                         │
-                         ▼
-                       [END]
+Usuário (Telegram)
+    │
+    ▼
+bot.py → process_message_async()
+    │
+    ▼
+agent.py → graph.ainvoke(initial_state)
+    │
+    ▼
+load_context → react (LLM + tools) → security_check → execute (+ hooks) → format_response → respond → save_memory
+    │                                                        │                                              │
+    ▼                                                        ▼                                              ▼
+PostgreSQL                                         Skill (ex: openclaw_exec)                          Redis (cache)
+(memória, learnings, proposals)                    [DADO EXTERNO — tag anti-injection]
 ```
 
-## Gerenciamento de Estado
+---
 
-### State Definition (AgentState)
+## Banco de Dados (PostgreSQL)
 
-```python
-class AgentState(TypedDict):
-    messages: Annotated[list, add_messages]
-    intent: str
-    intent_confidence: float
-    context: dict
-    plan: list
-    execution_result: dict
-    response: str
-    session_id: str
-    user_id: str
-    metadata: dict
-```
+Tabelas principais:
 
-### Persistência
+| Tabela | Descrição |
+|--------|-----------|
+| `agent_memory` | Fatos e contexto por usuário |
+| `agent_conversations` | Histórico de conversas |
+| `agent_learnings` | Erros e aprendizados |
+| `agent_proposals` | Proposals autônomas + status |
+| `agent_missions` | Execuções rastreadas |
 
-| Tipo | Tecnologia | Caso de Uso |
-|------|------------|-------------|
-| Estruturada | PostgreSQL | Conversas, metadados, estado |
-| Cache | Redis | Sessões, rate limits, tokens |
-| Vetorial | Qdrant | Memória semântica, embeddings |
-| Arquivos | Local | Logs, backups, configurações |
+Schema: `configs/init-db.sql` + `configs/migration-autonomous.sql`
 
-## Segurança
+---
 
-### Allowlist de Comandos
+## Métricas (Sprint 09)
 
-O sistema implementa uma camada de segurança via allowlist:
+| Métrica | Valor |
+|---------|-------|
+| Nós no grafo | 7 (era 10) |
+| Chamadas LLM por mensagem | 1-2 (decidir + opcionalmente formatar) |
+| Skills disponíveis | 12 |
+| Dead code removido (Sprint 03) | ~600 linhas |
+| Hook system builtin | 3 hooks |
+| Triggers autônomos com condições reais | 6/6 |
+| API keys hardcoded no código | 0 |
+| Redes Docker isoladas | 2 (vps-core-network / repo_default) |
 
-```python
-# Regras padrão
-- ALLOW: docker ps, stats, logs, inspect
-- ALLOW: free -m, df -h, uptime, whoami
-- REQUIRE_APPROVAL: docker start/stop/restart
-- DENY: rm -rf, dd, mkfs, fork bombs
-```
+---
 
-### Autenticação
+## Deploy na VPS (Produção)
 
-| Camada | Mecanismo | Status |
-|--------|-----------|--------|
-| Telegram | Bot Token + User ID whitelist | ✅ Implementado |
-| Gateway | API Key (env var) | 🔄 Em progresso |
-| Internal | Service-to-service trust | ✅ Implementado |
-
-## Resiliência
-
-### Circuit Breaker
-
-```python
- Estados:
- CLOSED  ──► OPEN (após N falhas)
-    ▲           │
-    │           ▼
-    └────── HALF_OPEN (retry)
-```
-
-### Rate Limiting
-
-- Per-user: 60 req/min
-- Per-endpoint: Configurável
-- Global: Proteção contra DDoS
-
-## Recursos e Limites
-
-### Memória (2.4 GB Total)
-
-| Categoria | Serviços | Limite |
-|-----------|----------|--------|
-| Sempre ON | PSQL, Redis, Core | ~750 MB |
-| Sob demanda | Qdrant, n8n | ~1.5 GB |
-| Máximo | - | 2.4 GB (hard limit) |
-
-### Concorrência
-
-- Max workers: 4 (CPU-bound)
-- Async tasks: ilimitado (IO-bound)
-- Docker containers simultâneos: 2
-
-## Configuração do Pacote
-
-O projeto usa `pyproject.toml` como pacote Python profissional:
-
-```toml
-[project]
-name = "vps-agent"
-version = "2.0.0"
-requires-python = ">=3.11"
-
-[project.scripts]
-vps-agent = "telegram_bot.bot:main"
-vps-mcp = "core.mcp_server:main"
-vps-gateway = "core.gateway.main:run_server"
-```
-
-Instalação:
-```bash
-pip install -e ".[dev]"
-```
-
-## Decisões de Arquitetura (ADRs)
-
-Consulte o diretório `docs/adr/` para decisões documentadas:
-
-- [ADR-001: Estratégia de Memória](adr/001-memory-strategy.md)
-- [ADR-002: Abstração LLM](adr/002-llm-abstraction.md)
-
-## Evolução Planejada
-
-| Fase | Foco | Componentes |
-|------|------|-------------|
-| 1.1 | Async | Connection pooling, asyncpg |
-| 1.2 | Segurança | Allowlist no grafo |
-| 1.3 | Auth | Gateway API key real |
-| 2.0 | Modernização | LangGraph moderno, tool use |
-
-## Autonomous Engine (Sprint 02)
-
-O **Autonomous Engine** implementa o ciclo de 6 passos para automação autônoma:
-
-### 6-Step Blueprint
-
-```mermaid
-DETECT → PROPOSE → FILTER → EXECUTE → COMPLETE → RE-TRIGGER
-```
-
-| Passo | Descrição | Componente |
-|-------|-----------|-------------|
-| DETECT | Monitora condições do sistema | Triggers (RAM, erro, schedule) |
-| PROPOSE | Cria proposal no PostgreSQL | `create_proposal()` |
-| FILTER | Verifica recursos/segurança | Cap Gates |
-| EXECUTE | Executa via Skill Registry | `_execute_mission()` |
-| COMPLETE | Emite resultado | `agent_missions` table |
-| RE-TRIGGER | Gera novas proposals | Event loop |
-
-### Cap Gates
-
-Verificações de segurança antes de executar:
-
-```python
-class CapGate:
-    check_rate_limit()    # max 10 proposals/hora
-    check_ram_threshold()  # min 200MB RAM livre
-    check_security_level() # ações perigosas requerem aprovação
-```
-
-### Tabelas PostgreSQL
-
-- `agent_proposals`: Ações sugeridas pelo agente
-- `agent_missions`: Execução de proposals
-- `agent_policies`: Regras de governança
-
-### Triggers Autônomos
-
-| Trigger | Condição | Ação |
-|---------|----------|------|
-| `ram_high` | RAM > 80% | Limpar containers inativos |
-| `error_repeated` | >3 erros/hora | Investigar erros |
-| `schedule_due` | Tarefa pendente | Executar tarefa |
-| `health_check` | A cada 60s | Verificar containers |
-
-## ReAct Node (Sprint 02)
-
-O **ReAct Node** permite que o agente use tools via LLM:
-
-```python
-# Fluxo ReAct
-1. LLM analiza mensagem → tool_call
-2. Skill Registry executa tool
-3. LLM gera resposta final
-```
-
-### Tool Schemas
-
-Todas as skills expõem schemas OpenAI-compatible:
-
-```python
-# Exemplo: shell_exec
-{
-    "type": "function",
-    "function": {
-        "name": "shell_exec",
-        "description": "Executa comando shell",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "command": {"type": "string"}
-            }
-        }
-    }
-}
-```
-
-## Skills System (Sprint 02)
-
-Sistema de plugins para capacidades do agente:
-
-### Built-in Skills
-
-| Skill | Descrição | Handler |
-|-------|-----------|---------|
-| `shell_exec` | Executa comandos shell | `core/skills/_builtin/shell_exec/` |
-| `get_ram` | Consulta memória RAM | `core/skills/_builtin/ram/` |
-| `list_containers` | Lista Docker containers | `core/skills/_builtin/containers/` |
-| `get_system_status` | Status geral | `core/skills/_builtin/system_status/` |
-| `check_postgres` | Health PostgreSQL | `core/skills/_builtin/check_postgres/` |
-| `check_redis` | Health Redis | `core/skills/_builtin/check_redis/` |
-| `file_manager` | Operações arquivo | `core/skills/_builtin/file_manager/` |
-| `memory_query` | Consulta memória | `core/skills/_builtin/memory_query/` |
-| `web_search` | Pesquisa web | `core/skills/_builtin/web_search/` |
-| `self_edit` | Auto-edição | `core/skills/_builtin/self_edit/` |
-
-### Skill Registry
-
-Padrão registry para descoberta dinâmica:
-
-```python
-registry = get_skill_registry()
-schemas = registry.list_tool_schemas()
-result = await registry.execute_skill("shell_exec", {"command": "ls"})
-```
-
-## Referências
-
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+| Item | Valor |
+|------|-------|
+| Diretório app | `/opt/vps-agent/` |
+| Python venv | `/opt/vps-agent/core/venv/` |
+| Env file | `/opt/vps-agent/.env` |
+| Serviço 1 | `telegram-bot.service` (systemd) |
+| Serviço 2 | `mcp-server.service` (systemd) |
+| PostgreSQL | container `vps-postgres` (172.28.x.x) |
+| Redis | container `vps-redis` (172.28.x.x) |
+| Logs | `/opt/vps-agent/logs/telegram-bot.log` |

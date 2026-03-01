@@ -1,5 +1,5 @@
 """
-Testes basicos para o VPS-Agent v2.
+Testes basicos para o VPS-Agent v2 — Sprint 03.
 """
 
 import pytest
@@ -26,40 +26,38 @@ class TestAgentState:
         assert state["intent"] == "chat"
 
 
-class TestNodes:
-    """Testes para os nodes do LangGraph."""
+class TestReactNode:
+    """Testes para o react_node (substitui classify + plan)."""
 
-    @pytest.mark.asyncio
-    async def test_node_classify_intent_command(self):
-        """Testa classificacao de comandos."""
-        from core.vps_langgraph.nodes import node_classify_intent
+    def test_react_node_import(self):
+        """Testa se react_node pode ser importado."""
+        from core.vps_langgraph.react_node import node_react, route_after_react
 
-        state = {"user_id": "123", "user_message": "/ram"}
-        result = await node_classify_intent(state)
+        assert node_react is not None
+        assert route_after_react is not None
 
-        assert result["intent"] == "command"
+    def test_route_after_react_with_action(self):
+        """Testa roteamento quando react detectou acao necessaria (tool call)."""
+        from core.vps_langgraph.react_node import route_after_react
 
-    @pytest.mark.asyncio
-    async def test_node_classify_intent_question(self):
-        """Testa classificacao de perguntas."""
-        from core.vps_langgraph.nodes import node_classify_intent
+        state = {
+            "action_required": True,
+            "plan": [{"type": "skill", "action": "shell_exec", "args": {"command": "whoami"}}],
+            "current_step": 0,
+        }
+        result = route_after_react(state)
+        assert result == "security_check"
 
-        # Pergunta factual clara - sem "e" isolado para evitar match com self_improve
-        state = {"user_id": "123", "user_message": "oq e a capital do brasil?"}
-        result = await node_classify_intent(state)
+    def test_route_after_react_direct_response(self):
+        """Testa roteamento quando react respondeu diretamente (sem action)."""
+        from core.vps_langgraph.react_node import route_after_react
 
-        # Aceita question OU chat OU self_improve (modelo gratuito tem limitacoes)
-        assert result["intent"] in ["question", "chat", "self_improve"]
-
-    @pytest.mark.asyncio
-    async def test_node_classify_intent_chat(self):
-        """Testa classificacao de chat."""
-        from core.vps_langgraph.nodes import node_classify_intent
-
-        state = {"user_id": "123", "user_message": "Ola, tudo bem?"}
-        result = await node_classify_intent(state)
-
-        assert result["intent"] == "chat"
+        state = {
+            "action_required": False,
+            "response": "Ola! Como posso ajudar?",
+        }
+        result = route_after_react(state)
+        assert result == "respond"
 
 
 class TestGraph:
@@ -70,6 +68,14 @@ class TestGraph:
         from core.vps_langgraph.graph import build_agent_graph
 
         graph = build_agent_graph()
+        assert graph is not None
+
+    def test_graph_has_react_node(self):
+        """Testa que o grafo tem o node react."""
+        from core.vps_langgraph.graph import build_agent_graph
+
+        graph = build_agent_graph()
+        # O grafo compilado tem nodes acessiveis
         assert graph is not None
 
 

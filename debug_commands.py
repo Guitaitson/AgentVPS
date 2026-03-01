@@ -62,16 +62,17 @@ async def debug_command(message: str):
 
         traceback.print_exc()
 
-    # 3. Testar tools
-    print("\n3. TESTANDO TOOLS...")
+    # 3. Testar skills via registry
+    print("\n3. TESTANDO SKILL REGISTRY...")
     try:
-        from core.tools.system_tools import get_async_tool
+        from core.skills.registry import get_skill_registry
 
-        tools = ["list_containers", "get_system_status", "get_ram"]
-        for tool_name in tools:
-            tool = get_async_tool(tool_name)
-            status = "✅ ENCONTRADA" if tool else "❌ NÃO ENCONTRADA"
-            print(f"   {tool_name}: {status}")
+        registry = get_skill_registry()
+        skills = registry.list_skills()
+        for skill_info in skills:
+            print(f"   {skill_info['name']}: ✅ REGISTRADO")
+        if not skills:
+            print("   ❌ Nenhum skill registrado")
     except Exception as e:
         print(f"   ERRO: {e}")
         import traceback

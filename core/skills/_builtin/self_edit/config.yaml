@@ -24,22 +24,22 @@ parameters:
   mode:
     type: string
     required: false
-    description: "Modo: overwrite, append"
+    description: "Modo: overwrite, append, patch"
     default: "overwrite"
 parameters_schema:
   file_path:
     type: string
-    description: "O caminho do arquivo (ex: 'core/vps_agent/agent.py')"
+    description: "O caminho do arquivo (ex: '/opt/vps-agent/core/llm/agent_identity.py')"
     required: true
   content:
     type: string
-    description: "O novo conteúdo do arquivo"
+    description: "O novo conteúdo. Para mode=patch, usar formato 'TEXTO_ANTIGO|||TEXTO_NOVO'"
     required: true
   mode:
     type: string
-    description: "Modo de edição: 'overwrite' (substitui) ou 'append' (adiciona)"
+    description: "Modo: 'overwrite' (substitui tudo), 'append' (adiciona ao final), 'patch' (substitui trecho)"
     required: false
-    enum: ["overwrite", "append"]
+    enum: ["overwrite", "append", "patch"]
 max_output_chars: 1500
 timeout_seconds: 30
 enabled: true

@@ -1,0 +1,60 @@
+name: openclaw_exec
+description: "Controla o OpenClaw via docker exec. Ações: health, status, agent, agents, channels, approvals."
+version: "2.0.0"
+security_level: dangerous  # Requer aprovação: on-dangerous
+
+triggers:
+  - openclaw
+  - chamar openclaw
+  - executar openclaw
+  - status openclaw
+  - agente openclaw
+  - openclaw health
+  - openclaw status
+
+parameters:
+  action:
+    type: string
+    required: true
+    description: "Ação no OpenClaw: 'health', 'status', 'agent', 'agents', 'channels', 'approvals'"
+  message:
+    type: string
+    required: false
+    description: "Mensagem para enviar ao agente (obrigatório quando action='agent')"
+  timeout:
+    type: integer
+    required: false
+    default: 30
+    description: "Timeout em segundos (default: 30)"
+
+parameters_schema:
+  action:
+    type: string
+    description: "Ação a executar no OpenClaw"
+    required: true
+    enum:
+      - health
+      - status
+      - agent
+      - agents
+      - channels
+      - approvals
+  message:
+    type: string
+    description: "Mensagem para o agente (apenas quando action='agent')"
+    required: false
+  timeout:
+    type: integer
+    description: "Timeout em segundos"
+    required: false
+    default: 30
+
+enabled: true
+max_output_chars: 5000
+timeout_seconds: 40
+
+# Notas de implementação:
+# - OpenClaw NÃO tem binário CLI no host
+# - Comunicação via: docker exec repo-openclaw-gateway-1 node /app/dist/entry.js <cmd>
+# - Output marcado como dado externo (anti-prompt-injection)
+# - AgentVPS → OpenClaw (unidirecional por design de segurança)
