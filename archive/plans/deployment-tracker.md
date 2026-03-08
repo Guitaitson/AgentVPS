@@ -1,3 +1,8 @@
+> [!WARNING]
+> Documento historico (nao normativo).
+> Nao usar este arquivo para inferir estado atual do projeto.
+> Fonte atual: `docs/PROJECT_STATUS.md` + `origin/main`.
+
 # Tracker de Implantação — AgentVPS
 
 ## 📊 Estado Atual
