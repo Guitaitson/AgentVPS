@@ -9,9 +9,6 @@
 | [000](000-template.md) | Template ADR | Template | - |
 | [001](001-memory-strategy.md) | Estratégia de Memória Multi-Camada | Aceito | 2026-02-06 |
 | [002](002-llm-abstraction.md) | Abstração de Providers LLM | Aceito | 2026-02-06 |
-| [003](003-circuit-breaker.md) | Circuit Breaker Pattern | Aceito | 2026-02-07 |
-| [004](004-langgraph-orchestration.md) | Orquestração com LangGraph | Aceito | 2026-02-07 |
-| [005](005-rate-limiting.md) | Rate Limiting no Gateway | Aceito | 2026-02-08 |
 
 ## 📖 O Que é um ADR?
 
@@ -98,8 +95,8 @@ docs/adr/001.md
 
 | Métrica | Valor |
 |---------|-------|
-| Total de ADRs | 5 |
-| Aceitos | 5 |
+| Total de ADRs | 2 |
+| Aceitos | 2 |
 | Depreciados | 0 |
 | Propostos | 0 |
 

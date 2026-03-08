@@ -115,7 +115,7 @@
 
 | Item | Valor |
 |------|-------|
-| IP VPS | 107.175.1.42 |
+| IP VPS | SEU_HOST_VPS |
 | Porta SSH | 22 |
 | Usuário | root |
 | Telegram Bot Token | `SEU_BOT_TOKEN_AQUI` |
@@ -127,10 +127,10 @@
 
 ```bash
 # Conexão com senha (até criar chaves)
-ssh root@107.175.1.42 -p 22
+ssh root@SEU_HOST_VPS -p 22
 
 # Depois de configurar chaves
-ssh -i ~/.ssh/vps_agent_ed25519 root@107.175.1.42 -p 22
+ssh -i ~/.ssh/vps_agent_ed25519 root@SEU_HOST_VPS -p 22
 ```
 
 ---

@@ -95,11 +95,14 @@ POSTGRES_PORT=5432
 POSTGRES_DB=vps_agent
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
-OPENROUTER_API_KEY=sk-or-v1-sua-chave-aqui
+OPENROUTER_API_KEY=sua-chave-openrouter-aqui
 OPENROUTER_MODEL=minimax/minimax-m2.5
 OPENROUTER_MAX_TOKENS=2048
 OPENROUTER_TIMEOUT=30
 OPENROUTER_TEMPERATURE=0.7
+MCP_HOST=127.0.0.1
+MCP_PORT=8765
+MCP_API_KEY=troque-por-uma-chave-forte
 ```
 
 ---
@@ -163,7 +166,7 @@ systemctl is-active telegram-bot mcp-server
 # 2. Logs limpos (sem erros)
 tail -20 /opt/vps-agent/logs/telegram-bot.log
 
-# 3. Skills carregadas (deve mostrar 12)
+# 3. Skills carregadas (deve mostrar 13)
 PYTHONPATH=/opt/vps-agent /opt/vps-agent/core/venv/bin/python3 -c "
 from core.skills.registry import SkillRegistry
 r = SkillRegistry(['/opt/vps-agent/core/skills/_builtin'])

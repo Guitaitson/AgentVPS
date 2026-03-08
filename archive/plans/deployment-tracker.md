@@ -132,5 +132,5 @@
 ## 🔗 Referências
 
 - GitHub: https://github.com/Guitaitson/AgentVPS
-- VPS: 107.175.1.42
+- VPS: SEU_HOST_VPS
 - Documentação Principal: `plano-implantacao-vps-agente-v2.md`

@@ -172,7 +172,7 @@
 - Deploy script criado (scripts/deploy.sh)
 
 ### 2026-02-08 — FASE 1 v2 COMPLETA
-- VPS deployado com sucesso (107.175.1.42)
+- VPS deployado com sucesso (SEU_HOST_VPS)
 - PostgreSQL + Redis + Qdrant rodando
 - Documentação robusta criada:
   - docs/ARCHITECTURE.md

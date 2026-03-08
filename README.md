@@ -50,7 +50,7 @@ START → load_context → react → security_check → execute → format_respo
 
 ---
 
-## Skills Disponíveis (12)
+## Skills Disponíveis (13)
 
 | Skill | Descrição | Nível |
 |-------|-----------|-------|
@@ -63,6 +63,7 @@ START → load_context → react → security_check → execute → format_respo
 | `file_manager` | Lê/escreve arquivos | normal |
 | `memory_query` | Consulta memória persistida | safe |
 | `web_search` | Busca na web (fallback DuckDuckGo) | normal |
+| `fleetintel` | Consulta eventos e dados de frota via FleetIntel MCP | normal |
 | `self_edit` | Auto-edição de código | dangerous |
 | `log_reader` | Lê logs da VPS | safe |
 | `openclaw_exec` | Controla OpenClaw via docker exec | dangerous |
@@ -229,6 +230,7 @@ OPENROUTER_MODEL=minimax/minimax-m2.5
 
 ## Documentação
 
+- [Índice da documentação](docs/README.md)
 - [Arquitetura detalhada](docs/ARCHITECTURE.md)
 - [Guia de Deploy](docs/DEPLOYMENT.md)
 - [ADRs — Decisões de Arquitetura](docs/adr/README.md)

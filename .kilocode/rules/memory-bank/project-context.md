@@ -118,5 +118,5 @@ Criar um **agente autônomo** que:
 ## 🔗 REFERÊNCIAS
 
 - GitHub: https://github.com/Guitaitson/AgentVPS
-- VPS: 107.175.1.22 (esperando confirmação do IP)
+- VPS: SEU_HOST_VPS (definir no ambiente privado, não em docs versionadas)
 - Telegram: @Molttaitbot
