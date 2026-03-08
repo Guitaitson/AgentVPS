@@ -1,6 +1,6 @@
 """
 Nodes do agente LangGraph.
-Cada função é um nó no grafo de decisões.
+Cada funÃ§Ã£o Ã© um nÃ³ no grafo de decisÃµes.
 """
 
 from datetime import datetime
@@ -16,13 +16,13 @@ memory = AgentMemory()
 
 
 def node_load_context(state: AgentState) -> AgentState:
-    """Carrega contexto do usuário da memória."""
+    """Carrega contexto do usuÃ¡rio da memÃ³ria."""
     user_id = state["user_id"]
 
-    # Fatos do usuário
+    # Fatos do usuÃ¡rio
     user_facts = memory.get_user_facts(user_id)
 
-    # Histórico recente
+    # HistÃ³rico recente
     history = memory.get_conversation_history(user_id, limit=20)
 
     logger.info(
@@ -41,7 +41,7 @@ def node_load_context(state: AgentState) -> AgentState:
 
 def node_security_check(state: AgentState) -> AgentState:
     """
-    Verifica segurança antes de executar comandos.
+    Verifica seguranÃ§a antes de executar comandos.
     Consulta allowlist para bloquear comandos perigosos.
     """
 
@@ -73,12 +73,12 @@ def node_security_check(state: AgentState) -> AgentState:
     debug_info["action_type"] = action_type
     debug_info["action"] = action
 
-    # Carregar allowlist padrão
+    # Carregar allowlist padrÃ£o
     allowlist = create_default_allowlist()
 
     # Verificar comando se for do tipo command ou execute
     if action_type in ["command", "execute"]:
-        # Montar comando completo para verificação
+        # Montar comando completo para verificaÃ§Ã£o
         full_command = action if isinstance(action, str) else str(action)
         debug_info["full_command"] = full_command
 
@@ -99,7 +99,7 @@ def node_security_check(state: AgentState) -> AgentState:
                     "permission": result.permission.value,
                 },
                 "blocked_by_security": True,
-                "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}\n\nPara executar este comando, adicione-o à allowlist ou use modo de aprovação.",
+                "execution_result": f"â›” Comando bloqueado por seguranÃ§a:\n{result.reason}\n\nPara executar este comando, adicione-o Ã  allowlist ou use modo de aprovaÃ§Ã£o.",
             }
 
         debug_info["result"] = "allowed"
@@ -107,7 +107,7 @@ def node_security_check(state: AgentState) -> AgentState:
     # Skills do tipo "skill" verificam o comando dentro dos args
     if action_type == "skill":
         skill_args = current_action.get("args", {})
-        # Se o skill é shell_exec, verificar o comando
+        # Se o skill Ã© shell_exec, verificar o comando
         if action == "shell_exec" and "command" in skill_args:
             full_command = skill_args["command"]
             debug_info["full_command"] = full_command
@@ -126,11 +126,11 @@ def node_security_check(state: AgentState) -> AgentState:
                         "permission": result.permission.value,
                     },
                     "blocked_by_security": True,
-                    "execution_result": f"⛔ Comando bloqueado por segurança:\n{result.reason}",
+                    "execution_result": f"â›” Comando bloqueado por seguranÃ§a:\n{result.reason}",
                 }
         debug_info["result"] = "skill_allowed"
 
-    # Tools do tipo "tool" são permitidas (são nossas tools controladas)
+    # Tools do tipo "tool" sÃ£o permitidas (sÃ£o nossas tools controladas)
     if action_type == "tool":
         debug_info["result"] = "tool_allowed"
 
@@ -174,8 +174,77 @@ async def _execute_with_hooks(registry, skill_name, skill_args, user_id):
     return result, None
 
 
+def _build_runtime_context(state: AgentState, *, user_id: str) -> dict:
+    semantic_recall = memory.search_semantic_memory(
+        user_id=user_id,
+        query_text=state.get("user_message", ""),
+        project_id=state.get("project_id"),
+        limit=3,
+    )
+    return {
+        "intent": state.get("intent"),
+        "user_message": state.get("user_message", ""),
+        "user_context": state.get("user_context", {}),
+        "recent_history": state.get("conversation_history", [])[-3:],
+        "tool_suggestion": state.get("tool_suggestion", ""),
+        "semantic_recall": semantic_recall,
+    }
+
+
+async def _execute_via_runtime(
+    *,
+    state: AgentState,
+    action: str,
+    skill_args: dict,
+    preferred_runtime: str | None = None,
+    context_keys: list[str] | None = None,
+):
+    from ..orchestration import RuntimeExecutionRequest, RuntimeProtocol
+    from ..orchestration.router_factory import get_runtime_router, parse_runtime_protocol
+
+    user_id = state.get("user_id", "unknown")
+    runtime_hint = parse_runtime_protocol(preferred_runtime)
+    runtime_router = get_runtime_router()
+
+    request = RuntimeExecutionRequest(
+        action=action,
+        args=skill_args,
+        user_id=user_id,
+        project_id=state.get("project_id"),
+        context=_build_runtime_context(state, user_id=user_id),
+        context_keys=context_keys,
+        preferred_protocol=runtime_hint,
+    )
+    result = await runtime_router.dispatch(request)
+
+    if result.success:
+        return result.output, None
+
+    if result.runtime != RuntimeProtocol.LOCAL_SKILLS:
+        registry = get_skill_registry()
+        local_skill = registry.get(action) or registry.find_by_trigger(action)
+        if local_skill:
+            fallback_result, veto = await _execute_with_hooks(
+                registry,
+                local_skill.name,
+                skill_args,
+                user_id,
+            )
+            if veto:
+                return None, veto
+            logger.warning(
+                "node_execute_runtime_fallback_local",
+                failed_runtime=result.runtime.value,
+                action=action,
+                error=result.error,
+            )
+            return fallback_result, None
+
+    return None, result.error or "Falha ao executar em runtime externo."
+
+
 async def node_execute(state: AgentState) -> AgentState:
-    """Executa ação usando Skill Registry + Hook System."""
+    """Executa acao via runtime router com fallback local."""
     from .error_handler import format_error_for_user, wrap_error
 
     if state.get("blocked_by_security"):
@@ -187,49 +256,66 @@ async def node_execute(state: AgentState) -> AgentState:
     step = state.get("current_step", 0)
     tool_suggestion = state.get("tool_suggestion", "")
     user_message = state.get("user_message", "")
-    user_id = state.get("user_id", "unknown")
+    current_action_name = ""
 
     try:
-        # 1. Tentar skill pelo plano
+        # 1. Tentar acao definida no plano
         if plan and step < len(plan):
             current_action = plan[step]
             action = current_action.get("action", "")
+            current_action_name = action
             raw_message = current_action.get("raw_message", user_message)
+            skill_args = current_action.get("args", {}) or {"raw_input": raw_message}
+            preferred_runtime = current_action.get("runtime") or current_action.get("protocol")
+            context_keys = current_action.get("context_keys")
 
-            skill = registry.get(action) or registry.find_by_trigger(action)
-            if skill:
-                skill_args = current_action.get("args", {})
-                if not skill_args:
-                    skill_args = {"raw_input": raw_message}
-                result, veto = await _execute_with_hooks(registry, skill.name, skill_args, user_id)
-                if veto:
-                    return {**state, "execution_result": veto}
-                return {**state, "execution_result": result}
-            else:
-                logger.warning("node_execute_skill_not_found", action=action)
+            if action:
+                result, error = await _execute_via_runtime(
+                    state=state,
+                    action=action,
+                    skill_args=skill_args,
+                    preferred_runtime=preferred_runtime,
+                    context_keys=context_keys,
+                )
+                if error is None:
+                    return {**state, "execution_result": result}
+                logger.warning(
+                    "node_execute_plan_runtime_failed",
+                    action=action,
+                    error=error,
+                    preferred_runtime=preferred_runtime,
+                )
 
         # 2. Tentar por tool_suggestion do LLM
         if tool_suggestion:
-            skill = registry.get(tool_suggestion) or registry.find_by_trigger(tool_suggestion)
-            if skill:
-                result, veto = await _execute_with_hooks(
-                    registry, skill.name, {"raw_input": user_message}, user_id
-                )
-                if veto:
-                    return {**state, "execution_result": veto}
+            current_action_name = tool_suggestion
+            result, error = await _execute_via_runtime(
+                state=state,
+                action=tool_suggestion,
+                skill_args={"raw_input": user_message},
+                preferred_runtime=None,
+                context_keys=None,
+            )
+            if error is None:
                 return {**state, "execution_result": result}
+            logger.warning("node_execute_tool_suggestion_failed", tool=tool_suggestion, error=error)
 
-        # 3. Skill não encontrado — tentar encontrar por trigger na mensagem
+        # 3. Fallback por trigger na mensagem
         skill = registry.find_by_trigger(user_message)
         if skill:
-            result, veto = await _execute_with_hooks(
-                registry, skill.name, {"raw_input": user_message}, user_id
+            current_action_name = skill.name
+            result, error = await _execute_via_runtime(
+                state=state,
+                action=skill.name,
+                skill_args={"raw_input": user_message},
+                preferred_runtime="local_skills",
+                context_keys=None,
             )
-            if veto:
-                return {**state, "execution_result": veto}
-            return {**state, "execution_result": result}
+            if error is None:
+                return {**state, "execution_result": result}
+            logger.warning("node_execute_trigger_fallback_failed", skill=skill.name, error=error)
 
-        # 4. Skill não encontrado — resposta inteligente
+        # 4. Skill nao encontrado: resposta inteligente
         from .smart_responses import (
             detect_missing_skill_keywords,
             generate_smart_unavailable_response,
@@ -241,15 +327,13 @@ async def node_execute(state: AgentState) -> AgentState:
 
         response = generate_smart_unavailable_response(user_message, detected_skills=detected)
         if available_skills:
-            response += f"\n\n Skills disponíveis: {skills_list}"
+            response += f"\n\n Skills disponiveis: {skills_list}"
 
         logger.warning("node_execute_no_skill_found", message=user_message[:50])
         return {**state, "execution_result": response}
 
     except Exception as e:
-        wrapped = wrap_error(
-            e, metadata={"skill": tool_suggestion, "action": action if "action" in dir() else None}
-        )
+        wrapped = wrap_error(e, metadata={"skill": tool_suggestion, "action": current_action_name})
         logger.error("node_execute_error", error=str(e))
         return {
             **state,
@@ -260,13 +344,13 @@ async def node_execute(state: AgentState) -> AgentState:
 
 async def node_generate_response(state: AgentState) -> AgentState:
     """
-    Gera resposta final ao usuário com identidade VPS-Agent.
+    Gera resposta final ao usuÃ¡rio com identidade VPS-Agent.
 
     Prioridade de resposta (Sprint 07):
-    1. Bloqueio de segurança → mensagem de bloqueio
-    2. response já definida neste ciclo (por format_response ou react_node) → preservar
-    3. execution_result presente → formatar via LLM (nunca retornar raw)
-    4. intent chat/question → LLM com identidade
+    1. Bloqueio de seguranÃ§a â†’ mensagem de bloqueio
+    2. response jÃ¡ definida neste ciclo (por format_response ou react_node) â†’ preservar
+    3. execution_result presente â†’ formatar via LLM (nunca retornar raw)
+    4. intent chat/question â†’ LLM com identidade
     5. Fallback contextual via LLM (nunca hardcoded)
     """
     from .smart_responses import (
@@ -289,20 +373,20 @@ async def node_generate_response(state: AgentState) -> AgentState:
         response_preview=str(state.get("response", ""))[:80],
     )
 
-    # --- Prioridade 1: Bloqueio de segurança ---
+    # --- Prioridade 1: Bloqueio de seguranÃ§a ---
     if state.get("blocked_by_security") and execution_result:
         logger.info("node_generate_response_blocked", preview=str(execution_result)[:100])
         return {**state, "response": execution_result}
 
-    # --- Prioridade 2: response já definida neste ciclo ---
-    # Com state reset em agent.py, response="" no início de cada mensagem.
-    # Se response não é vazia aqui, foi definida pelo react_node ou format_response NESTA execução.
-    # Preservar SEMPRE — não sobrescrever com execution_result raw.
+    # --- Prioridade 2: response jÃ¡ definida neste ciclo ---
+    # Com state reset em agent.py, response="" no inÃ­cio de cada mensagem.
+    # Se response nÃ£o Ã© vazia aqui, foi definida pelo react_node ou format_response NESTA execuÃ§Ã£o.
+    # Preservar SEMPRE â€” nÃ£o sobrescrever com execution_result raw.
     existing_response = state.get("response")
     if existing_response and existing_response.strip():
         logger.info("node_generate_response_preserved", preview=str(existing_response)[:100])
 
-        # Salvar memória
+        # Salvar memÃ³ria
         should_save = intent in ["command", "task"] or len(user_message) > 50
         return {
             **state,
@@ -319,12 +403,12 @@ async def node_generate_response(state: AgentState) -> AgentState:
 
     response = None
 
-    # --- Prioridade 3: execution_result presente → formatar via LLM ---
+    # --- Prioridade 3: execution_result presente â†’ formatar via LLM ---
     if execution_result is not None:
         result_str = str(execution_result).lower()
         if (
-            "não implementado" in result_str
-            or "não encontrado" in result_str
+            "nÃ£o implementado" in result_str
+            or "nÃ£o encontrado" in result_str
             or "not implemented" in result_str
         ):
             detected = detect_missing_skill_keywords(user_message.lower())
@@ -370,7 +454,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
         )
         logger.info("node_generate_response_self_improve")
 
-    # --- Prioridade 5: chat/question → LLM com identidade ---
+    # --- Prioridade 5: chat/question â†’ LLM com identidade ---
     elif intent in ["chat", "question"]:
         logger.info("node_generate_response_using_llm", intent=intent)
         try:
@@ -432,7 +516,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
     if response is None:
         response = "Entendi sua mensagem. Como VPS-Agent, estou pronto para ajudar. O que precisa?"
 
-    # Salvar memória se foi uma interação significativa
+    # Salvar memÃ³ria se foi uma interaÃ§Ã£o significativa
     should_save = intent in ["command", "task"] or len(user_message) > 50
 
     logger.info(
@@ -456,7 +540,7 @@ async def node_generate_response(state: AgentState) -> AgentState:
 
 
 def node_save_memory(state: AgentState) -> AgentState:
-    """Salva conversas e fatos na memória persistente."""
+    """Salva conversas e fatos na memÃ³ria persistente."""
     user_id = state["user_id"]
     user_message = state.get("user_message", "")
     response = state.get("response", "")

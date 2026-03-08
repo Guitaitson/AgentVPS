@@ -59,12 +59,88 @@ CREATE TABLE IF NOT EXISTS agent_skills (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Catálogo de skills externos (normalizados)
+CREATE TABLE IF NOT EXISTS skills_catalog (
+    id BIGSERIAL PRIMARY KEY,
+    skill_name VARCHAR(255) NOT NULL,
+    source_name VARCHAR(255) NOT NULL,
+    version VARCHAR(100) NOT NULL,
+    schema_hash VARCHAR(64) NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'active', -- active, inactive
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(skill_name, source_name)
+);
+
+CREATE TABLE IF NOT EXISTS skills_catalog_sync_runs (
+    id BIGSERIAL PRIMARY KEY,
+    run_mode VARCHAR(20) NOT NULL, -- check, apply
+    status VARCHAR(20) NOT NULL, -- success, failed
+    source_count INTEGER DEFAULT 0,
+    stats JSONB DEFAULT '{}',
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Auditoria de memória tipada (Phase 1)
+CREATE TABLE IF NOT EXISTS memory_audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    event_ts TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    action VARCHAR(50) NOT NULL,
+    memory_type VARCHAR(50) NOT NULL,
+    user_id VARCHAR(100) NOT NULL,
+    memory_key VARCHAR(255) NOT NULL,
+    scope VARCHAR(50) NOT NULL,
+    project_id VARCHAR(100),
+    redacted BOOLEAN DEFAULT FALSE,
+    outcome VARCHAR(50) DEFAULT 'success',
+    details JSONB DEFAULT '{}'
+);
+
+-- Alma do agente (identidade versionada)
+CREATE TABLE IF NOT EXISTS agent_soul_artifacts (
+    id BIGSERIAL PRIMARY KEY,
+    artifact_type VARCHAR(50) NOT NULL, -- core_identity, personal_voice, behavior_contract
+    version INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_by VARCHAR(100) DEFAULT 'system',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(artifact_type, version)
+);
+
+-- Propostas auditáveis de mudança de alma
+CREATE TABLE IF NOT EXISTS agent_soul_change_proposals (
+    id BIGSERIAL PRIMARY KEY,
+    artifact_type VARCHAR(50) NOT NULL,
+    proposed_content TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    impact_level VARCHAR(20) DEFAULT 'medium', -- low, medium, high
+    requires_approval BOOLEAN DEFAULT TRUE,
+    status VARCHAR(20) DEFAULT 'pending', -- pending, approved, rejected, applied
+    requested_by VARCHAR(100) DEFAULT 'system',
+    reviewer VARCHAR(100),
+    review_note TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    applied_at TIMESTAMP WITH TIME ZONE
+);
+
 -- Índices para performance
 CREATE INDEX idx_memory_user ON agent_memory(user_id, memory_type);
 CREATE INDEX idx_memory_key ON agent_memory(key);
 CREATE INDEX idx_conversation_user ON conversation_log(user_id, created_at DESC);
 CREATE INDEX idx_tasks_status ON scheduled_tasks(status, next_run);
 CREATE INDEX idx_skills_trigger ON agent_skills(trigger_pattern);
+CREATE INDEX idx_skills_catalog_name ON skills_catalog(skill_name, source_name);
+CREATE INDEX idx_skills_catalog_status ON skills_catalog(status, updated_at DESC);
+CREATE INDEX idx_skills_catalog_runs_created ON skills_catalog_sync_runs(created_at DESC);
+CREATE INDEX idx_memory_audit_ts ON memory_audit_log(event_ts DESC);
+CREATE INDEX idx_memory_audit_user ON memory_audit_log(user_id, event_ts DESC);
+CREATE INDEX idx_soul_artifact_type_version ON agent_soul_artifacts(artifact_type, version DESC);
+CREATE INDEX idx_soul_proposals_status ON agent_soul_change_proposals(status, created_at DESC);
 
 -- Função para auto-update do updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -85,6 +161,10 @@ CREATE TRIGGER trg_state_updated
 
 CREATE TRIGGER trg_skills_updated
     BEFORE UPDATE ON agent_skills
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_skills_catalog_updated
+    BEFORE UPDATE ON skills_catalog
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- Capacidades do agente (Self-Improvement)

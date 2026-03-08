@@ -100,6 +100,18 @@ class QdrantSettings(BaseSettings):
     )
 
     url: str = Field(default="http://127.0.0.1:6333", description="URL do Qdrant")
+    api_key: Optional[str] = Field(default=None, description="API key do Qdrant (opcional)")
+    timeout_seconds: int = Field(default=5, description="Timeout para operacoes Qdrant")
+    semantic_enabled: bool = Field(default=True, description="Habilita indexacao/recall semantico")
+    semantic_collection: str = Field(
+        default="agent_semantic_memory",
+        description="Collection de memoria semantica",
+    )
+    semantic_vector_size: int = Field(default=64, description="Dimensao do vetor semantico")
+    semantic_recall_limit: int = Field(
+        default=3,
+        description="Quantidade padrao de itens de recall semantico no runtime",
+    )
 
 
 class GatewaySettings(BaseSettings):
@@ -116,6 +128,83 @@ class GatewaySettings(BaseSettings):
     port: int = Field(default=8080, description="Porta do Gateway")
     api_key: Optional[str] = Field(default=None, description="Chave API do Gateway")
     dev_mode: bool = Field(default=False, description="Modo de desenvolvimento")
+
+
+class OrchestrationSettings(BaseSettings):
+    """Configurações de roteamento para runtimes externos."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="ORCH_",
+        env_file=ENV_FILE_CANDIDATES,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    enable_mcp: bool = Field(default=False, description="Habilita delegação MCP")
+    mcp_base_url: str = Field(default="http://127.0.0.1:8765", description="URL base MCP")
+    mcp_api_key: Optional[str] = Field(default=None, description="API key MCP (opcional)")
+
+    enable_a2a: bool = Field(default=False, description="Habilita delegação A2A")
+    a2a_endpoint: Optional[str] = Field(default=None, description="Endpoint A2A")
+
+    enable_acp: bool = Field(default=False, description="Habilita delegação ACP")
+    acp_endpoint: Optional[str] = Field(default=None, description="Endpoint ACP")
+
+    enable_deepagents: bool = Field(default=False, description="Habilita delegacao DeepAgents")
+    deepagents_endpoint: Optional[str] = Field(default=None, description="Endpoint DeepAgents")
+
+    enable_openclaw: bool = Field(default=False, description="Habilita delegacao OpenClaw")
+    openclaw_endpoint: Optional[str] = Field(default=None, description="Endpoint OpenClaw")
+    openclaw_api_key: Optional[str] = Field(default=None, description="API key OpenClaw")
+
+    timeout_seconds: int = Field(default=30, description="Timeout para delegações externas")
+
+
+class IdentitySettings(BaseSettings):
+    """Configurações da alma/identidade do agente."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="SOUL_",
+        env_file=ENV_FILE_CANDIDATES,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    owner_name: str = Field(default="Guilherme", description="Nome do criador/owner")
+    challenge_mode_enabled: bool = Field(
+        default=True,
+        description="Quando ativo, o agente deve contestar decisões frágeis antes de planos complexos",
+    )
+
+
+class CatalogSettings(BaseSettings):
+    """Configurações do sync do catálogo de skills externos."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="CATALOG_",
+        env_file=ENV_FILE_CANDIDATES,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    enabled: bool = Field(default=True, description="Habilita catálogo de skills externo")
+    sources_file: str = Field(
+        default="configs/skills-catalog-sources.json",
+        description="Arquivo JSON com fontes do catálogo",
+    )
+    fallback_cache_file: str = Field(
+        default="configs/skills-catalog-cache.json",
+        description="Cache local quando DB está indisponível",
+    )
+    check_interval_seconds: int = Field(
+        default=6 * 60 * 60,
+        description="Intervalo para check automático no loop autônomo",
+    )
+    http_timeout_seconds: int = Field(default=20, description="Timeout HTTP das fontes remotas")
+    approval_required_for_apply: bool = Field(
+        default=True,
+        description="Se true, apply automático via trigger gera proposal com aprovação humana",
+    )
 
 
 class AppSettings(BaseSettings):
@@ -137,6 +226,9 @@ class AppSettings(BaseSettings):
     openrouter: OpenRouterSettings = Field(default_factory=OpenRouterSettings)
     qdrant: QdrantSettings = Field(default_factory=QdrantSettings)
     gateway: GatewaySettings = Field(default_factory=GatewaySettings)
+    orchestration: OrchestrationSettings = Field(default_factory=OrchestrationSettings)
+    identity: IdentitySettings = Field(default_factory=IdentitySettings)
+    catalog: CatalogSettings = Field(default_factory=CatalogSettings)
 
     # Configurações gerais
     env: str = Field(default="production", description="Ambiente (production/development)")
@@ -165,6 +257,9 @@ __all__ = [
     "OpenRouterSettings",
     "QdrantSettings",
     "GatewaySettings",
+    "OrchestrationSettings",
+    "IdentitySettings",
+    "CatalogSettings",
     "get_settings",
     "settings",
 ]

@@ -1,0 +1,10 @@
+{
+  "sources": [
+    {
+      "name": "langchain_skills_curated",
+      "type": "langchain_skills_url_json",
+      "location": "https://example.invalid/langchain-skills/catalog.json",
+      "enabled": false
+    }
+  ]
+}

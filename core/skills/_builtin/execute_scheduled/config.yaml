@@ -1,0 +1,29 @@
+name: execute_scheduled
+description: "Executa payload de tarefa agendada (notify, catalog_sync_apply, approve_update_proposals)."
+version: "1.0.0"
+security_level: moderate
+triggers:
+  - executar tarefa agendada
+  - schedule due
+  - scheduled task
+  - maintenance window
+parameters:
+  task:
+    type: object
+    required: true
+    description: "Metadados da tarefa, incluindo id."
+  payload:
+    type: object
+    required: true
+    description: "Payload da tarefa agendada."
+parameters_schema:
+  task:
+    type: object
+    required: true
+  payload:
+    type: object
+    required: true
+max_output_chars: 3000
+timeout_seconds: 60
+enabled: true
+

@@ -1,0 +1,31 @@
+{
+  "version": "2026.03.08",
+  "domain": "protocol_mappings",
+  "items": [
+    {
+      "name": "mcp",
+      "mapping": "core.orchestration.runtime_adapters.MCPAdapter",
+      "status": "active"
+    },
+    {
+      "name": "a2a",
+      "mapping": "core.orchestration.runtime_adapters.A2AAdapter",
+      "status": "active"
+    },
+    {
+      "name": "acp",
+      "mapping": "core.orchestration.runtime_adapters.ACPAdapter",
+      "status": "active"
+    },
+    {
+      "name": "deepagents",
+      "mapping": "core.orchestration.runtime_adapters.DeepAgentsAdapter",
+      "status": "active"
+    },
+    {
+      "name": "openclaw",
+      "mapping": "core.orchestration.runtime_adapters.OpenClawAdapter",
+      "status": "active"
+    }
+  ]
+}

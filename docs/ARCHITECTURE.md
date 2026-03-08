@@ -119,6 +119,41 @@ Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (
 
 **Blueprint:** DETECT → PROPOSE → FILTER (Cap Gates) → APPROVE (Telegram) → EXECUTE → COMPLETE
 
+### 5.1 Memory Core (Phase 1)
+
+| Componente | Localização | Descrição |
+|---|---|---|
+| Memory Policy | `core/memory/policy.py` | Tipos de memória, TTL, retenção e redaction |
+| Memory Audit | `core/memory/audit.py` | Trilha auditável de operações de memória |
+| Memory Facade | `core/vps_langgraph/memory.py` | API compatível + memória tipada + fallback local |
+| Migration | `configs/migration-memory-soul.sql` | `memory_audit_log` e tabelas de identidade versionada |
+
+Tipos de memória suportados: `episodic`, `semantic`, `procedural`, `profile`, `goals`.
+
+### 5.2 Soul Governance (Phase 1)
+
+| Componente | Localização | Descrição |
+|---|---|---|
+| Soul Manager | `core/identity/soul.py` | Identidade versionada (`core_identity`, `personal_voice`, `behavior_contract`) |
+| Prompt Integration | `core/llm/agent_identity.py` | Injeta artefatos da alma no prompt do agente |
+| Tabelas | `agent_soul_artifacts`, `agent_soul_change_proposals` | Propostas auditáveis com aprovação/rejeição |
+
+### 5.3 Catálogo e Atualização Contínua (Phase 1)
+
+| Componente | Localização | Descrição |
+|---|---|---|
+| Sync Engine | `core/catalog/sync_engine.py` | Normaliza fontes externas e calcula diff (`check`/`apply`) |
+| Updater Agent | `core/updater/agent.py` | Orquestra jobs de atualização e abertura de proposals |
+| Skill Operacional | `core/skills/_builtin/skills_catalog_sync/` | Trigger manual/on-demand para check/apply |
+| Trigger Autônomo | `core/autonomous/engine.py` (`catalog_sync_check`) | Check periódico estilo cron + proposal para apply |
+| Tabelas | `skills_catalog`, `skills_catalog_sync_runs` | Estado versionado e histórico de sincronizações |
+
+Modelo adotado (híbrido):
+- `engine`: lógica de atualização e diff.
+- `updater agent`: coordena checks e proposals por domínio.
+- `skill`: execução explícita pelo operador/agente.
+- `trigger`: automação periódica para detecção de updates sem aplicar silenciosamente.
+
 ### 6. LLM Layer
 
 | Componente | Localização | Descrição |
