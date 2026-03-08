@@ -14,6 +14,13 @@ CREATE TABLE IF NOT EXISTS skills_catalog (
     UNIQUE(skill_name, source_name)
 );
 
+ALTER TABLE skills_catalog
+    ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS pinned_version VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS pin_reason TEXT,
+    ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS pinned_by VARCHAR(100);
+
 CREATE TABLE IF NOT EXISTS skills_catalog_sync_runs (
     id BIGSERIAL PRIMARY KEY,
     run_mode VARCHAR(20) NOT NULL,
@@ -24,6 +31,20 @@ CREATE TABLE IF NOT EXISTS skills_catalog_sync_runs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS skills_catalog_history (
+    id BIGSERIAL PRIMARY KEY,
+    skill_name VARCHAR(255) NOT NULL,
+    source_name VARCHAR(255) NOT NULL,
+    version VARCHAR(100) NOT NULL,
+    schema_hash VARCHAR(64) NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    change_type VARCHAR(40) NOT NULL,
+    changed_by VARCHAR(100) DEFAULT 'sync_engine',
+    details JSONB DEFAULT '{}',
+    changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_skills_catalog_name
 ON skills_catalog(skill_name, source_name);
 
@@ -32,6 +53,9 @@ ON skills_catalog(status, updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_skills_catalog_runs_created
 ON skills_catalog_sync_runs(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_skills_catalog_history_name
+ON skills_catalog_history(skill_name, source_name, changed_at DESC);
 
 DO $$
 BEGIN

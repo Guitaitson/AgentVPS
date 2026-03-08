@@ -96,6 +96,8 @@ END
 | `self_edit` | dangerous | Auto-edição de código da VPS |
 | `log_reader` | safe | Leitura de logs da VPS |
 | `openclaw_exec` | dangerous | Controla OpenClaw via docker exec |
+| `skills_catalog_sync` | moderate | Sync/pin/rollback/provenance do catalogo externo |
+| `execute_scheduled` | dangerous | Executa acoes agendadas e janelas de manutencao |
 
 Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (`on-dangerous`).
 
@@ -144,15 +146,23 @@ Tipos de memória suportados: `episodic`, `semantic`, `procedural`, `profile`, `
 |---|---|---|
 | Sync Engine | `core/catalog/sync_engine.py` | Normaliza fontes externas e calcula diff (`check`/`apply`) |
 | Updater Agent | `core/updater/agent.py` | Orquestra jobs de atualização e abertura de proposals |
-| Skill Operacional | `core/skills/_builtin/skills_catalog_sync/` | Trigger manual/on-demand para check/apply |
+| Skill Operacional | `core/skills/_builtin/skills_catalog_sync/` | Trigger manual/on-demand para check/apply/pin/unpin/rollback/provenance |
 | Trigger Autônomo | `core/autonomous/engine.py` (`catalog_sync_check`) | Check periódico estilo cron + proposal para apply |
-| Tabelas | `skills_catalog`, `skills_catalog_sync_runs` | Estado versionado e histórico de sincronizações |
+| Tabelas | `skills_catalog`, `skills_catalog_history`, `skills_catalog_sync_runs` | Estado versionado, provenance e historico de sincronizacoes |
 
 Modelo adotado (híbrido):
 - `engine`: lógica de atualização e diff.
 - `updater agent`: coordena checks e proposals por domínio.
 - `skill`: execução explícita pelo operador/agente.
 - `trigger`: automação periódica para detecção de updates sem aplicar silenciosamente.
+
+### 5.4 Runtime Control (Phase 1)
+
+| Componente | Localizacao | Descricao |
+|---|---|---|
+| Runtime Control | `core/orchestration/runtime_control.py` | Overrides de enable/disable por protocolo (MCP/A2A/ACP/DeepAgents/OpenClaw) |
+| Router Factory | `core/orchestration/router_factory.py` | Construcao do runtime router usando defaults + overrides persistidos |
+| Comando Telegram | `telegram_bot/bot.py` (`/runtimes`) | `list`, `enable`, `disable` dos runtimes externos |
 
 ### 6. LLM Layer
 

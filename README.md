@@ -50,7 +50,7 @@ START → load_context → react → security_check → execute → format_respo
 
 ---
 
-## Skills Disponíveis (13)
+## Skills Disponiveis (15)
 
 | Skill | Descrição | Nível |
 |-------|-----------|-------|
@@ -67,6 +67,8 @@ START → load_context → react → security_check → execute → format_respo
 | `self_edit` | Auto-edição de código | dangerous |
 | `log_reader` | Lê logs da VPS | safe |
 | `openclaw_exec` | Controla OpenClaw via docker exec | dangerous |
+| `skills_catalog_sync` | Sync/pin/rollback/provenance do catalogo externo | normal |
+| `execute_scheduled` | Executa acoes agendadas (notify/catalog apply) | dangerous |
 
 Skills com `dangerous` requerem aprovação humana (configurável via `on-dangerous`).
 
@@ -155,7 +157,7 @@ AgentVPS/
 │   ├── hooks/              # Hook system (logging, feedback, learning)
 │   ├── llm/                # Provider OpenRouter unificado
 │   ├── security/           # Allowlist de comandos
-│   ├── skills/             # Skill registry + 12 skills builtin
+│   ├── skills/             # Skill registry + 15 skills builtin
 │   │   └── _builtin/       # handler.py + config.yaml por skill
 │   ├── structured_logging/ # JSON logging com structlog
 │   ├── vps_agent/          # Orquestração principal
@@ -209,6 +211,9 @@ OPENROUTER_MODEL=minimax/minimax-m2.5
 | `/proposals` | Ver proposals pendentes |
 | `/approve <id>` | Aprovar proposal |
 | `/reject <id>` | Rejeitar proposal |
+| `/catalogsync <cmd>` | check/apply/pin/unpin/rollback/provenance do catalogo |
+| `/runtimes [list|enable|disable]` | Gerenciar runtime adapters externos |
+| `/updatestatus` | Status do updater e ultimo catalog sync |
 
 ---
 
