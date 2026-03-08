@@ -1,7 +1,8 @@
-# Documentação Técnica
+# Documentacao Tecnica
 
 ## Documentos Ativos
 
+- [PROJECT_STATUS.md](PROJECT_STATUS.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [DEPLOYMENT.md](DEPLOYMENT.md)
 - [MCP_SERVER.md](MCP_SERVER.md)
@@ -14,7 +15,14 @@
 
 - [adr/README.md](adr/README.md)
 
-## Histórico
+## Ordem de Consulta (estado atual)
 
-- Conteúdo histórico fica em `archive/` e `Sprint*`.
-- Esses arquivos são referência de contexto e não definem o estado operacional atual.
+1. `origin/main` no GitHub
+2. `docs/PROJECT_STATUS.md`
+3. Worktree local (WIP nao commitado)
+4. `archive/` apenas para contexto historico
+
+## Historico
+
+- Conteudo historico fica em `archive/` e `Sprint*`.
+- Esses arquivos sao referencia de contexto e nao definem o estado operacional atual.

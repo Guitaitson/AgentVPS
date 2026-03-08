@@ -1,3 +1,7 @@
+> [!NOTE]
+> Consulte `docs/PROJECT_STATUS.md` para o estado consolidado atual.
+> Este tracker e detalhado e pode divergir de arquivos historicos em `archive/`.
+
 # Tracker de Implantação — AgentVPS
 
 ## 📊 Estado Atual

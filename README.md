@@ -231,6 +231,7 @@ OPENROUTER_MODEL=minimax/minimax-m2.5
 ## Documentação
 
 - [Índice da documentação](docs/README.md)
+- [Status atual consolidado](docs/PROJECT_STATUS.md)
 - [Arquitetura detalhada](docs/ARCHITECTURE.md)
 - [Guia de Deploy](docs/DEPLOYMENT.md)
 - [ADRs — Decisões de Arquitetura](docs/adr/README.md)
