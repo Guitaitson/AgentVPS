@@ -1,13 +1,13 @@
 """
-Autonomous Loop Engine - Sistema de execução autônomo (T4-02)
+Autonomous Loop Engine - Sistema de execuÃ§Ã£o autÃ´nomo (T4-02)
 
 Implementa o Blueprint de 6 passos:
-1. DETECT → Trigger identifica condição
-2. PROPOSE → Cria proposal no PostgreSQL
-3. FILTER → Cap Gates verificam recursos/segurança
-4. EXECUTE → Worker executa via Skill
-5. COMPLETE → Emite evento com resultado
-6. RE-TRIGGER → Evento gera novas proposals
+1. DETECT â†’ Trigger identifica condiÃ§Ã£o
+2. PROPOSE â†’ Cria proposal no PostgreSQL
+3. FILTER â†’ Cap Gates verificam recursos/seguranÃ§a
+4. EXECUTE â†’ Worker executa via Skill
+5. COMPLETE â†’ Emite evento com resultado
+6. RE-TRIGGER â†’ Evento gera novas proposals
 """
 
 import asyncio
@@ -19,7 +19,15 @@ import psycopg2
 import redis
 import structlog
 
+from core.config import get_settings
 from core.env import load_project_env
+from core.updater import (
+    PolicyBundleUpdateJob,
+    ProtocolMappingsUpdateJob,
+    RunbookUpdateJob,
+    SkillsCatalogUpdateJob,
+    UpdaterAgent,
+)
 
 load_project_env()
 
@@ -58,7 +66,46 @@ class Trigger:
 
 
 class CapGate:
-    """Cap Gates - verificações antes de executar uma proposal."""
+    """Cap Gates - verificaÃ§Ãµes antes de executar uma proposal."""
+
+    @staticmethod
+    def _mark_requires_approval(
+        engine: "AutonomousLoop",
+        proposal_id: int,
+        action: str,
+        reason: str = "requires_approval",
+    ) -> dict:
+        try:
+            conn = engine._get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                """UPDATE agent_proposals
+                SET requires_approval = TRUE, status = 'pending'
+                WHERE id = %s""",
+                (proposal_id,),
+            )
+            conn.commit()
+            conn.close()
+
+            try:
+                from telegram_bot.bot import send_notification
+
+                asyncio.ensure_future(
+                    send_notification(
+                        f"Proposta autonoma #{proposal_id}:\n"
+                        f"Acao: {action}\n"
+                        f"Motivo: {reason}\n\n"
+                        f"Aprovar? /approve {proposal_id}\n"
+                        f"Rejeitar? /reject {proposal_id}"
+                    )
+                )
+            except Exception as notify_err:
+                logger.error("notification_error", error=str(notify_err))
+
+            return {"blocked": True, "reason": reason, "action": action}
+        except Exception as exc:
+            logger.error("cap_gate_mark_approval_error", error=str(exc))
+            return {"blocked": False}
 
     @staticmethod
     async def check_rate_limit(engine: "AutonomousLoop", proposal_id: int) -> dict:
@@ -84,7 +131,7 @@ class CapGate:
 
     @staticmethod
     async def check_ram_threshold(engine: "AutonomousLoop", proposal_id: int) -> dict:
-        """Verifica se há RAM suficiente."""
+        """Verifica se hÃ¡ RAM suficiente."""
         try:
             with open("/proc/meminfo", "r") as f:
                 meminfo = f.read()
@@ -108,47 +155,39 @@ class CapGate:
 
     @staticmethod
     async def check_security_level(engine: "AutonomousLoop", proposal_id: int, action: str) -> dict:
-        """Verifica se ação perigosa requer aprovação."""
+        """Verifica se aÃ§Ã£o perigosa requer aprovaÃ§Ã£o."""
         dangerous_actions = ["systemctl", "rm -rf", "kill", "docker stop", "docker rm"]
         requires_approval = any(d in action for d in dangerous_actions)
 
         if requires_approval:
-            try:
-                conn = engine._get_conn()
-                cur = conn.cursor()
-                cur.execute(
-                    """UPDATE agent_proposals
-                    SET requires_approval = TRUE, status = 'pending'
-                    WHERE id = %s""",
-                    (proposal_id,),
-                )
-                conn.commit()
-                conn.close()
-
-                # Notificar via Telegram
-                try:
-                    from telegram_bot.bot import send_notification
-
-                    asyncio.ensure_future(
-                        send_notification(
-                            f"Proposta autonoma #{proposal_id}:\n"
-                            f"Acao: {action}\n\n"
-                            f"Aprovar? /approve {proposal_id}\n"
-                            f"Rejeitar? /reject {proposal_id}"
-                        )
-                    )
-                except Exception as notify_err:
-                    logger.error("notification_error", error=str(notify_err))
-
-                return {"blocked": True, "reason": "requires_approval", "action": action}
-            except Exception as e:
-                logger.error("cap_gate_security_error", error=str(e))
+            return CapGate._mark_requires_approval(
+                engine=engine,
+                proposal_id=proposal_id,
+                action=action,
+                reason="requires_approval",
+            )
 
         return {"blocked": False}
 
+    @staticmethod
+    async def check_explicit_approval(
+        engine: "AutonomousLoop", proposal_id: int, suggested_action: dict
+    ) -> dict:
+        """Honors explicit requires_approval flag on suggested action."""
+        if not bool(suggested_action.get("requires_approval", False)):
+            return {"blocked": False}
+
+        action = str(suggested_action.get("action", "unknown"))
+        return CapGate._mark_requires_approval(
+            engine=engine,
+            proposal_id=proposal_id,
+            action=action,
+            reason="explicit_approval_required",
+        )
+
 
 class AutonomousLoop:
-    """Motor de execução autônoma com PostgreSQL."""
+    """Motor de execuÃ§Ã£o autÃ´noma com PostgreSQL."""
 
     def __init__(self):
         self._triggers: dict[str, Trigger] = {}
@@ -172,7 +211,7 @@ class AutonomousLoop:
         logger.info("trigger_registered", name=trigger.name, interval=trigger.interval)
 
     async def start(self):
-        """Inicia o loop de execução."""
+        """Inicia o loop de execuÃ§Ã£o."""
         if self._running:
             return
 
@@ -205,8 +244,24 @@ class AutonomousLoop:
     def _get_conn(self):
         return psycopg2.connect(**self._db_config)
 
+    def has_open_proposal(self, trigger_name: str) -> bool:
+        """Checks if there is any in-flight proposal for the trigger."""
+        conn = self._get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM agent_proposals
+            WHERE trigger_name = %s
+            AND status IN ('pending', 'approved', 'executing')
+            """,
+            (trigger_name,),
+        )
+        has_open = cur.fetchone()[0] > 0
+        conn.close()
+        return has_open
+
     async def _process_proposals(self):
-        """Processa proposals pendentes (DETECT → FILTER → EXECUTE → COMPLETE)."""
+        """Processa proposals pendentes (DETECT â†’ FILTER â†’ EXECUTE â†’ COMPLETE)."""
         try:
             conn = self._get_conn()
             cur = conn.cursor()
@@ -226,21 +281,21 @@ class AutonomousLoop:
             proposal_id, trigger_name, suggested_action_json, status = proposal
             suggested_action = json.loads(suggested_action_json)
 
-            # EXECUTE: executar a ação
+            # EXECUTE: executar a aÃ§Ã£o
             await self._execute_mission(proposal_id, suggested_action)
 
         except Exception as e:
             logger.error("process_proposals_error", error=str(e))
 
     async def _execute_mission(self, proposal_id: int, suggested_action: dict):
-        """Executa uma missão."""
+        """Executa uma missÃ£o."""
         try:
             action = suggested_action.get("action")
             args = suggested_action.get("args", {})
 
             logger.info("executing_mission", proposal_id=proposal_id, action=action)
 
-            # Criar missão
+            # Criar missÃ£o
             conn = self._get_conn()
             cur = conn.cursor()
             cur.execute(
@@ -267,7 +322,7 @@ class AutonomousLoop:
             else:
                 result = {"status": "completed", "note": f"No skill '{action}' found"}
 
-            # Atualizar missão
+            # Atualizar missÃ£o
             conn = self._get_conn()
             cur = conn.cursor()
             cur.execute(
@@ -326,7 +381,7 @@ class AutonomousLoop:
             return -1
 
     async def _check_cap_gates(self, proposal_id: int, suggested_action: dict):
-        """Executa as verificações de cap gates."""
+        """Executa as verificaÃ§Ãµes de cap gates."""
         action = suggested_action.get("action", "")
 
         # Rate limit
@@ -341,10 +396,16 @@ class AutonomousLoop:
             self._reject_proposal(proposal_id, result["reason"])
             return
 
+        # Explicit approval
+        result = await CapGate.check_explicit_approval(self, proposal_id, suggested_action)
+        if result.get("blocked"):
+            # Já marcado para aprovação na função
+            return
+
         # Security
         result = await CapGate.check_security_level(self, proposal_id, action)
         if result.get("blocked"):
-            # Já marcado para aprovação na função
+            # JÃ¡ marcado para aprovaÃ§Ã£o na funÃ§Ã£o
             return
 
         # Aprovar automaticamente
@@ -381,13 +442,13 @@ _autonomous_loop: Optional[AutonomousLoop] = None
 
 
 def get_autonomous_loop() -> AutonomousLoop:
-    """Retorna instância singleton do loop."""
+    """Retorna instÃ¢ncia singleton do loop."""
     global _autonomous_loop
     if _autonomous_loop is None:
         _autonomous_loop = AutonomousLoop()
 
         # ============================================
-        # TRIGGERS COM CONDIÇÕES REAIS
+        # TRIGGERS COM CONDIÃ‡Ã•ES REAIS
         # ============================================
 
         # Trigger 1: Health Check
@@ -433,6 +494,12 @@ def get_autonomous_loop() -> AutonomousLoop:
         # Trigger 2: Memory Cleanup
         async def memory_cleanup_action(engine: AutonomousLoop):
             try:
+                from core.vps_langgraph.memory import AgentMemory
+
+                memory = AgentMemory()
+                expired_deleted = memory.cleanup_expired_typed_memory()
+                audit_deleted = memory.cleanup_old_audit_events(older_than_days=90)
+
                 conn = engine._get_conn()
                 cur = conn.cursor()
                 cur.execute(
@@ -441,9 +508,19 @@ def get_autonomous_loop() -> AutonomousLoop:
                 deleted = cur.rowcount
                 conn.commit()
                 conn.close()
-                if deleted > 0:
-                    logger.info("memory_cleaned", deleted=deleted)
-                return {"deleted": deleted}
+                total_deleted = deleted + expired_deleted + audit_deleted
+                if total_deleted > 0:
+                    logger.info(
+                        "memory_cleaned",
+                        conversation_deleted=deleted,
+                        expired_typed_deleted=expired_deleted,
+                        audit_deleted=audit_deleted,
+                    )
+                return {
+                    "conversation_deleted": deleted,
+                    "expired_typed_deleted": expired_deleted,
+                    "audit_deleted": audit_deleted,
+                }
             except Exception as e:
                 logger.error("memory_cleanup_error", error=str(e))
                 return {"deleted": 0}
@@ -542,7 +619,7 @@ def get_autonomous_loop() -> AutonomousLoop:
             )
         )
 
-        # Trigger 4: RAM > 80% → criar proposal
+        # Trigger 4: RAM > 80% â†’ criar proposal
         def check_ram_condition() -> bool:
             try:
                 with open("/proc/meminfo", "r") as f:
@@ -590,7 +667,7 @@ def get_autonomous_loop() -> AutonomousLoop:
             )
         )
 
-        # Trigger 5: Error repeated → criar proposal
+        # Trigger 5: Error repeated â†’ criar proposal
         async def error_repeated_action(engine: AutonomousLoop):
             try:
                 conn = engine._get_conn()
@@ -652,7 +729,7 @@ def get_autonomous_loop() -> AutonomousLoop:
             )
         )
 
-        # Trigger 6: Schedule due → executar tarefas (notify direto, resto via proposal)
+        # Trigger 6: Schedule due â†’ executar tarefas (notify direto, resto via proposal)
         async def schedule_due_action(engine: AutonomousLoop):
             try:
                 conn = engine._get_conn()
@@ -685,7 +762,7 @@ def get_autonomous_loop() -> AutonomousLoop:
                         try:
                             from telegram_bot.bot import send_notification
 
-                            await send_notification(f"🔔 {message}")
+                            await send_notification(f"ðŸ”” {message}")
                             logger.info("schedule_notify_sent", task_id=task_id)
                         except Exception as notify_err:
                             logger.error("schedule_notify_error", error=str(notify_err))
@@ -745,9 +822,9 @@ def get_autonomous_loop() -> AutonomousLoop:
             )
         )
 
-        # Trigger 7: Self-improvement — propor melhorias quando falhas se repetem
+        # Trigger 7: Self-improvement â€” propor melhorias quando falhas se repetem
         def self_improvement_condition() -> bool:
-            """3+ falhas na mesma categoria nas últimas 24h."""
+            """3+ falhas na mesma categoria nas Ãºltimas 24h."""
             try:
                 conn = _autonomous_loop._get_conn()
                 cur = conn.cursor()
@@ -805,7 +882,7 @@ def get_autonomous_loop() -> AutonomousLoop:
                     from telegram_bot.bot import send_notification
 
                     await send_notification(
-                        f"🔧 Proposta de melhoria\n\n"
+                        f"ðŸ”§ Proposta de melhoria\n\n"
                         f"Detectei {len(failures)} falhas recentes.\n\n"
                         f"Minha sugestao:\n{resp.content[:1500]}\n\n"
                         f"Quer que eu implemente? /approve ou /reject"
@@ -823,6 +900,65 @@ def get_autonomous_loop() -> AutonomousLoop:
                 action=self_improvement_action,
                 interval=3600,
                 enabled=True,
+            )
+        )
+
+        # Trigger 8: Updater agent (check periódico + proposals de apply)
+        settings = get_settings()
+        catalog_cfg = settings.catalog
+        catalog_interval = max(300, int(catalog_cfg.check_interval_seconds))
+        updater_agent = UpdaterAgent(
+            jobs=[
+                SkillsCatalogUpdateJob(
+                    approval_required_for_apply=bool(catalog_cfg.approval_required_for_apply)
+                ),
+                ProtocolMappingsUpdateJob(),
+                PolicyBundleUpdateJob(),
+                RunbookUpdateJob(),
+            ]
+        )
+
+        async def catalog_sync_action(engine: AutonomousLoop):
+            import time
+
+            try:
+                now = time.time()
+                engine._redis.set("catalog:last_check", str(time.time()))
+                summaries = await updater_agent.check_and_propose(engine)
+                engine._redis.set("updater:last_check", str(now))
+                engine._redis.setex(
+                    "updater:last_summary",
+                    60 * 60 * 24,
+                    json.dumps({"ts": now, "jobs": summaries}),
+                )
+                if not summaries:
+                    return {"status": "no_jobs"}
+                return summaries[0]
+            except Exception as exc:
+                logger.error("catalog_sync_trigger_error", error=str(exc))
+                return {"status": "error", "error": str(exc)}
+
+        def catalog_sync_condition() -> bool:
+            import time
+
+            if not bool(catalog_cfg.enabled):
+                return False
+            last = _autonomous_loop._redis.get("catalog:last_check")
+            if not last:
+                return True
+            try:
+                elapsed = time.time() - float(last)
+                return elapsed >= catalog_interval
+            except Exception:
+                return True
+
+        _autonomous_loop.register_trigger(
+            Trigger(
+                name="catalog_sync_check",
+                condition=catalog_sync_condition,
+                action=catalog_sync_action,
+                interval=catalog_interval,
+                enabled=bool(catalog_cfg.enabled),
             )
         )
 

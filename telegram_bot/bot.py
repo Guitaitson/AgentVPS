@@ -1,6 +1,6 @@
 """
-VPS-Agent Telegram Bot — Interface principal
-Versão: 2.0 — Com LangGraph e timeout otimizado
+VPS-Agent Telegram Bot â€” Interface principal
+VersÃ£o: 2.0 â€” Com LangGraph e timeout otimizado
 """
 
 import logging
@@ -18,13 +18,13 @@ from telegram.ext import (
     filters,
 )
 
-# VPS-Agent Core (nosso módulo)
+# VPS-Agent Core (nosso mÃ³dulo)
 from core.env import load_project_env
 from core.vps_agent.agent import process_message_async
 
 # Telegram Log Handler (F0-06)
 
-# Configuração de logging estruturado
+# ConfiguraÃ§Ã£o de logging estruturado
 structlog.configure(
     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
     logger_factory=structlog.PrintLoggerFactory(),
@@ -32,7 +32,7 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
-# Carregar variáveis de ambiente
+# Carregar variÃ¡veis de ambiente
 load_project_env()
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -41,9 +41,9 @@ ALLOWED_USERS = [
 ]
 
 
-# Conexões
+# ConexÃµes
 def get_db_conn():
-    """Retorna conexão com PostgreSQL."""
+    """Retorna conexÃ£o com PostgreSQL."""
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
         port=int(os.getenv("POSTGRES_PORT", 5432)),
@@ -54,7 +54,7 @@ def get_db_conn():
 
 
 def get_redis():
-    """Retorna conexão com Redis."""
+    """Retorna conexÃ£o com Redis."""
     return redis.Redis(
         host=os.getenv("REDIS_HOST", "127.0.0.1"),
         port=int(os.getenv("REDIS_PORT", 6379)),
@@ -62,15 +62,29 @@ def get_redis():
     )
 
 
-# Middleware de segurança
+def _parse_db_json(value):
+    """Converte JSON do banco para dict de forma resiliente."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        import json
+
+        try:
+            return json.loads(value)
+        except Exception:
+            return {}
+    return {}
+
+
+# Middleware de seguranÃ§a
 def authorized_only(func):
-    """Decorator: só permite usuários autorizados."""
+    """Decorator: sÃ³ permite usuÃ¡rios autorizados."""
 
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if user_id not in ALLOWED_USERS:
             logger.warning("acesso_negado", user_id=user_id)
-            await update.message.reply_text("⛔ Acesso não autorizado.")
+            await update.message.reply_text("â›” Acesso nÃ£o autorizado.")
             return
         return await func(update, context)
 
@@ -84,53 +98,53 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
 
     await update.message.reply_text(
-        f"🤖 **VPS-Agent v2 Online!**\n\n"
-        f"Olá, {user_name}! Seu agente autônomo está pronto.\n\n"
-        f"**Comandos disponíveis:**\n"
-        f"• `/status` — Estado da VPS\n"
-        f"• `/ram` — Uso de memória\n"
-        f"• `/containers` — Containers ativos\n"
-        f"• `/health` — Health check completo\n"
-        f"• `/help` — Ajuda\n\n"
-        f"Ou basta enviar uma mensagem e eu proceso através do LangGraph!"
+        f"ðŸ¤– **VPS-Agent v2 Online!**\n\n"
+        f"OlÃ¡, {user_name}! Seu agente autÃ´nomo estÃ¡ pronto.\n\n"
+        f"**Comandos disponÃ­veis:**\n"
+        f"â€¢ `/status` â€” Estado da VPS\n"
+        f"â€¢ `/ram` â€” Uso de memÃ³ria\n"
+        f"â€¢ `/containers` â€” Containers ativos\n"
+        f"â€¢ `/health` â€” Health check completo\n"
+        f"â€¢ `/help` â€” Ajuda\n\n"
+        f"Ou basta enviar uma mensagem e eu proceso atravÃ©s do LangGraph!"
     )
 
 
 @authorized_only
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para mensagens gerais — usa LangGraph com tratamento de erro robusto."""
+    """Handler para mensagens gerais â€” usa LangGraph com tratamento de erro robusto."""
     user_id = str(update.effective_user.id)
     message = update.message.text
 
     logger.info("mensagem_recebida", user_id=user_id, message=message[:100])
 
     try:
-        # Processar através do LangGraph
+        # Processar atravÃ©s do LangGraph
         response = await process_message_async(user_id, message)
 
-        # Garantir que temos uma resposta válida
+        # Garantir que temos uma resposta vÃ¡lida
         if not response:
-            response = "Desculpe, não consegui processar sua mensagem. Tente novamente."
+            response = "Desculpe, nÃ£o consegui processar sua mensagem. Tente novamente."
 
         await update.message.reply_text(response)
 
     except Exception as e:
         logger.error("erro_processamento_mensagem", user_id=user_id, error=str(e))
 
-        # Resposta de fallback amigável
+        # Resposta de fallback amigÃ¡vel
         fallback_response = (
-            "🤖 **VPS-Agent**\n\n"
+            "ðŸ¤– **VPS-Agent**\n\n"
             "Desculpe, ocorreu um erro ao processar sua mensagem.\n\n"
-            "Você pode tentar:\n"
-            "• Enviar a mensagem novamente\n"
-            "• Usar comandos diretos como `/status` ou `/help`\n\n"
+            "VocÃª pode tentar:\n"
+            "â€¢ Enviar a mensagem novamente\n"
+            "â€¢ Usar comandos diretos como `/status` ou `/help`\n\n"
             f"_Erro: {str(e)[:100]}_"
         )
 
         try:
             await update.message.reply_text(fallback_response, parse_mode="Markdown")
         except Exception:
-            # Se até o fallback falhar, enviar sem markdown
+            # Se atÃ© o fallback falhar, enviar sem markdown
             await update.message.reply_text(
                 "Desculpe, ocorreu um erro. Tente novamente ou use /help."
             )
@@ -138,7 +152,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /status — usa grafo LangGraph."""
+    """Handler para /status â€” usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_status", user_id=user_id)
 
@@ -149,7 +163,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /ram — usa grafo LangGraph."""
+    """Handler para /ram â€” usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_ram", user_id=user_id)
 
@@ -160,7 +174,7 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /containers — usa grafo LangGraph."""
+    """Handler para /containers â€” usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_containers", user_id=user_id)
 
@@ -171,7 +185,7 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /health — usa grafo LangGraph."""
+    """Handler para /health â€” usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_health", user_id=user_id)
 
@@ -182,20 +196,23 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /help — ajuda."""
+    """Handler para /help â€” ajuda."""
     help_text = """
-🤖 **VPS-Agent v3 — Ajuda**
+ðŸ¤– **VPS-Agent v3 â€” Ajuda**
 
-**Comandos disponíveis:**
-- `/start` — Iniciar conversa
-- `/status` — Estado geral da VPS
-- `/ram` — Uso de memória por container
-- `/containers` — Lista de containers ativos
-- `/health` — Health check completo
-- `/proposals` — Lista proposals autonomas pendentes
-- `/approve <id>` — Aprova proposal autonoma
-- `/reject <id>` — Rejeita proposal autonoma
-- `/help` — Esta ajuda
+**Comandos disponÃ­veis:**
+- `/start` â€” Iniciar conversa
+- `/status` â€” Estado geral da VPS
+- `/ram` â€” Uso de memÃ³ria por container
+- `/containers` â€” Lista de containers ativos
+- `/health` â€” Health check completo
+- `/proposals` â€” Lista proposals autonomas pendentes
+- `/proposal <id>` â€” Detalha uma proposal
+- `/approve <id>` â€” Aprova proposal autonoma
+- `/reject <id>` â€” Rejeita proposal autonoma
+- `/catalogsync [check|apply] [source]` â€” Sincroniza catalogo de skills
+- `/updatestatus` â€” Mostra status do updater automatico
+- `/help` â€” Esta ajuda
 
 **Sobre:**
 Este bot controla o VPS-Agent, um agente autonomo com ReAct + function calling.
@@ -205,12 +222,12 @@ Este bot controla o VPS-Agent, um agente autonomo com ReAct + function calling.
 
 @authorized_only
 async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /proposals — lista proposals pendentes."""
+    """Handler para /proposals - lista proposals pendentes."""
     try:
         conn = get_db_conn()
         cur = conn.cursor()
         cur.execute(
-            """SELECT id, trigger_name, suggested_action, created_at
+            """SELECT id, trigger_name, suggested_action, condition_data, created_at
             FROM agent_proposals
             WHERE status = 'pending' AND requires_approval = TRUE
             ORDER BY priority ASC, created_at ASC
@@ -223,13 +240,25 @@ async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Nenhuma proposal pendente de aprovacao.")
             return
 
-        import json
-
         lines = ["Proposals pendentes:\n"]
-        for p_id, trigger, action_json, created in proposals:
-            action = json.loads(action_json)
+        for p_id, trigger, action_json, condition_json, _created in proposals:
+            action = _parse_db_json(action_json)
+            condition = _parse_db_json(condition_json)
             desc = action.get("description", action.get("action", "?"))
-            lines.append(f"#{p_id} [{trigger}] {desc}\n  /approve {p_id} | /reject {p_id}")
+
+            details = ""
+            if trigger == "catalog_update_available":
+                details = (
+                    f" (changes={condition.get('changes_detected', 0)}, "
+                    f"add={condition.get('added', 0)}, upd={condition.get('updated', 0)}, "
+                    f"rm={condition.get('removed', 0)})"
+                )
+
+            lines.append(
+                f"#{p_id} [{trigger}] {desc}{details}\n"
+                f"  /proposal {p_id}\n"
+                f"  /approve {p_id} | /reject {p_id}"
+            )
 
         await update.message.reply_text("\n".join(lines))
     except Exception as e:
@@ -238,8 +267,56 @@ async def cmd_proposals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @authorized_only
+async def cmd_proposal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /proposal <id> - detalha proposal."""
+    if not context.args:
+        await update.message.reply_text("Uso: /proposal <id>")
+        return
+
+    try:
+        proposal_id = int(context.args[0])
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, trigger_name, status, requires_approval, suggested_action, condition_data, created_at
+            FROM agent_proposals
+            WHERE id = %s
+            LIMIT 1""",
+            (proposal_id,),
+        )
+        row = cur.fetchone()
+        conn.close()
+
+        if not row:
+            await update.message.reply_text(f"Proposal #{proposal_id} nao encontrada.")
+            return
+
+        p_id, trigger, status, requires_approval, action_json, condition_json, created_at = row
+        action = _parse_db_json(action_json)
+        condition = _parse_db_json(condition_json)
+
+        text = (
+            f"Proposal #{p_id}\n"
+            f"- trigger: {trigger}\n"
+            f"- status: {status}\n"
+            f"- requires_approval: {requires_approval}\n"
+            f"- created_at: {created_at}\n"
+            f"- action: {action.get('action', '?')}\n"
+            f"- description: {action.get('description', '-')}\n"
+            f"- args: {action.get('args', {})}\n"
+            f"- condition: {condition}"
+        )
+        await update.message.reply_text(text)
+    except ValueError:
+        await update.message.reply_text("ID invalido. Uso: /proposal <numero>")
+    except Exception as e:
+        logger.error("cmd_proposal_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
 async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /approve <id> — aprova proposal."""
+    """Handler para /approve <id> â€” aprova proposal."""
     if not context.args:
         await update.message.reply_text("Uso: /approve <id>")
         return
@@ -275,7 +352,7 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /reject <id> — rejeita proposal."""
+    """Handler para /reject <id> â€” rejeita proposal."""
     if not context.args:
         await update.message.reply_text("Uso: /reject <id>")
         return
@@ -308,6 +385,127 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Erro: {str(e)[:100]}")
 
 
+@authorized_only
+async def cmd_catalogsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /catalogsync [check|apply] [source]."""
+    from core.catalog import SkillsCatalogSyncEngine
+
+    mode = "check"
+    source = None
+
+    if context.args:
+        candidate = context.args[0].strip().lower()
+        if candidate in {"check", "apply"}:
+            mode = candidate
+            if len(context.args) > 1:
+                source = context.args[1].strip()
+        else:
+            source = context.args[0].strip()
+            if len(context.args) > 1 and context.args[1].strip().lower() in {"check", "apply"}:
+                mode = context.args[1].strip().lower()
+
+    try:
+        engine = SkillsCatalogSyncEngine()
+        result = await engine.sync(mode=mode, source_name=source)
+        if not result.get("success"):
+            await update.message.reply_text(
+                f"❌ catalog sync falhou\n- mode: {mode}\n- erro: {result.get('error', 'unknown')}"
+            )
+            return
+
+        text = (
+            "📚 catalog sync\n"
+            f"- mode: {result.get('mode')}\n"
+            f"- source_count: {result.get('sources_checked', 0)}\n"
+            f"- skills_discovered: {result.get('skills_discovered', 0)}\n"
+            f"- changes: {result.get('changes_detected', 0)}\n"
+            f"- added: {result.get('added', 0)}\n"
+            f"- updated: {result.get('updated', 0)}\n"
+            f"- removed: {result.get('removed', 0)}"
+        )
+        await update.message.reply_text(text)
+    except Exception as e:
+        logger.error("cmd_catalogsync_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
+async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /updatestatus - status do updater autonomo."""
+    try:
+        from datetime import datetime, timezone
+
+        redis_conn = get_redis()
+        last_check_raw = redis_conn.get("updater:last_check")
+        last_summary_raw = redis_conn.get("updater:last_summary")
+        summary = _parse_db_json(last_summary_raw)
+
+        last_check_text = "never"
+        if last_check_raw:
+            try:
+                last_check_dt = datetime.fromtimestamp(float(last_check_raw), tz=timezone.utc)
+                last_check_text = last_check_dt.isoformat()
+            except Exception:
+                last_check_text = str(last_check_raw)
+
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT run_mode, status, stats, created_at
+            FROM skills_catalog_sync_runs
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        )
+        latest_sync = cur.fetchone()
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM agent_proposals
+            WHERE trigger_name LIKE '%_update_available'
+            AND status IN ('pending', 'approved', 'executing')
+            """
+        )
+        open_proposals = cur.fetchone()[0]
+        conn.close()
+
+        lines = [
+            "Updater status",
+            f"- last_check_utc: {last_check_text}",
+            f"- open_update_proposals: {open_proposals}",
+        ]
+
+        jobs = summary.get("jobs", []) if isinstance(summary, dict) else []
+        if jobs:
+            for item in jobs[:5]:
+                lines.append(
+                    f"- job {item.get('job', '?')}: {item.get('status', '?')} "
+                    f"(changes={item.get('changes', 0)})"
+                )
+
+        if latest_sync:
+            run_mode, status, stats_json, created_at = latest_sync
+            stats = _parse_db_json(stats_json)
+            lines.extend(
+                [
+                    "",
+                    "Latest catalog sync run:",
+                    f"- created_at: {created_at}",
+                    f"- mode: {run_mode}",
+                    f"- status: {status}",
+                    f"- changes: {stats.get('changes_detected', 0)}",
+                    f"- added: {stats.get('added', 0)}",
+                    f"- updated: {stats.get('updated', 0)}",
+                    f"- removed: {stats.get('removed', 0)}",
+                ]
+            )
+
+        await update.message.reply_text("\n".join(lines))
+    except Exception as e:
+        logger.error("cmd_updatestatus_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
 async def send_notification(message: str):
     """Envia notificacao para todos os usuarios autorizados."""
     import telegram
@@ -321,7 +519,7 @@ async def send_notification(message: str):
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para erros — envia para Telegram e log local."""
+    """Handler para erros â€” envia para Telegram e log local."""
     error_msg = str(context.error)
 
     # Log local
@@ -344,12 +542,12 @@ def main():
     app = (
         Application.builder()
         .token(TOKEN)
-        .connect_timeout(30.0)  # Timeout de conexão
+        .connect_timeout(30.0)  # Timeout de conexÃ£o
         .read_timeout(30.0)  # Timeout de leitura
         .write_timeout(30.0)  # Timeout de escrita
-        .pool_timeout(30.0)  # Timeout do pool de conexões
-        .concurrent_updates(10)  # Atualizações simultâneas
-        .connection_pool_size(20)  # Tamanho do pool de conexões
+        .pool_timeout(30.0)  # Timeout do pool de conexÃµes
+        .concurrent_updates(10)  # AtualizaÃ§Ãµes simultÃ¢neas
+        .connection_pool_size(20)  # Tamanho do pool de conexÃµes
         .build()
     )
 
@@ -361,8 +559,11 @@ def main():
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("proposals", cmd_proposals))
+    app.add_handler(CommandHandler("proposal", cmd_proposal))
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
+    app.add_handler(CommandHandler("catalogsync", cmd_catalogsync))
+    app.add_handler(CommandHandler("updatestatus", cmd_updatestatus))
 
     # Handler para mensagens gerais (LangGraph)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
