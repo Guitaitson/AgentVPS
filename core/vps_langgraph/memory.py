@@ -51,9 +51,9 @@ class AgentMemory:
         }
 
         self._redis = self._init_redis_client()
-        self._semantic_enabled = (
-            os.getenv("QDRANT_SEMANTIC_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
-        )
+        self._semantic_enabled = os.getenv(
+            "QDRANT_SEMANTIC_ENABLED", "true"
+        ).strip().lower() not in {"0", "false", "no"}
         self._semantic_collection = os.getenv(
             "QDRANT_SEMANTIC_COLLECTION",
             "agent_semantic_memory",
@@ -143,7 +143,10 @@ class AgentMemory:
 
         for token in tokens:
             digest = hashlib.sha256(token.encode("utf-8")).digest()
-            index = int.from_bytes(digest[:4], byteorder="big", signed=False) % self._semantic_vector_size
+            index = (
+                int.from_bytes(digest[:4], byteorder="big", signed=False)
+                % self._semantic_vector_size
+            )
             sign = -1.0 if (digest[4] & 1) else 1.0
             vector[index] += sign
 
@@ -420,7 +423,9 @@ class AgentMemory:
             )
         return deleted
 
-    def list_memory_audit(self, user_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    def list_memory_audit(
+        self, user_id: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Return memory audit events from PostgreSQL or local fallback."""
         try:
             conn = self._get_conn()
@@ -743,7 +748,9 @@ class AgentMemory:
         project_id: str | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        effective_limit = self._semantic_recall_default_limit if limit is None else max(1, int(limit))
+        effective_limit = (
+            self._semantic_recall_default_limit if limit is None else max(1, int(limit))
+        )
         if not query_text.strip():
             return []
 
@@ -787,7 +794,9 @@ class AgentMemory:
                 if output:
                     return output
             except Exception as exc:
-                logger.warning("memory.semantic_search_qdrant_failed", error=str(exc), user_id=user_id)
+                logger.warning(
+                    "memory.semantic_search_qdrant_failed", error=str(exc), user_id=user_id
+                )
 
         entries = self.get_typed_memory(
             user_id=user_id,

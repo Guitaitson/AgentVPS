@@ -149,14 +149,18 @@ class SoulManager:
                     content=row["content"],
                     metadata=row.get("metadata") or {},
                     created_by=row.get("created_by") or "unknown",
-                    created_at=row["created_at"].isoformat() if row.get("created_at") else _utcnow(),
+                    created_at=row["created_at"].isoformat()
+                    if row.get("created_at")
+                    else _utcnow(),
                 )
         except Exception as exc:
             logger.debug("soul.get_artifact_fallback_local", error=str(exc))
         return self._local_artifacts[artifact_type]
 
     def get_all_artifacts(self) -> dict[SoulArtifactType, SoulArtifact]:
-        return {artifact_type: self.get_artifact(artifact_type) for artifact_type in SoulArtifactType}
+        return {
+            artifact_type: self.get_artifact(artifact_type) for artifact_type in SoulArtifactType
+        }
 
     def propose_change(
         self,
@@ -268,9 +272,13 @@ class SoulManager:
         return True
 
     def list_pending_proposals(self, limit: int = 20) -> list[SoulChangeProposal]:
-        local_pending = [proposal for proposal in self._local_proposals.values() if proposal.status == "pending"]
+        local_pending = [
+            proposal for proposal in self._local_proposals.values() if proposal.status == "pending"
+        ]
         if local_pending:
-            return sorted(local_pending, key=lambda proposal: proposal.proposal_id, reverse=True)[:limit]
+            return sorted(local_pending, key=lambda proposal: proposal.proposal_id, reverse=True)[
+                :limit
+            ]
 
         try:
             conn = self._get_conn()
@@ -336,7 +344,10 @@ class SoulManager:
             artifact_type=proposal.artifact_type,
             version=new_version,
             content=proposal.proposed_content,
-            metadata={"from_proposal_id": proposal.proposal_id, "impact": proposal.impact_level.value},
+            metadata={
+                "from_proposal_id": proposal.proposal_id,
+                "impact": proposal.impact_level.value,
+            },
             created_by=created_by,
             created_at=now,
         )

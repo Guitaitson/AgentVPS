@@ -133,7 +133,10 @@ async def test_catalog_sync_parses_langchain_skills_source(tmp_path):
                             "semver": "0.3.1",
                             "risk_level": "medium",
                             "keywords": ["lookup", "docs"],
-                            "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}},
+                            "input_schema": {
+                                "type": "object",
+                                "properties": {"q": {"type": "string"}},
+                            },
                         }
                     ],
                 }

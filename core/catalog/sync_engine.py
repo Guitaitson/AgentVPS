@@ -127,7 +127,9 @@ class SkillsCatalogSyncEngine:
             )
             return {"success": False, "mode": mode, "error": str(exc)}
 
-    async def _discover_all_sources(self, sources: list[CatalogSource]) -> dict[str, dict[str, Any]]:
+    async def _discover_all_sources(
+        self, sources: list[CatalogSource]
+    ) -> dict[str, dict[str, Any]]:
         catalog: dict[str, dict[str, Any]] = {}
         for source in sources:
             raw_skills = await self._fetch_source_skills(source)
@@ -229,7 +231,9 @@ class SkillsCatalogSyncEngine:
             normalized_like.append(item)
         return normalized_like
 
-    def _normalize_skill(self, raw_skill: dict[str, Any], *, source_name: str) -> dict[str, Any] | None:
+    def _normalize_skill(
+        self, raw_skill: dict[str, Any], *, source_name: str
+    ) -> dict[str, Any] | None:
         skill_name = self._pick_name(raw_skill)
         if not skill_name:
             return None
@@ -505,7 +509,9 @@ class SkillsCatalogSyncEngine:
 
     @staticmethod
     def _pick_triggers(raw_skill: dict[str, Any]) -> list[str]:
-        value = raw_skill.get("triggers") or raw_skill.get("keywords") or raw_skill.get("tags") or []
+        value = (
+            raw_skill.get("triggers") or raw_skill.get("keywords") or raw_skill.get("tags") or []
+        )
         if isinstance(value, list):
             return [str(item).strip() for item in value if str(item).strip()]
         if isinstance(value, str):

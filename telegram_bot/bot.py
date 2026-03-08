@@ -1,4 +1,4 @@
-﻿"""
+"""
 VPS-Agent Telegram Bot â€” Interface principal
 VersÃ£o: 2.0 â€” Com LangGraph e timeout otimizado
 """
@@ -62,7 +62,6 @@ def get_redis():
     )
 
 
-
 def _parse_db_json(value):
     """Converte JSON do banco para dict de forma resiliente."""
     if isinstance(value, dict):
@@ -75,6 +74,7 @@ def _parse_db_json(value):
         except Exception:
             return {}
     return {}
+
 
 # Middleware de seguranÃ§a
 def authorized_only(func):
@@ -576,4 +576,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

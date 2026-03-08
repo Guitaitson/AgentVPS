@@ -147,4 +147,3 @@ class ExecuteScheduledSkill(SkillBase):
         conn.commit()
         conn.close()
         return approved
-

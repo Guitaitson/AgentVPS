@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agent Identity System - Identidade e contexto do VPS-Agent
 
 Este mÃ³dulo fornece ao LLM todas as informaÃ§Ãµes necessÃ¡rias

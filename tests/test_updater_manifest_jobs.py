@@ -71,7 +71,9 @@ async def test_manifest_job_detects_change_and_creates_proposal(tmp_path, monkey
     assert first.changes_detected == 0
 
     # Change detected
-    manifest.write_text(json.dumps({"version": "2", "items": [{"name": "a"}, {"name": "b"}]}), encoding="utf-8")
+    manifest.write_text(
+        json.dumps({"version": "2", "items": [{"name": "a"}, {"name": "b"}]}), encoding="utf-8"
+    )
     agent = UpdaterAgent(jobs=[job])
     engine = _FakeEngine()
     summary = await agent.check_and_propose(engine)

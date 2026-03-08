@@ -86,4 +86,3 @@ async def test_updater_agent_reports_failed_check():
     assert summary[0]["status"] == "check_failed"
     assert summary[0]["error"] == "network_error"
     assert engine.created == []
-

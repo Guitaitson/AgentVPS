@@ -1,4 +1,4 @@
-﻿"""
+"""
 Autonomous Loop Engine - Sistema de execuÃ§Ã£o autÃ´nomo (T4-02)
 
 Implementa o Blueprint de 6 passos:
@@ -67,6 +67,7 @@ class Trigger:
 
 class CapGate:
     """Cap Gates - verificaÃ§Ãµes antes de executar uma proposal."""
+
     @staticmethod
     def _mark_requires_approval(
         engine: "AutonomousLoop",
@@ -105,7 +106,6 @@ class CapGate:
         except Exception as exc:
             logger.error("cap_gate_mark_approval_error", error=str(exc))
             return {"blocked": False}
-
 
     @staticmethod
     async def check_rate_limit(engine: "AutonomousLoop", proposal_id: int) -> dict:
@@ -170,7 +170,9 @@ class CapGate:
         return {"blocked": False}
 
     @staticmethod
-    async def check_explicit_approval(engine: "AutonomousLoop", proposal_id: int, suggested_action: dict) -> dict:
+    async def check_explicit_approval(
+        engine: "AutonomousLoop", proposal_id: int, suggested_action: dict
+    ) -> dict:
         """Honors explicit requires_approval flag on suggested action."""
         if not bool(suggested_action.get("requires_approval", False)):
             return {"blocked": False}
