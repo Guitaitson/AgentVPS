@@ -9,10 +9,11 @@ import os
 
 import psycopg2
 import redis
-from dotenv import load_dotenv
 from psycopg2.extras import Json, RealDictCursor
 
-load_dotenv("/opt/vps-agent/core/.env")
+from core.env import load_project_env
+
+load_project_env()
 
 
 class AgentMemory:

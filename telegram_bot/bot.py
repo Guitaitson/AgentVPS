@@ -9,7 +9,6 @@ import os
 import psycopg2
 import redis
 import structlog
-from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -20,6 +19,7 @@ from telegram.ext import (
 )
 
 # VPS-Agent Core (nosso módulo)
+from core.env import load_project_env
 from core.vps_agent.agent import process_message_async
 
 # Telegram Log Handler (F0-06)
@@ -33,7 +33,7 @@ structlog.configure(
 logger = structlog.get_logger()
 
 # Carregar variáveis de ambiente
-load_dotenv("/opt/vps-agent/core/.env")
+load_project_env()
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ALLOWED_USERS = [
