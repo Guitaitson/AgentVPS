@@ -131,6 +131,14 @@ docker exec -i vps-postgres psql -U vps_agent -d vps_agent \
 docker exec -i vps-postgres psql -U vps_agent -d vps_agent \
   < /opt/vps-agent/configs/migration-autonomous.sql
 
+# Migration: memória tipada auditável + soul governance
+docker exec -i vps-postgres psql -U vps_agent -d vps_agent \
+  < /opt/vps-agent/configs/migration-memory-soul.sql
+
+# Migration: catálogo de skills externos
+docker exec -i vps-postgres psql -U vps_agent -d vps_agent \
+  < /opt/vps-agent/configs/migration-skills-catalog.sql
+
 # Verificar tabelas criadas
 docker exec vps-postgres psql -U vps_agent -d vps_agent \
   -c "\dt" | grep agent
@@ -207,6 +215,45 @@ journalctl -u telegram-bot -f
 
 # MCP server
 journalctl -u mcp-server -f
+```
+
+### OperaÃ§Ã£o do Updater
+
+Comandos Ãºteis no Telegram:
+
+- `/catalogsync check` - verifica mudanÃ§as no catÃ¡logo sem aplicar
+- `/catalogsync apply` - aplica mudanÃ§as detectadas
+- `/updatestatus` - status do updater autÃ´nomo e Ãºltimo sync
+- `/proposals` e `/proposal <id>` - inspeciona proposals de update
+
+### Janela de ManutenÃ§Ã£o (Scheduled Updates)
+
+Exemplo 1: aprovar proposals de update (sem burlar `requires_approval=true`):
+
+```bash
+docker exec vps-postgres psql -U vps_agent -d vps_agent -c "
+INSERT INTO scheduled_tasks (task_name, task_type, payload, status, next_run)
+VALUES (
+  'janela-update-approve',
+  'once',
+  '{\"action\":\"approve_update_proposals\",\"limit\":20,\"include_requires_approval\":false}',
+  'pending',
+  NOW() + INTERVAL '30 minutes'
+);"
+```
+
+Exemplo 2: aplicar catÃ¡logo diretamente na janela:
+
+```bash
+docker exec vps-postgres psql -U vps_agent -d vps_agent -c "
+INSERT INTO scheduled_tasks (task_name, task_type, payload, status, next_run)
+VALUES (
+  'janela-catalog-apply',
+  'once',
+  '{\"action\":\"catalog_sync_apply\"}',
+  'pending',
+  NOW() + INTERVAL '30 minutes'
+);"
 ```
 
 ### Backup do Banco

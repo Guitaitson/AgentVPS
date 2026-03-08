@@ -1,0 +1,29 @@
+{
+  "version": "2026.03.08",
+  "domain": "policy_bundle",
+  "policies": [
+    {
+      "name": "dangerous_action_requires_approval",
+      "scope": "agent_proposals",
+      "enforced_by": [
+        "core.autonomous.engine.CapGate.check_explicit_approval",
+        "core.autonomous.engine.CapGate.check_security_level"
+      ]
+    },
+    {
+      "name": "delegation_least_privilege_context",
+      "scope": "runtime_context",
+      "enforced_by": [
+        "core.orchestration.runtime_adapters.RuntimeRouter._prepare_request",
+        "core.memory.policy.MemoryPolicy.sanitize_context"
+      ]
+    },
+    {
+      "name": "memory_redaction_default",
+      "scope": "memory",
+      "enforced_by": [
+        "core.memory.policy.MemoryPolicy.redact_value"
+      ]
+    }
+  ]
+}

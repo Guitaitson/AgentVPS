@@ -1,0 +1,21 @@
+{
+  "version": "2026.03.08",
+  "domain": "runbook_bundle",
+  "runbooks": [
+    {
+      "name": "deploy_core_services",
+      "path": "docs/DEPLOYMENT.md",
+      "type": "deployment"
+    },
+    {
+      "name": "architecture_reference",
+      "path": "docs/ARCHITECTURE.md",
+      "type": "architecture"
+    },
+    {
+      "name": "mcp_operations",
+      "path": "docs/MCP_SERVER.md",
+      "type": "operations"
+    }
+  ]
+}
