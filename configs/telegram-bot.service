@@ -9,6 +9,7 @@ User=root
 WorkingDirectory=/opt/vps-agent/core
 Environment=PATH=/opt/vps-agent/core/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONPATH=/opt/vps-agent
+EnvironmentFile=/opt/vps-agent/.env
 ExecStart=/opt/vps-agent/core/venv/bin/python3 /opt/vps-agent/telegram_bot/bot.py
 Restart=always
 RestartSec=10

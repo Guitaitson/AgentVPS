@@ -12,9 +12,10 @@ import os
 from typing import Dict, List
 
 import httpx
-from dotenv import load_dotenv
 
-load_dotenv("/opt/vps-agent/core/.env")
+from core.env import load_project_env
+
+load_project_env()
 
 # Configuração
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")

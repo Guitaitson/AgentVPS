@@ -55,7 +55,7 @@ A VPS é o agente. O CLI (Kilocode/Claude) é o CÉREBRO instalado na própria V
 ```
 
 ## Acesso VPS
-- IP: 107.175.1.42
+- IP: SEU_HOST_VPS
 - Porta SSH: 22
 - Usuário: root (CLI instalado localmente)
 

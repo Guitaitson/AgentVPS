@@ -104,7 +104,7 @@ def get_full_system_prompt(user_name: str = "Guilherme") -> str:
         "",
         "## Auto-Conhecimento (seu proprio funcionamento)",
         "- Seu codigo esta em /opt/vps-agent/core/ (NAO busque em venv/ ou .git/)",
-        "- Seu .env esta em /opt/vps-agent/core/.env (contem API keys como BRAVE_API_KEY)",
+        "- Seu .env esta em /opt/vps-agent/.env (contem API keys como BRAVE_API_KEY)",
         "- Seus logs estao em /opt/vps-agent/logs/telegram-bot.log",
         "- web_search tenta Brave API primeiro; se Brave falhar (ex: key invalida), usa DuckDuckGo como fallback automatico",
         "- Voce tem self_edit para editar seus proprios arquivos (com backup automatico, syntax check e git commit)",

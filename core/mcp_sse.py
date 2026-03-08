@@ -13,14 +13,28 @@ Conecte via: http://localhost:8000/mcp
 
 import asyncio
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from core.config import get_settings
+from core.env import load_project_env
+
+load_project_env()
+
+MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(os.getenv("MCP_PORT", "8765"))
+MCP_API_KEY = os.getenv("MCP_API_KEY", "").strip()
+MCP_CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("MCP_CORS_ORIGINS", "http://localhost,https://localhost").split(",")
+    if origin.strip()
+]
 
 # ============================================
 # MCP Protocol Types
@@ -274,11 +288,29 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=MCP_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/"}
+
+
+@app.middleware("http")
+async def require_mcp_api_key(request: Request, call_next):
+    if MCP_API_KEY and request.url.path not in PUBLIC_PATHS:
+        if request.headers.get("X-API-Key", "").strip() != MCP_API_KEY:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error",
+                    "message": "Unauthorized. Provide X-API-Key header.",
+                },
+            )
+
+    return await call_next(request)
+
 
 # Instância do servidor MCP
 mcp_server = MCPServer()
@@ -368,6 +400,10 @@ async def mcp_websocket(websocket: WebSocket):
     WebSocket para comunicação em tempo real com o MCP.
     Suporta streaming de tool results e notifications.
     """
+    if MCP_API_KEY and websocket.headers.get("X-API-Key", "").strip() != MCP_API_KEY:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
     try:
@@ -448,9 +484,13 @@ def main():
     print("  GET  /mcp/stream         - SSE stream")
     print("  WS   /mcp/ws            - WebSocket")
     print("  GET  /                   - Info")
+    if MCP_API_KEY:
+        print("  Auth enabled: use header X-API-Key")
+    else:
+        print("  Auth disabled (set MCP_API_KEY to enable)")
     print("=" * 50)
 
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host=MCP_HOST, port=MCP_PORT, log_level="info")
 
 
 if __name__ == "__main__":

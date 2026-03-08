@@ -11,13 +11,15 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.env import ENV_FILE_CANDIDATES
+
 
 class PostgresSettings(BaseSettings):
     """Configurações do PostgreSQL."""
 
     model_config = SettingsConfigDict(
         env_prefix="POSTGRES_",
-        env_file="/opt/vps-agent/core/.env",
+        env_file=ENV_FILE_CANDIDATES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -39,7 +41,7 @@ class RedisSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="REDIS_",
-        env_file="/opt/vps-agent/core/.env",
+        env_file=ENV_FILE_CANDIDATES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -54,7 +56,7 @@ class TelegramSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="TELEGRAM_",
-        env_file="/opt/vps-agent/core/.env",
+        env_file=ENV_FILE_CANDIDATES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -75,7 +77,7 @@ class OpenRouterSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="OPENROUTER_",
-        env_file="/opt/vps-agent/core/.env",
+        env_file=ENV_FILE_CANDIDATES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -92,7 +94,7 @@ class QdrantSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="QDRANT_",
-        env_file="/opt/vps-agent/core/.env",
+        env_file=ENV_FILE_CANDIDATES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -105,7 +107,7 @@ class GatewaySettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="GATEWAY_",
-        env_file="/opt/vps-agent/core/.env",
+        env_file=ENV_FILE_CANDIDATES,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -123,7 +125,9 @@ class AppSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file="/opt/vps-agent/core/.env", env_file_encoding="utf-8", extra="ignore"
+        env_file=ENV_FILE_CANDIDATES,
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     # Sub-configurações

@@ -1,119 +1,36 @@
-# Guia: SSH Tunnel para Claude CLI OAuth
+# Guia: SSH Tunnel (Headless VPS)
 
-O Claude CLI com assinatura requer autenticação OAuth via navegador. Como a VPS é headless, usamos SSH tunnel para abrir o browser no seu PC.
+Use este guia quando você precisa acessar serviços locais da VPS (por exemplo MCP, OAuth callback) a partir do seu computador.
 
-## Método 1: SSH com Forwarding (Recomendado)
+## Pré-requisitos
 
-### Passo 1: Iniciar SSH com Portal de Browser
+- SSH funcional para sua VPS
+- Serviço alvo ouvindo em `localhost` na VPS
+- Host e usuário definidos em variáveis locais (não versionar)
 
-No seu **PC local** (Windows/Mac/Linux), execute:
+## Exemplo Genérico
 
-```bash
-# Linux/Mac
-ssh -L 9999:localhost:9999 root@107.175.1.42
-
-# Windows (PowerShell)
-ssh -L 9999:localhost:9999 root@107.175.1.42
-```
-
-Isso cria um túnel da porta 9999 do seu PC para a VPS.
-
-### Passo 2: Na VPS (novo terminal)
+No computador local:
 
 ```bash
-# Exportar variáveis e iniciar autenticação
-export DISPLAY=:0
-claude setup-token
+ssh -L <PORTA_LOCAL>:localhost:<PORTA_REMOTA> <USUARIO>@<SEU_HOST_VPS>
 ```
 
-O comando vai abrir uma URL no seu navegador local (http://localhost:9999/...).
-
-### Passo 3: Fazer Login
-
-1. Você será redirecionado para o login da Anthropic
-2. Faça login com: `guilhermetaitson@gmail.com`
-3. Autorize o acesso
-4. O token será salvo automaticamente
-
----
-
-## Método 2: URL Manual (Mais Simples)
-
-### Passo 1: Na VPS
+Exemplo para MCP na porta `8765`:
 
 ```bash
-export DISPLAY=:0
-claude setup-token
+ssh -L 8765:localhost:8765 <USUARIO>@<SEU_HOST_VPS>
 ```
 
-O comando vai exibir uma **URL** (algo como `https://claude.com/auth/...`).
-
-### Passo 2: No seu PC
-
-1. Copie a URL exibida
-2. Cole no navegador do seu PC
-3. Faça login na Anthropic
-4. **O token será salvo na VPS automaticamente**
-
----
-
-## Método 3: Usar API Key (Sem OAuth)
-
-Se preferir não usar OAuth, pode gerar uma API Key no console da Anthropic:
-
-1. Acesse: https://console.anthropic.com/settings/keys
-2. Crie uma nova API Key
-3. Configure na VPS:
+Depois disso, no seu computador:
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-api03-sua-chave-aqui"
-echo "export ANTHROPIC_API_KEY='sk-ant-api03-sua-chave-aqui'" >> ~/.bashrc
+curl http://localhost:8765/health
 ```
 
-**Nota:** API Keys usam cobrança por uso. OAuth com assinatura é diferente.
+## Boas Práticas
 
----
-
-## Verificar Autenticação
-
-Após configurar, verify:
-
-```bash
-# Status do CLI
-agent-cli status
-
-# Testar Claude
-claude --version
-```
-
----
-
-## Solução de Problemas
-
-### "Browser não encontrado"
-```bash
-# Instalar browser leve na VPS
-apt-get install -y firefox-esr
-# ou
-apt-get install -y chromium-browser
-```
-
-### "Display não configurado"
-```bash
-export DISPLAY=:0
-# ou
-export DISPLAY=:1
-```
-
-### Token expirado
-```bash
-claude setup-token
-# Vai pedir nova autenticação
-```
-
----
-
-## Fontes
-
-- [Reddit: bypass OAuth login](https://www.reddit.com/r/ClaudeAI/comments/1mideyc/how_to_bypass_claude_code_initial_oauth_login/)
-- [Claude Code Docs: Authentication](https://code.claude.com/docs/en/authentication)
+- Não publique IP, usuário, senha, tokens ou e-mails pessoais em arquivos versionados.
+- Prefira autenticação por chave SSH.
+- Mantenha serviços sensíveis bindados em `127.0.0.1` na VPS.
+- Se expor um túnel para terceiros, use autenticação adicional (`X-API-Key`, proxy, ACL).

@@ -189,7 +189,7 @@ class SkillRegistry:
         # Para shell_exec, classificar o comando específico
         if name == "shell_exec" and args and args.get("command"):
             try:
-                from .._builtin.shell_exec.handler import classify_command
+                from ._builtin.shell_exec.handler import classify_command
 
                 cmd_level = classify_command(args["command"])
                 return cmd_level.value

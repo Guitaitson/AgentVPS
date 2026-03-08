@@ -712,7 +712,7 @@ class Capability:
 
 ## 🔗 Links Úteis
 
-- **VPS:** 107.175.1.42:22 (root)
+- **VPS:** SEU_HOST_VPS:22 (root)
 - **GitHub:** https://github.com/Guitaitson/AgentVPS
 - **Telegram:** @Molttaitbot
 - **Stack Overflow:** [perguntas sobre LangGraph](https://python.langchain.com/docs/langgraph)

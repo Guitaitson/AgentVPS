@@ -18,9 +18,10 @@ from typing import Any, Callable, Optional
 import psycopg2
 import redis
 import structlog
-from dotenv import load_dotenv
 
-load_dotenv("/opt/vps-agent/core/.env")
+from core.env import load_project_env
+
+load_project_env()
 
 logger = structlog.get_logger()
 

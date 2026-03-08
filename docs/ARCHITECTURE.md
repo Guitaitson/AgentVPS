@@ -79,7 +79,7 @@ END
 | Base | `core/skills/base.py` | `SkillBase` — interface que todas as skills implementam |
 | Tool Schemas | `registry.list_tool_schemas()` | JSON Schema para function calling |
 
-**Skills disponíveis (12):**
+**Skills disponíveis (13):**
 
 | Skill | Nível | Descrição |
 |-------|-------|-----------|
@@ -92,6 +92,7 @@ END
 | `file_manager` | normal | Lê e escreve arquivos |
 | `memory_query` | safe | Consulta memória persistida (PostgreSQL) |
 | `web_search` | normal | Busca web (DuckDuckGo fallback) |
+| `fleetintel` | normal | Consulta eventos e dados de frota via FleetIntel MCP |
 | `self_edit` | dangerous | Auto-edição de código da VPS |
 | `log_reader` | safe | Leitura de logs da VPS |
 | `openclaw_exec` | dangerous | Controla OpenClaw via docker exec |
@@ -212,7 +213,7 @@ Schema: `configs/init-db.sql` + `configs/migration-autonomous.sql`
 |---------|-------|
 | Nós no grafo | 7 (era 10) |
 | Chamadas LLM por mensagem | 1-2 (decidir + opcionalmente formatar) |
-| Skills disponíveis | 12 |
+| Skills disponíveis | 13 |
 | Dead code removido (Sprint 03) | ~600 linhas |
 | Hook system builtin | 3 hooks |
 | Triggers autônomos com condições reais | 6/6 |

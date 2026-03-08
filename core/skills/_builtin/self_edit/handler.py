@@ -28,6 +28,7 @@ ALLOWED_DIRS = [
 # Paths explicitamente bloqueados (segurança)
 BLOCKED_PATHS = [
     "/opt/vps-agent/core/security/",
+    "/opt/vps-agent/.env",
     "/opt/vps-agent/core/.env",
     "/opt/vps-agent/telegram_bot/",
 ]

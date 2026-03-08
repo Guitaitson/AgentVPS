@@ -13,7 +13,7 @@
 - Docker + Docker Compose
 - MiniMax M2.1 via OpenRouter
 
-**VPS:** 107.175.1.42 (Ubuntu, root access)
+**VPS:** SEU_HOST_VPS (Ubuntu, acesso root)
 
 ---
 

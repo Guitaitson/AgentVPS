@@ -292,7 +292,7 @@ docker compose -f configs/docker-compose.core.yml up -d
 
 - **Issues:** https://github.com/Guitaitson/AgentVPS/issues
 - **CI/CD:** https://github.com/Guitaitson/AgentVPS/actions
-- **VPS:** 107.175.1.42 (acesso SSH)
+- **VPS:** configure no seu ambiente privado (`SEU_HOST_VPS`)
 
 ---
 

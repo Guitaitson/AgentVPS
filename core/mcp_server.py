@@ -8,18 +8,27 @@ Usage:
 The server will be available at http://localhost:8000/mcp
 """
 
+import os
 import subprocess
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi_mcp import FastApiMCP
 
+from core.env import load_project_env
 from core.resource_manager.manager import (
     get_available_ram,
     get_tools_status,
     start_tool,
     stop_tool,
 )
+
+load_project_env()
+
+MCP_HOST = os.getenv("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(os.getenv("MCP_PORT", "8765"))
+MCP_API_KEY = os.getenv("MCP_API_KEY", "").strip()
 
 
 @asynccontextmanager
@@ -39,6 +48,27 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+
+
+@app.middleware("http")
+async def require_mcp_api_key(request: Request, call_next):
+    """
+    Exige X-API-Key quando MCP_API_KEY está configurada.
+    Mantém /health e páginas de documentação públicas.
+    """
+    if MCP_API_KEY and request.url.path not in PUBLIC_PATHS:
+        if request.headers.get("X-API-Key", "").strip() != MCP_API_KEY:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error",
+                    "message": "Unauthorized. Provide X-API-Key header.",
+                },
+            )
+
+    return await call_next(request)
 
 
 def get_docker_containers() -> list:
@@ -194,11 +224,15 @@ def main():
     print("VPS-Agent MCP Server")
     print("=" * 50)
     print("Starting MCP server...")
-    print("MCP endpoint: http://localhost:8000/mcp")
-    print("Docs: http://localhost:8000/docs")
+    print(f"MCP endpoint: http://{MCP_HOST}:{MCP_PORT}/mcp")
+    print(f"Docs: http://{MCP_HOST}:{MCP_PORT}/docs")
+    if MCP_API_KEY:
+        print("Auth: X-API-Key enabled")
+    else:
+        print("Auth: disabled (set MCP_API_KEY to enable)")
     print("=" * 50)
 
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host=MCP_HOST, port=MCP_PORT, log_level="info")
 
 
 if __name__ == "__main__":

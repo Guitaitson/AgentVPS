@@ -37,6 +37,13 @@ bearer_scheme = HTTPBearer(auto_error=False)
 # Load API key from environment
 GATEWAY_API_KEY = os.getenv("GATEWAY_API_KEY")
 GATEWAY_DEV_MODE = os.getenv("GATEWAY_DEV_MODE", "false").lower() == "true"
+GATEWAY_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("GATEWAY_ALLOWED_ORIGINS", "http://localhost,https://localhost").split(
+        ","
+    )
+    if origin.strip()
+]
 
 # Rate limiter (in-memory, replace with Redis in production)
 rate_limiter = RateLimiter(requests_per_minute=60)
@@ -115,7 +122,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=GATEWAY_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -220,15 +227,19 @@ async def send_message(request: MessageRequest, user_identifier: str = Depends(v
         logger.info(f"📨 Message from {request.user_id}: {request.message[:100]}...")
 
         # Process message through agent
-        result = await process_message_async(
-            user_id=request.user_id, message=request.message, session_id=request.session_id
-        )
+        result = await process_message_async(user_id=request.user_id, message=request.message)
+
+        if isinstance(result, dict):
+            return MessageResponse(
+                response=result.get("response", "Erro ao processar mensagem"),
+                session_id=result.get("session_id", request.session_id or request.user_id),
+                intent=result.get("intent"),
+                confidence=result.get("intent_confidence"),
+            )
 
         return MessageResponse(
-            response=result.get("response", "Erro ao processar mensagem"),
-            session_id=result.get("session_id", request.session_id or ""),
-            intent=result.get("intent"),
-            confidence=result.get("intent_confidence"),
+            response=str(result),
+            session_id=request.session_id or request.user_id,
         )
 
     except Exception as e:
@@ -275,12 +286,14 @@ async def telegram_webhook(request: Request):
             chat_id = result.get("chat_id")
 
             # Processar via agente
-            agent_result = await process_message_async(
-                user_id=user_id, message=text, session_id=chat_id
-            )
+            agent_result = await process_message_async(user_id=user_id, message=text)
 
             # Responder ao usuário
-            response_text = agent_result.get("response", "Erro ao processar")
+            response_text = (
+                agent_result.get("response", "Erro ao processar")
+                if isinstance(agent_result, dict)
+                else str(agent_result)
+            )
             adapter.send_message(chat_id, response_text)
 
             return {"ok": True, "processed": True, "response": response_text}
