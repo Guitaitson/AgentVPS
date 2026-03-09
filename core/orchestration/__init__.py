@@ -20,6 +20,7 @@ from .runtime_adapters import (
     RuntimeProtocol,
     RuntimeRouter,
 )
+from .runtime_control import RuntimeControl, RuntimeState
 
 __all__ = [
     "A2AAdapter",
@@ -33,6 +34,8 @@ __all__ = [
     "RuntimeExecutionResult",
     "RuntimeProtocol",
     "RuntimeRouter",
+    "RuntimeControl",
+    "RuntimeState",
     "get_runtime_router",
     "parse_runtime_protocol",
     "reset_runtime_router_for_tests",

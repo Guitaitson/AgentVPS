@@ -164,3 +164,8 @@ data/*
 *.pem
 *.key
 *.crt
+
+# Runtime catalog state
+configs/skills-catalog-cache.json
+configs/skills-catalog-history.json
+configs/skills-catalog-pins.json

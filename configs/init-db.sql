@@ -68,6 +68,11 @@ CREATE TABLE IF NOT EXISTS skills_catalog (
     schema_hash VARCHAR(64) NOT NULL,
     payload JSONB NOT NULL,
     status VARCHAR(20) DEFAULT 'active', -- active, inactive
+    pinned BOOLEAN DEFAULT FALSE,
+    pinned_version VARCHAR(100),
+    pin_reason TEXT,
+    pinned_at TIMESTAMP WITH TIME ZONE,
+    pinned_by VARCHAR(100),
     last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -82,6 +87,20 @@ CREATE TABLE IF NOT EXISTS skills_catalog_sync_runs (
     stats JSONB DEFAULT '{}',
     error_message TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS skills_catalog_history (
+    id BIGSERIAL PRIMARY KEY,
+    skill_name VARCHAR(255) NOT NULL,
+    source_name VARCHAR(255) NOT NULL,
+    version VARCHAR(100) NOT NULL,
+    schema_hash VARCHAR(64) NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    change_type VARCHAR(40) NOT NULL,
+    changed_by VARCHAR(100) DEFAULT 'sync_engine',
+    details JSONB DEFAULT '{}',
+    changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Auditoria de memória tipada (Phase 1)
@@ -137,6 +156,7 @@ CREATE INDEX idx_skills_trigger ON agent_skills(trigger_pattern);
 CREATE INDEX idx_skills_catalog_name ON skills_catalog(skill_name, source_name);
 CREATE INDEX idx_skills_catalog_status ON skills_catalog(status, updated_at DESC);
 CREATE INDEX idx_skills_catalog_runs_created ON skills_catalog_sync_runs(created_at DESC);
+CREATE INDEX idx_skills_catalog_history_name ON skills_catalog_history(skill_name, source_name, changed_at DESC);
 CREATE INDEX idx_memory_audit_ts ON memory_audit_log(event_ts DESC);
 CREATE INDEX idx_memory_audit_user ON memory_audit_log(user_id, event_ts DESC);
 CREATE INDEX idx_soul_artifact_type_version ON agent_soul_artifacts(artifact_type, version DESC);

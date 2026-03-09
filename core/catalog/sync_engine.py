@@ -38,6 +38,8 @@ class SkillsCatalogSyncEngine:
         self.settings = settings.catalog
         self.sources_file = sources_file or self.settings.sources_file
         self._fallback_cache_path = self.settings.fallback_cache_file
+        self._history_file_path = self.settings.history_file
+        self._pins_file_path = self.settings.pins_file
         self._db_config = {
             "host": os.getenv("POSTGRES_HOST", "127.0.0.1"),
             "port": int(os.getenv("POSTGRES_PORT", 5432)),
@@ -93,16 +95,19 @@ class SkillsCatalogSyncEngine:
                 "added": 0,
                 "updated": 0,
                 "removed": 0,
+                "pinned_skipped": 0,
                 "message": "No enabled sources configured",
             }
 
         try:
             discovered = await self._discover_all_sources(sources)
             existing = self._load_existing_catalog()
+            self._apply_pins_to_discovered(discovered)
             diff = self._diff_catalog(existing, discovered)
 
             if mode == "apply":
-                self._apply_catalog(diff, discovered)
+                self._apply_catalog(diff, discovered, existing)
+                self._persist_history_snapshot(discovered, diff)
 
             result = {
                 "success": True,
@@ -113,6 +118,7 @@ class SkillsCatalogSyncEngine:
                 "added": diff["added"],
                 "updated": diff["updated"],
                 "removed": diff["removed"],
+                "pinned_skipped": diff.get("pinned_skipped", 0),
                 "changed_keys": diff["changed_keys"][:50],
             }
             self._persist_run(status="success", run_mode=mode, stats=result)
@@ -126,6 +132,324 @@ class SkillsCatalogSyncEngine:
                 error_message=str(exc),
             )
             return {"success": False, "mode": mode, "error": str(exc)}
+
+    async def pin(
+        self,
+        *,
+        skill_name: str,
+        source_name: str | None = None,
+        version: str | None = None,
+        reason: str | None = None,
+        pinned_by: str = "system",
+    ) -> dict[str, Any]:
+        """Pins one catalog entry to prevent version drift on apply sync."""
+        skill_name = skill_name.strip()
+        source_name = source_name.strip() if source_name else None
+        version = version.strip() if version else None
+        if not skill_name:
+            return {"success": False, "error": "skill_name is required"}
+
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            if source_name:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version
+                    FROM skills_catalog
+                    WHERE skill_name = %s AND source_name = %s
+                    LIMIT 1
+                    """,
+                    (skill_name, source_name),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version
+                    FROM skills_catalog
+                    WHERE skill_name = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (skill_name,),
+                )
+            row = cur.fetchone()
+            if not row:
+                conn.close()
+                return {"success": False, "error": "skill not found in catalog"}
+
+            source = source_name or row["source_name"]
+            pin_version = version or row["version"]
+            cur.execute(
+                """
+                UPDATE skills_catalog
+                SET pinned = TRUE,
+                    pinned_version = %s,
+                    pin_reason = %s,
+                    pinned_at = NOW(),
+                    pinned_by = %s
+                WHERE skill_name = %s AND source_name = %s
+                """,
+                (pin_version, reason, pinned_by, skill_name, source),
+            )
+            conn.commit()
+            conn.close()
+            return {
+                "success": True,
+                "skill_name": skill_name,
+                "source_name": source,
+                "pinned_version": pin_version,
+            }
+        except Exception:
+            return self._pin_in_file(
+                skill_name=skill_name,
+                source_name=source_name,
+                version=version,
+                reason=reason,
+                pinned_by=pinned_by,
+            )
+
+    async def unpin(self, *, skill_name: str, source_name: str | None = None) -> dict[str, Any]:
+        skill_name = skill_name.strip()
+        source_name = source_name.strip() if source_name else None
+        if not skill_name:
+            return {"success": False, "error": "skill_name is required"}
+
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            if source_name:
+                cur.execute(
+                    """
+                    UPDATE skills_catalog
+                    SET pinned = FALSE,
+                        pinned_version = NULL,
+                        pin_reason = NULL,
+                        pinned_at = NULL,
+                        pinned_by = NULL
+                    WHERE skill_name = %s AND source_name = %s
+                    """,
+                    (skill_name, source_name),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE skills_catalog
+                    SET pinned = FALSE,
+                        pinned_version = NULL,
+                        pin_reason = NULL,
+                        pinned_at = NULL,
+                        pinned_by = NULL
+                    WHERE skill_name = %s
+                    """,
+                    (skill_name,),
+                )
+            updated = int(cur.rowcount)
+            conn.commit()
+            conn.close()
+            return {"success": True, "updated": updated}
+        except Exception:
+            pins = self._load_pins_from_file()
+            keys = [key for key in pins if key.startswith(f"{skill_name}:")]
+            if source_name:
+                keys = (
+                    [f"{skill_name}:{source_name}"] if f"{skill_name}:{source_name}" in pins else []
+                )
+            for key in keys:
+                pins.pop(key, None)
+            self._save_pins_to_file(pins)
+            return {"success": True, "updated": len(keys)}
+
+    async def provenance(
+        self,
+        *,
+        skill_name: str,
+        source_name: str | None = None,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        skill_name = skill_name.strip()
+        source_name = source_name.strip() if source_name else None
+        if not skill_name:
+            return {"success": False, "error": "skill_name is required"}
+
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            if source_name:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version, schema_hash, status, last_seen_at,
+                           pinned, pinned_version, pin_reason, pinned_at, pinned_by
+                    FROM skills_catalog
+                    WHERE skill_name = %s AND source_name = %s
+                    LIMIT 1
+                    """,
+                    (skill_name, source_name),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version, schema_hash, status, last_seen_at,
+                           pinned, pinned_version, pin_reason, pinned_at, pinned_by
+                    FROM skills_catalog
+                    WHERE skill_name = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (skill_name,),
+                )
+            current = cur.fetchone()
+            if not current:
+                conn.close()
+                return {"success": False, "error": "skill not found in catalog"}
+
+            cur.execute(
+                """
+                SELECT version, schema_hash, status, changed_at, change_type, changed_by
+                FROM skills_catalog_history
+                WHERE skill_name = %s AND source_name = %s
+                ORDER BY changed_at DESC
+                LIMIT %s
+                """,
+                (current["skill_name"], current["source_name"], max(1, int(limit))),
+            )
+            history = cur.fetchall()
+            conn.close()
+
+            return {
+                "success": True,
+                "current": self._serialize_catalog_row(current),
+                "history": [self._serialize_catalog_row(row) for row in history],
+            }
+        except Exception:
+            return self._provenance_from_files(
+                skill_name=skill_name, source_name=source_name, limit=limit
+            )
+
+    async def rollback(
+        self,
+        *,
+        skill_name: str,
+        source_name: str | None = None,
+        target_version: str | None = None,
+        actor: str = "system",
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        skill_name = skill_name.strip()
+        source_name = source_name.strip() if source_name else None
+        target_version = target_version.strip() if target_version else None
+        if not skill_name:
+            return {"success": False, "error": "skill_name is required"}
+
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            if source_name:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version
+                    FROM skills_catalog
+                    WHERE skill_name = %s AND source_name = %s
+                    LIMIT 1
+                    """,
+                    (skill_name, source_name),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version
+                    FROM skills_catalog
+                    WHERE skill_name = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (skill_name,),
+                )
+            current = cur.fetchone()
+            if not current:
+                conn.close()
+                return {"success": False, "error": "skill not found in catalog"}
+
+            params: list[Any] = [current["skill_name"], current["source_name"]]
+            where_version = ""
+            if target_version:
+                where_version = "AND version = %s"
+                params.append(target_version)
+
+            cur.execute(
+                f"""
+                SELECT skill_name, source_name, version, schema_hash, payload, status
+                FROM skills_catalog_history
+                WHERE skill_name = %s AND source_name = %s
+                  {where_version}
+                ORDER BY changed_at DESC
+                LIMIT 1
+                """,
+                tuple(params),
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.close()
+                return {"success": False, "error": "no rollback candidate in history"}
+
+            cur.execute(
+                """
+                INSERT INTO skills_catalog (
+                    skill_name, source_name, version, schema_hash, payload, status, last_seen_at
+                )
+                VALUES (%s, %s, %s, %s, %s, 'active', NOW())
+                ON CONFLICT (skill_name, source_name)
+                DO UPDATE SET
+                    version = EXCLUDED.version,
+                    schema_hash = EXCLUDED.schema_hash,
+                    payload = EXCLUDED.payload,
+                    status = 'active',
+                    last_seen_at = NOW(),
+                    updated_at = NOW()
+                """,
+                (
+                    row["skill_name"],
+                    row["source_name"],
+                    row["version"],
+                    row["schema_hash"],
+                    Json(row["payload"]),
+                ),
+            )
+
+            detail = {"reason": reason} if reason else {}
+            cur.execute(
+                """
+                INSERT INTO skills_catalog_history (
+                    skill_name, source_name, version, schema_hash, payload, status, change_type, changed_by, details
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    row["skill_name"],
+                    row["source_name"],
+                    row["version"],
+                    row["schema_hash"],
+                    Json(row["payload"]),
+                    "active",
+                    "rollback_applied",
+                    actor,
+                    Json(detail),
+                ),
+            )
+            conn.commit()
+            conn.close()
+            return {
+                "success": True,
+                "skill_name": row["skill_name"],
+                "source_name": row["source_name"],
+                "rolled_back_to_version": row["version"],
+            }
+        except Exception:
+            return self._rollback_from_files(
+                skill_name=skill_name,
+                source_name=source_name,
+                target_version=target_version,
+            )
 
     async def _discover_all_sources(
         self, sources: list[CatalogSource]
@@ -273,12 +597,21 @@ class SkillsCatalogSyncEngine:
         try:
             conn = self._get_conn()
             cur = conn.cursor(cursor_factory=RealDictCursor)
-            cur.execute(
-                """
-                SELECT skill_name, source_name, version, schema_hash, payload, status, last_seen_at
-                FROM skills_catalog
-                """
-            )
+            try:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version, schema_hash, payload, status, last_seen_at,
+                           pinned, pinned_version, pin_reason, pinned_at, pinned_by
+                    FROM skills_catalog
+                    """
+                )
+            except Exception:
+                cur.execute(
+                    """
+                    SELECT skill_name, source_name, version, schema_hash, payload, status, last_seen_at
+                    FROM skills_catalog
+                    """
+                )
             rows = cur.fetchall()
             conn.close()
             existing = {}
@@ -316,12 +649,21 @@ class SkillsCatalogSyncEngine:
         added = 0
         updated = 0
         removed = 0
+        pinned_skipped = 0
         changed_keys: list[str] = []
 
         for key, item in discovered.items():
             if key not in existing:
                 added += 1
                 changed_keys.append(key)
+                continue
+            pinned_version = existing[key].get("pinned_version")
+            if (
+                existing[key].get("pinned")
+                and pinned_version
+                and item.get("version") != pinned_version
+            ):
+                pinned_skipped += 1
                 continue
             if existing[key].get("schema_hash") != item.get("schema_hash"):
                 updated += 1
@@ -336,21 +678,47 @@ class SkillsCatalogSyncEngine:
             "added": added,
             "updated": updated,
             "removed": removed,
+            "pinned_skipped": pinned_skipped,
             "changed_keys": changed_keys,
         }
 
-    def _apply_catalog(self, diff: dict[str, Any], discovered: dict[str, dict[str, Any]]) -> None:
+    def _apply_catalog(
+        self,
+        diff: dict[str, Any],
+        discovered: dict[str, dict[str, Any]],
+        existing: dict[str, dict[str, Any]],
+    ) -> None:
         try:
             conn = self._get_conn()
             cur = conn.cursor()
 
-            for item in discovered.values():
+            for key, item in discovered.items():
+                current = existing.get(key)
+                pinned_version = current.get("pinned_version") if current else None
+                if (
+                    current
+                    and current.get("pinned")
+                    and pinned_version
+                    and item.get("version") != pinned_version
+                ):
+                    # Keep pinned version stable, only refresh heartbeat.
+                    cur.execute(
+                        """
+                        UPDATE skills_catalog
+                        SET status = 'active', last_seen_at = NOW(), updated_at = NOW()
+                        WHERE skill_name = %s AND source_name = %s
+                        """,
+                        (item["skill_name"], item["source_name"]),
+                    )
+                    continue
+
                 cur.execute(
                     """
                     INSERT INTO skills_catalog (
-                        skill_name, source_name, version, schema_hash, payload, status, last_seen_at
+                        skill_name, source_name, version, schema_hash, payload, status, last_seen_at,
+                        pinned, pinned_version, pin_reason, pinned_at, pinned_by
                     )
-                    VALUES (%s, %s, %s, %s, %s, 'active', NOW())
+                    VALUES (%s, %s, %s, %s, %s, 'active', NOW(), FALSE, NULL, NULL, NULL, NULL)
                     ON CONFLICT (skill_name, source_name)
                     DO UPDATE SET
                         version = EXCLUDED.version,
@@ -369,19 +737,26 @@ class SkillsCatalogSyncEngine:
                     ),
                 )
 
+                self._insert_history_row(
+                    cur,
+                    item=item,
+                    status="active",
+                    change_type="applied",
+                )
+
             if discovered:
                 pairs = [(item["skill_name"], item["source_name"]) for item in discovered.values()]
                 cur.execute(
                     """
-                    SELECT skill_name, source_name
+                    SELECT skill_name, source_name, version, schema_hash, payload
                     FROM skills_catalog
                     WHERE status = 'active'
                     """
                 )
                 rows = cur.fetchall()
-                known = {(row[0], row[1]) for row in rows}
+                known = {(row[0], row[1]): row for row in rows}
                 discovered_set = set(pairs)
-                removed_set = known - discovered_set
+                removed_set = set(known.keys()) - discovered_set
                 for skill_name, source_name in removed_set:
                     cur.execute(
                         """
@@ -391,19 +766,287 @@ class SkillsCatalogSyncEngine:
                         """,
                         (skill_name, source_name),
                     )
+                    row = known[(skill_name, source_name)]
+                    self._insert_history_row(
+                        cur,
+                        item={
+                            "skill_name": row[0],
+                            "source_name": row[1],
+                            "version": row[2],
+                            "schema_hash": row[3],
+                            "payload": row[4],
+                        },
+                        status="inactive",
+                        change_type="removed",
+                    )
 
             conn.commit()
             conn.close()
         except Exception as exc:
             logger.warning("catalog.apply_fallback_file", error=str(exc))
-            path = Path(self._fallback_cache_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            payload = {
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+            self._write_catalog_cache_file(discovered, diff)
+
+    def _apply_pins_to_discovered(self, discovered: dict[str, dict[str, Any]]) -> None:
+        pins = self._load_pins_from_file()
+        if not pins:
+            return
+        for key, item in discovered.items():
+            pin = pins.get(key)
+            if not isinstance(pin, dict):
+                continue
+            pin_version = pin.get("version")
+            if pin_version:
+                item["pinned"] = True
+                item["pinned_version"] = str(pin_version)
+                item.setdefault("payload", {}).setdefault("metadata", {})["pinned"] = True
+
+    def _insert_history_row(
+        self,
+        cur,
+        *,
+        item: dict[str, Any],
+        status: str,
+        change_type: str,
+        changed_by: str = "sync_engine",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        try:
+            cur.execute(
+                """
+                INSERT INTO skills_catalog_history (
+                    skill_name, source_name, version, schema_hash, payload, status, change_type, changed_by, details
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    item["skill_name"],
+                    item["source_name"],
+                    item.get("version", "0.0.0"),
+                    item.get("schema_hash", ""),
+                    Json(item.get("payload", {})),
+                    status,
+                    change_type,
+                    changed_by,
+                    Json(details or {}),
+                ),
+            )
+        except Exception:
+            return
+
+    def _write_catalog_cache_file(
+        self,
+        discovered: dict[str, dict[str, Any]],
+        diff: dict[str, Any],
+    ) -> None:
+        path = Path(self._fallback_cache_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "skills": list(discovered.values()),
+            "diff": diff,
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+
+    def _persist_history_snapshot(
+        self,
+        discovered: dict[str, dict[str, Any]],
+        diff: dict[str, Any],
+    ) -> None:
+        path = Path(self._history_file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        history = []
+        if path.is_file():
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(raw, list):
+                    history = raw
+            except Exception:
+                history = []
+        history.append(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
                 "skills": list(discovered.values()),
                 "diff": diff,
             }
-            path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+        )
+        history = history[-100:]
+        path.write_text(json.dumps(history, ensure_ascii=True, indent=2), encoding="utf-8")
+
+    def _load_pins_from_file(self) -> dict[str, dict[str, Any]]:
+        path = Path(self._pins_file_path)
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return {
+                    str(key): value for key, value in payload.items() if isinstance(value, dict)
+                }
+            return {}
+        except Exception:
+            return {}
+
+    def _save_pins_to_file(self, pins: dict[str, dict[str, Any]]) -> None:
+        path = Path(self._pins_file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(pins, ensure_ascii=True, indent=2), encoding="utf-8")
+
+    def _pin_in_file(
+        self,
+        *,
+        skill_name: str,
+        source_name: str | None,
+        version: str | None,
+        reason: str | None,
+        pinned_by: str,
+    ) -> dict[str, Any]:
+        catalog = self._load_existing_from_file()
+        candidate_key = None
+        if source_name:
+            key = self._catalog_key(skill_name, source_name)
+            if key in catalog:
+                candidate_key = key
+        else:
+            for key, item in catalog.items():
+                if item.get("skill_name") == skill_name:
+                    candidate_key = key
+                    break
+        if not candidate_key:
+            return {"success": False, "error": "skill not found in cache"}
+
+        item = catalog[candidate_key]
+        pin_version = version or str(item.get("version", "0.0.0"))
+        pins = self._load_pins_from_file()
+        pins[candidate_key] = {
+            "version": pin_version,
+            "reason": reason,
+            "pinned_by": pinned_by,
+            "pinned_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._save_pins_to_file(pins)
+        return {
+            "success": True,
+            "skill_name": item.get("skill_name"),
+            "source_name": item.get("source_name"),
+            "pinned_version": pin_version,
+        }
+
+    def _provenance_from_files(
+        self,
+        *,
+        skill_name: str,
+        source_name: str | None,
+        limit: int,
+    ) -> dict[str, Any]:
+        catalog = self._load_existing_from_file()
+        current = None
+        if source_name:
+            current = catalog.get(self._catalog_key(skill_name, source_name))
+        else:
+            for item in catalog.values():
+                if item.get("skill_name") == skill_name:
+                    current = item
+                    break
+        if not current:
+            return {"success": False, "error": "skill not found in cache"}
+
+        history_path = Path(self._history_file_path)
+        history_rows: list[dict[str, Any]] = []
+        if history_path.is_file():
+            try:
+                snapshots = json.loads(history_path.read_text(encoding="utf-8"))
+                if isinstance(snapshots, list):
+                    for snapshot in reversed(snapshots):
+                        for item in snapshot.get("skills", []):
+                            if not isinstance(item, dict):
+                                continue
+                            if item.get("skill_name") != current.get("skill_name"):
+                                continue
+                            if item.get("source_name") != current.get("source_name"):
+                                continue
+                            history_rows.append(
+                                {
+                                    "version": item.get("version"),
+                                    "schema_hash": item.get("schema_hash"),
+                                    "status": item.get("status", "active"),
+                                    "changed_at": snapshot.get("ts"),
+                                    "change_type": "snapshot",
+                                    "changed_by": "sync_engine",
+                                }
+                            )
+                            if len(history_rows) >= max(1, int(limit)):
+                                break
+                        if len(history_rows) >= max(1, int(limit)):
+                            break
+            except Exception:
+                history_rows = []
+
+        return {
+            "success": True,
+            "current": self._serialize_catalog_row(current),
+            "history": [self._serialize_catalog_row(row) for row in history_rows],
+        }
+
+    def _rollback_from_files(
+        self,
+        *,
+        skill_name: str,
+        source_name: str | None,
+        target_version: str | None,
+    ) -> dict[str, Any]:
+        history_path = Path(self._history_file_path)
+        if not history_path.is_file():
+            return {"success": False, "error": "history unavailable"}
+        try:
+            snapshots = json.loads(history_path.read_text(encoding="utf-8"))
+            if not isinstance(snapshots, list):
+                return {"success": False, "error": "invalid history format"}
+
+            candidate = None
+            for snapshot in reversed(snapshots):
+                for item in snapshot.get("skills", []):
+                    if not isinstance(item, dict):
+                        continue
+                    if item.get("skill_name") != skill_name:
+                        continue
+                    if source_name and item.get("source_name") != source_name:
+                        continue
+                    if target_version and str(item.get("version")) != target_version:
+                        continue
+                    candidate = item
+                    break
+                if candidate:
+                    break
+
+            if not candidate:
+                return {"success": False, "error": "rollback candidate not found in history"}
+
+            catalog = self._load_existing_from_file()
+            key = self._catalog_key(
+                candidate.get("skill_name", ""), candidate.get("source_name", "")
+            )
+            if key == ":":
+                return {"success": False, "error": "invalid candidate key"}
+            catalog[key] = candidate
+            self._write_catalog_cache_file(catalog, {"rollback": True})
+            return {
+                "success": True,
+                "skill_name": candidate.get("skill_name"),
+                "source_name": candidate.get("source_name"),
+                "rolled_back_to_version": candidate.get("version"),
+            }
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    @staticmethod
+    def _serialize_catalog_row(row: dict[str, Any]) -> dict[str, Any]:
+        output: dict[str, Any] = {}
+        for key, value in row.items():
+            if hasattr(value, "isoformat"):
+                output[key] = value.isoformat()
+            else:
+                output[key] = value
+        return output
 
     def _persist_run(
         self,

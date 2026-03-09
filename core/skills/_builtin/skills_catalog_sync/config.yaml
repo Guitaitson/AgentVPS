@@ -1,6 +1,6 @@
-name: skills_catalog_sync
-description: "Sincroniza catálogo de skills externos (check/apply) com diff auditável."
-version: "1.0.0"
+﻿name: skills_catalog_sync
+description: "Sincroniza e gerencia catalogo de skills externos (check/apply/pin/unpin/rollback/provenance)."
+version: "1.1.0"
 security_level: moderate
 triggers:
   - sync catalogo
@@ -8,23 +8,57 @@ triggers:
   - atualizar catalogo
   - catalog sync
   - skills externas
+  - pin skill catalogo
+  - rollback skill catalogo
 parameters:
   mode:
     type: string
     required: false
-    description: "Modo de execução: check (default) ou apply"
+    description: "Modo: check, apply, pin, unpin, rollback, provenance"
   source:
     type: string
     required: false
-    description: "Nome de uma fonte específica para sincronizar"
+    description: "Nome da fonte especifica"
+  skill_name:
+    type: string
+    required: false
+    description: "Nome da skill para pin/unpin/rollback/provenance"
+  version:
+    type: string
+    required: false
+    description: "Versao de pin"
+  target_version:
+    type: string
+    required: false
+    description: "Versao alvo para rollback"
+  limit:
+    type: integer
+    required: false
+    description: "Limite de eventos de provenance"
 parameters_schema:
   mode:
     type: string
-    description: "check para detectar mudanças, apply para persistir mudanças"
+    description: "check|apply|pin|unpin|rollback|provenance"
     required: false
   source:
     type: string
     description: "Nome da fonte (opcional)"
+    required: false
+  skill_name:
+    type: string
+    description: "Skill alvo para pin/unpin/rollback/provenance"
+    required: false
+  version:
+    type: string
+    description: "Versao para pin"
+    required: false
+  target_version:
+    type: string
+    description: "Versao para rollback"
+    required: false
+  limit:
+    type: integer
+    description: "Quantidade de entradas de provenance"
     required: false
 max_output_chars: 3000
 timeout_seconds: 45

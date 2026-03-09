@@ -21,6 +21,7 @@ from .runtime_adapters import (
     RuntimeProtocol,
     RuntimeRouter,
 )
+from .runtime_control import RuntimeControl
 
 
 def _build_local_executor(registry):
@@ -73,7 +74,8 @@ def get_runtime_router() -> RuntimeRouter:
     ]
 
     orch = settings.orchestration
-    if orch.enable_mcp:
+    control = RuntimeControl()
+    if control.is_enabled("mcp", fallback_default=orch.enable_mcp):
         adapters.append(
             MCPAdapter(
                 base_url=orch.mcp_base_url,
@@ -81,15 +83,21 @@ def get_runtime_router() -> RuntimeRouter:
                 timeout_s=orch.timeout_seconds,
             )
         )
-    if orch.enable_a2a and orch.a2a_endpoint:
+    if control.is_enabled("a2a", fallback_default=orch.enable_a2a) and orch.a2a_endpoint:
         adapters.append(A2AAdapter(endpoint=orch.a2a_endpoint, timeout_s=orch.timeout_seconds))
-    if orch.enable_acp and orch.acp_endpoint:
+    if control.is_enabled("acp", fallback_default=orch.enable_acp) and orch.acp_endpoint:
         adapters.append(ACPAdapter(endpoint=orch.acp_endpoint, timeout_s=orch.timeout_seconds))
-    if orch.enable_deepagents and orch.deepagents_endpoint:
+    if (
+        control.is_enabled("deepagents", fallback_default=orch.enable_deepagents)
+        and orch.deepagents_endpoint
+    ):
         adapters.append(
             DeepAgentsAdapter(endpoint=orch.deepagents_endpoint, timeout_s=orch.timeout_seconds)
         )
-    if orch.enable_openclaw and orch.openclaw_endpoint:
+    if (
+        control.is_enabled("openclaw", fallback_default=orch.enable_openclaw)
+        and orch.openclaw_endpoint
+    ):
         adapters.append(
             OpenClawAdapter(
                 endpoint=orch.openclaw_endpoint,

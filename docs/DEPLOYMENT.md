@@ -174,7 +174,7 @@ systemctl is-active telegram-bot mcp-server
 # 2. Logs limpos (sem erros)
 tail -20 /opt/vps-agent/logs/telegram-bot.log
 
-# 3. Skills carregadas (deve mostrar 13)
+# 3. Skills carregadas (deve mostrar 15)
 PYTHONPATH=/opt/vps-agent /opt/vps-agent/core/venv/bin/python3 -c "
 from core.skills.registry import SkillRegistry
 r = SkillRegistry(['/opt/vps-agent/core/skills/_builtin'])
@@ -219,12 +219,18 @@ journalctl -u mcp-server -f
 
 ### OperaÃ§Ã£o do Updater
 
-Comandos Ãºteis no Telegram:
+Comandos uteis no Telegram:
 
-- `/catalogsync check` - verifica mudanÃ§as no catÃ¡logo sem aplicar
-- `/catalogsync apply` - aplica mudanÃ§as detectadas
-- `/updatestatus` - status do updater autÃ´nomo e Ãºltimo sync
+- `/catalogsync check [source]` - verifica mudancas no catalogo sem aplicar
+- `/catalogsync apply [source]` - aplica mudancas detectadas
+- `/catalogsync pin <skill> [source] [version]` - fixa versao de skill
+- `/catalogsync unpin <skill> [source]` - remove fixacao
+- `/catalogsync rollback <skill> [source] [target_version]` - rollback para versao anterior
+- `/catalogsync provenance <skill> [source] [limit]` - historico de versoes e origem
+- `/runtimes [list|enable|disable]` - gerencia runtimes externos
+- `/updatestatus` - status do updater autonomo e ultimo sync
 - `/proposals` e `/proposal <id>` - inspeciona proposals de update
+
 
 ### Janela de ManutenÃ§Ã£o (Scheduled Updates)
 

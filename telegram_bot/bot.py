@@ -1,6 +1,6 @@
 """
-VPS-Agent Telegram Bot â€” Interface principal
-VersÃ£o: 2.0 â€” Com LangGraph e timeout otimizado
+VPS-Agent Telegram Bot Ã¢â‚¬â€ Interface principal
+VersÃƒÂ£o: 2.0 Ã¢â‚¬â€ Com LangGraph e timeout otimizado
 """
 
 import logging
@@ -18,13 +18,13 @@ from telegram.ext import (
     filters,
 )
 
-# VPS-Agent Core (nosso mÃ³dulo)
+# VPS-Agent Core (nosso mÃƒÂ³dulo)
 from core.env import load_project_env
 from core.vps_agent.agent import process_message_async
 
 # Telegram Log Handler (F0-06)
 
-# ConfiguraÃ§Ã£o de logging estruturado
+# ConfiguraÃƒÂ§ÃƒÂ£o de logging estruturado
 structlog.configure(
     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
     logger_factory=structlog.PrintLoggerFactory(),
@@ -32,7 +32,7 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
-# Carregar variÃ¡veis de ambiente
+# Carregar variÃƒÂ¡veis de ambiente
 load_project_env()
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -41,9 +41,9 @@ ALLOWED_USERS = [
 ]
 
 
-# ConexÃµes
+# ConexÃƒÂµes
 def get_db_conn():
-    """Retorna conexÃ£o com PostgreSQL."""
+    """Retorna conexÃƒÂ£o com PostgreSQL."""
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
         port=int(os.getenv("POSTGRES_PORT", 5432)),
@@ -54,7 +54,7 @@ def get_db_conn():
 
 
 def get_redis():
-    """Retorna conexÃ£o com Redis."""
+    """Retorna conexÃƒÂ£o com Redis."""
     return redis.Redis(
         host=os.getenv("REDIS_HOST", "127.0.0.1"),
         port=int(os.getenv("REDIS_PORT", 6379)),
@@ -76,15 +76,15 @@ def _parse_db_json(value):
     return {}
 
 
-# Middleware de seguranÃ§a
+# Middleware de seguranÃƒÂ§a
 def authorized_only(func):
-    """Decorator: sÃ³ permite usuÃ¡rios autorizados."""
+    """Decorator: sÃƒÂ³ permite usuÃƒÂ¡rios autorizados."""
 
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if user_id not in ALLOWED_USERS:
             logger.warning("acesso_negado", user_id=user_id)
-            await update.message.reply_text("â›” Acesso nÃ£o autorizado.")
+            await update.message.reply_text("Ã¢â€ºâ€ Acesso nÃƒÂ£o autorizado.")
             return
         return await func(update, context)
 
@@ -98,53 +98,53 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
 
     await update.message.reply_text(
-        f"ðŸ¤– **VPS-Agent v2 Online!**\n\n"
-        f"OlÃ¡, {user_name}! Seu agente autÃ´nomo estÃ¡ pronto.\n\n"
-        f"**Comandos disponÃ­veis:**\n"
-        f"â€¢ `/status` â€” Estado da VPS\n"
-        f"â€¢ `/ram` â€” Uso de memÃ³ria\n"
-        f"â€¢ `/containers` â€” Containers ativos\n"
-        f"â€¢ `/health` â€” Health check completo\n"
-        f"â€¢ `/help` â€” Ajuda\n\n"
-        f"Ou basta enviar uma mensagem e eu proceso atravÃ©s do LangGraph!"
+        f"Ã°Å¸Â¤â€“ **VPS-Agent v2 Online!**\n\n"
+        f"OlÃƒÂ¡, {user_name}! Seu agente autÃƒÂ´nomo estÃƒÂ¡ pronto.\n\n"
+        f"**Comandos disponÃƒÂ­veis:**\n"
+        f"Ã¢â‚¬Â¢ `/status` Ã¢â‚¬â€ Estado da VPS\n"
+        f"Ã¢â‚¬Â¢ `/ram` Ã¢â‚¬â€ Uso de memÃƒÂ³ria\n"
+        f"Ã¢â‚¬Â¢ `/containers` Ã¢â‚¬â€ Containers ativos\n"
+        f"Ã¢â‚¬Â¢ `/health` Ã¢â‚¬â€ Health check completo\n"
+        f"Ã¢â‚¬Â¢ `/help` Ã¢â‚¬â€ Ajuda\n\n"
+        f"Ou basta enviar uma mensagem e eu proceso atravÃƒÂ©s do LangGraph!"
     )
 
 
 @authorized_only
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para mensagens gerais â€” usa LangGraph com tratamento de erro robusto."""
+    """Handler para mensagens gerais Ã¢â‚¬â€ usa LangGraph com tratamento de erro robusto."""
     user_id = str(update.effective_user.id)
     message = update.message.text
 
     logger.info("mensagem_recebida", user_id=user_id, message=message[:100])
 
     try:
-        # Processar atravÃ©s do LangGraph
+        # Processar atravÃƒÂ©s do LangGraph
         response = await process_message_async(user_id, message)
 
-        # Garantir que temos uma resposta vÃ¡lida
+        # Garantir que temos uma resposta vÃƒÂ¡lida
         if not response:
-            response = "Desculpe, nÃ£o consegui processar sua mensagem. Tente novamente."
+            response = "Desculpe, nÃƒÂ£o consegui processar sua mensagem. Tente novamente."
 
         await update.message.reply_text(response)
 
     except Exception as e:
         logger.error("erro_processamento_mensagem", user_id=user_id, error=str(e))
 
-        # Resposta de fallback amigÃ¡vel
+        # Resposta de fallback amigÃƒÂ¡vel
         fallback_response = (
-            "ðŸ¤– **VPS-Agent**\n\n"
+            "Ã°Å¸Â¤â€“ **VPS-Agent**\n\n"
             "Desculpe, ocorreu um erro ao processar sua mensagem.\n\n"
-            "VocÃª pode tentar:\n"
-            "â€¢ Enviar a mensagem novamente\n"
-            "â€¢ Usar comandos diretos como `/status` ou `/help`\n\n"
+            "VocÃƒÂª pode tentar:\n"
+            "Ã¢â‚¬Â¢ Enviar a mensagem novamente\n"
+            "Ã¢â‚¬Â¢ Usar comandos diretos como `/status` ou `/help`\n\n"
             f"_Erro: {str(e)[:100]}_"
         )
 
         try:
             await update.message.reply_text(fallback_response, parse_mode="Markdown")
         except Exception:
-            # Se atÃ© o fallback falhar, enviar sem markdown
+            # Se atÃƒÂ© o fallback falhar, enviar sem markdown
             await update.message.reply_text(
                 "Desculpe, ocorreu um erro. Tente novamente ou use /help."
             )
@@ -152,7 +152,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /status â€” usa grafo LangGraph."""
+    """Handler para /status Ã¢â‚¬â€ usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_status", user_id=user_id)
 
@@ -163,7 +163,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /ram â€” usa grafo LangGraph."""
+    """Handler para /ram Ã¢â‚¬â€ usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_ram", user_id=user_id)
 
@@ -174,7 +174,7 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /containers â€” usa grafo LangGraph."""
+    """Handler para /containers Ã¢â‚¬â€ usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_containers", user_id=user_id)
 
@@ -185,7 +185,7 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /health â€” usa grafo LangGraph."""
+    """Handler para /health Ã¢â‚¬â€ usa grafo LangGraph."""
     user_id = str(update.effective_user.id)
     logger.info("comando_health", user_id=user_id)
 
@@ -196,23 +196,24 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /help â€” ajuda."""
+    """Handler para /help Ã¢â‚¬â€ ajuda."""
     help_text = """
-ðŸ¤– **VPS-Agent v3 â€” Ajuda**
+**VPS-Agent v3 - Ajuda**
 
-**Comandos disponÃ­veis:**
-- `/start` â€” Iniciar conversa
-- `/status` â€” Estado geral da VPS
-- `/ram` â€” Uso de memÃ³ria por container
-- `/containers` â€” Lista de containers ativos
-- `/health` â€” Health check completo
-- `/proposals` â€” Lista proposals autonomas pendentes
-- `/proposal <id>` â€” Detalha uma proposal
-- `/approve <id>` â€” Aprova proposal autonoma
-- `/reject <id>` â€” Rejeita proposal autonoma
-- `/catalogsync [check|apply] [source]` â€” Sincroniza catalogo de skills
-- `/updatestatus` â€” Mostra status do updater automatico
-- `/help` â€” Esta ajuda
+**Comandos disponiveis:**
+- `/start` - Iniciar conversa
+- `/status` - Estado geral da VPS
+- `/ram` - Uso de memoria por container
+- `/containers` - Lista de containers ativos
+- `/health` - Health check completo
+- `/proposals` - Lista proposals autonomas pendentes
+- `/proposal <id>` - Detalha uma proposal
+- `/approve <id>` - Aprova proposal autonoma
+- `/reject <id>` - Rejeita proposal autonoma
+- `/catalogsync <cmd>` - check/apply/pin/unpin/rollback/provenance do catalogo
+- `/runtimes [list|enable|disable]` - Gerencia runtimes externos
+- `/updatestatus` - Mostra status do updater automatico
+- `/help` - Esta ajuda
 
 **Sobre:**
 Este bot controla o VPS-Agent, um agente autonomo com ReAct + function calling.
@@ -316,7 +317,7 @@ async def cmd_proposal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /approve <id> â€” aprova proposal."""
+    """Handler para /approve <id> Ã¢â‚¬â€ aprova proposal."""
     if not context.args:
         await update.message.reply_text("Uso: /approve <id>")
         return
@@ -352,7 +353,7 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /reject <id> â€” rejeita proposal."""
+    """Handler para /reject <id> Ã¢â‚¬â€ rejeita proposal."""
     if not context.args:
         await update.message.reply_text("Uso: /reject <id>")
         return
@@ -387,45 +388,201 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_catalogsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /catalogsync [check|apply] [source]."""
+    """Handler para /catalogsync commands."""
     from core.catalog import SkillsCatalogSyncEngine
-
-    mode = "check"
-    source = None
-
-    if context.args:
-        candidate = context.args[0].strip().lower()
-        if candidate in {"check", "apply"}:
-            mode = candidate
-            if len(context.args) > 1:
-                source = context.args[1].strip()
-        else:
-            source = context.args[0].strip()
-            if len(context.args) > 1 and context.args[1].strip().lower() in {"check", "apply"}:
-                mode = context.args[1].strip().lower()
 
     try:
         engine = SkillsCatalogSyncEngine()
-        result = await engine.sync(mode=mode, source_name=source)
-        if not result.get("success"):
+        args = [arg.strip() for arg in context.args] if context.args else []
+        command = args[0].lower() if args else "check"
+
+        if command in {"check", "apply"}:
+            source = args[1] if len(args) > 1 else None
+            result = await engine.sync(mode=command, source_name=source)
+            if not result.get("success"):
+                await update.message.reply_text(
+                    f"ERRO catalog sync falhou\n- mode: {command}\n- erro: {result.get('error', 'unknown')}"
+                )
+                return
+            text = (
+                "catalog sync\n"
+                f"- mode: {result.get('mode')}\n"
+                f"- source_count: {result.get('sources_checked', 0)}\n"
+                f"- skills_discovered: {result.get('skills_discovered', 0)}\n"
+                f"- changes: {result.get('changes_detected', 0)}\n"
+                f"- added: {result.get('added', 0)}\n"
+                f"- updated: {result.get('updated', 0)}\n"
+                f"- removed: {result.get('removed', 0)}\n"
+                f"- pinned_skipped: {result.get('pinned_skipped', 0)}"
+            )
+            await update.message.reply_text(text)
+            return
+
+        if command == "pin":
+            if len(args) < 2:
+                await update.message.reply_text(
+                    "Uso: /catalogsync pin <skill_name> [source_name] [version]"
+                )
+                return
+            skill_name = args[1]
+            source_name = args[2] if len(args) > 2 else None
+            version = args[3] if len(args) > 3 else None
+            result = await engine.pin(
+                skill_name=skill_name,
+                source_name=source_name,
+                version=version,
+                pinned_by=f"tg:{update.effective_user.id}",
+            )
+            if not result.get("success"):
+                await update.message.reply_text(
+                    f"ERRO pin falhou: {result.get('error', 'unknown_error')}"
+                )
+                return
             await update.message.reply_text(
-                f"❌ catalog sync falhou\n- mode: {mode}\n- erro: {result.get('error', 'unknown')}"
+                "pin aplicado\n"
+                f"- skill: {result.get('skill_name')}\n"
+                f"- source: {result.get('source_name')}\n"
+                f"- version: {result.get('pinned_version')}"
             )
             return
 
-        text = (
-            "📚 catalog sync\n"
-            f"- mode: {result.get('mode')}\n"
-            f"- source_count: {result.get('sources_checked', 0)}\n"
-            f"- skills_discovered: {result.get('skills_discovered', 0)}\n"
-            f"- changes: {result.get('changes_detected', 0)}\n"
-            f"- added: {result.get('added', 0)}\n"
-            f"- updated: {result.get('updated', 0)}\n"
-            f"- removed: {result.get('removed', 0)}"
+        if command == "unpin":
+            if len(args) < 2:
+                await update.message.reply_text(
+                    "Uso: /catalogsync unpin <skill_name> [source_name]"
+                )
+                return
+            skill_name = args[1]
+            source_name = args[2] if len(args) > 2 else None
+            result = await engine.unpin(skill_name=skill_name, source_name=source_name)
+            if not result.get("success"):
+                await update.message.reply_text(
+                    f"ERRO unpin falhou: {result.get('error', 'unknown_error')}"
+                )
+                return
+            await update.message.reply_text(f"unpin concluido (updated={result.get('updated', 0)})")
+            return
+
+        if command == "rollback":
+            if len(args) < 2:
+                await update.message.reply_text(
+                    "Uso: /catalogsync rollback <skill_name> [source_name] [target_version]"
+                )
+                return
+            skill_name = args[1]
+            source_name = args[2] if len(args) > 2 else None
+            target_version = args[3] if len(args) > 3 else None
+            result = await engine.rollback(
+                skill_name=skill_name,
+                source_name=source_name,
+                target_version=target_version,
+                actor=f"tg:{update.effective_user.id}",
+                reason="rollback via telegram",
+            )
+            if not result.get("success"):
+                await update.message.reply_text(
+                    f"ERRO rollback falhou: {result.get('error', 'unknown_error')}"
+                )
+                return
+            await update.message.reply_text(
+                "rollback concluido\n"
+                f"- skill: {result.get('skill_name')}\n"
+                f"- source: {result.get('source_name')}\n"
+                f"- version: {result.get('rolled_back_to_version')}"
+            )
+            return
+
+        if command == "provenance":
+            if len(args) < 2:
+                await update.message.reply_text(
+                    "Uso: /catalogsync provenance <skill_name> [source_name] [limit]"
+                )
+                return
+            skill_name = args[1]
+            source_name = args[2] if len(args) > 2 else None
+            limit = int(args[3]) if len(args) > 3 and args[3].isdigit() else 5
+            result = await engine.provenance(
+                skill_name=skill_name,
+                source_name=source_name,
+                limit=limit,
+            )
+            if not result.get("success"):
+                await update.message.reply_text(
+                    f"Erro provenance: {result.get('error', 'unknown_error')}"
+                )
+                return
+            current = result.get("current", {})
+            history = result.get("history", [])
+            lines = [
+                "provenance",
+                f"- skill: {current.get('skill_name')}",
+                f"- source: {current.get('source_name')}",
+                f"- current_version: {current.get('version')}",
+                f"- status: {current.get('status')}",
+                f"- pinned: {current.get('pinned', False)}",
+            ]
+            if current.get("pinned_version"):
+                lines.append(f"- pinned_version: {current.get('pinned_version')}")
+            if history:
+                lines.append("")
+                lines.append("history:")
+                for item in history[:limit]:
+                    lines.append(
+                        f"- {item.get('changed_at', '?')} | v{item.get('version')} | {item.get('change_type', item.get('status', '?'))}"
+                    )
+            await update.message.reply_text("\n".join(lines))
+            return
+
+        await update.message.reply_text(
+            "Uso: /catalogsync [check|apply|pin|unpin|rollback|provenance] ..."
         )
-        await update.message.reply_text(text)
     except Exception as e:
         logger.error("cmd_catalogsync_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
+async def cmd_runtimes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /runtimes [list|enable|disable] [protocol]."""
+    from core.orchestration import RuntimeControl, reset_runtime_router_for_tests
+
+    args = [arg.strip().lower() for arg in context.args] if context.args else []
+    command = args[0] if args else "list"
+
+    try:
+        control = RuntimeControl()
+        if command == "list":
+            states = control.list_states()
+            lines = ["Runtime status:"]
+            for state in states:
+                endpoint = state.endpoint or "-"
+                lines.append(
+                    f"- {state.protocol}: {'enabled' if state.enabled else 'disabled'} "
+                    f"(source={state.source}, default={state.default_enabled}, endpoint={endpoint})"
+                )
+            await update.message.reply_text("\n".join(lines))
+            return
+
+        if command in {"enable", "disable"}:
+            if len(args) < 2:
+                await update.message.reply_text("Uso: /runtimes [enable|disable] <protocol>")
+                return
+            protocol = args[1]
+            result = control.set_enabled(protocol, command == "enable")
+            if not result.get("success"):
+                await update.message.reply_text(
+                    f"Erro runtime update: {result.get('error', 'unknown_error')}"
+                )
+                return
+            reset_runtime_router_for_tests()
+            await update.message.reply_text(
+                f"Runtime '{result.get('protocol')}' -> {'enabled' if result.get('enabled') else 'disabled'}"
+            )
+            return
+
+        await update.message.reply_text("Uso: /runtimes [list|enable|disable] [protocol]")
+    except Exception as e:
+        logger.error("cmd_runtimes_error", error=str(e))
         await update.message.reply_text(f"Erro: {str(e)[:100]}")
 
 
@@ -519,7 +676,7 @@ async def send_notification(message: str):
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para erros â€” envia para Telegram e log local."""
+    """Handler para erros Ã¢â‚¬â€ envia para Telegram e log local."""
     error_msg = str(context.error)
 
     # Log local
@@ -542,12 +699,12 @@ def main():
     app = (
         Application.builder()
         .token(TOKEN)
-        .connect_timeout(30.0)  # Timeout de conexÃ£o
+        .connect_timeout(30.0)  # Timeout de conexÃƒÂ£o
         .read_timeout(30.0)  # Timeout de leitura
         .write_timeout(30.0)  # Timeout de escrita
-        .pool_timeout(30.0)  # Timeout do pool de conexÃµes
-        .concurrent_updates(10)  # AtualizaÃ§Ãµes simultÃ¢neas
-        .connection_pool_size(20)  # Tamanho do pool de conexÃµes
+        .pool_timeout(30.0)  # Timeout do pool de conexÃƒÂµes
+        .concurrent_updates(10)  # AtualizaÃƒÂ§ÃƒÂµes simultÃƒÂ¢neas
+        .connection_pool_size(20)  # Tamanho do pool de conexÃƒÂµes
         .build()
     )
 
@@ -563,6 +720,7 @@ def main():
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("catalogsync", cmd_catalogsync))
+    app.add_handler(CommandHandler("runtimes", cmd_runtimes))
     app.add_handler(CommandHandler("updatestatus", cmd_updatestatus))
 
     # Handler para mensagens gerais (LangGraph)

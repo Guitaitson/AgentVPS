@@ -13,7 +13,7 @@ Last updated: 2026-03-08
 
 - Canonical branch on GitHub: `origin/main`
 - Current `origin/main` tip at review time: `27c1d69` (2026-03-08 sync)
-- Current worktree branch: `claude/vigorous-elbakyan`
+- Current worktree branch: `claude/pr2-runtime-gate`
 - Local worktree contains additional uncommitted changes (tracked + untracked)
 
 ## Master Plan Status (Strict 100% Gate)
@@ -25,13 +25,15 @@ Last updated: 2026-03-08
 - Memory audit trail
 - Versioned soul identity with proposal/approval flow and challenge mode
 - Runtime adapter layer (local + MCP + A2A + ACP + DeepAgents + OpenClaw)
+- Runtime adapter control plane (`/runtimes list|enable|disable`) with persisted overrides
 - Skills catalog sync engine + updater agent + autonomous trigger integration
+- Catalog operations: pin, unpin, rollback, provenance (DB + fallback file)
 - Real semantic memory integration with Qdrant in runtime path (save + recall)
 - Regression coverage for delegated runtime and semantic memory paths
 
 Validation at review time:
 - `python -m ruff check .` -> OK
-- `python -m pytest -q` -> 211 passed, 2 skipped
+- `python -m pytest -q` -> 218 passed, 2 skipped
 
 ## Decision Gate for Next Features
 
