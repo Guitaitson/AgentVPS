@@ -1,4 +1,4 @@
-﻿"""
+"""
 ConfiguraÃ§Ãµes Centralizadas - Pydantic Settings v2
 
 Este mÃ³dulo centraliza todas as configuraÃ§Ãµes do projeto usando Pydantic Settings.

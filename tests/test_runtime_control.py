@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from core.config import get_settings
 from core.orchestration.runtime_control import RuntimeControl

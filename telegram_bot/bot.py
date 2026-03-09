@@ -1,4 +1,4 @@
-﻿"""
+"""
 VPS-Agent Telegram Bot Ã¢â‚¬â€ Interface principal
 VersÃƒÂ£o: 2.0 Ã¢â‚¬â€ Com LangGraph e timeout otimizado
 """
@@ -448,7 +448,9 @@ async def cmd_catalogsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if command == "unpin":
             if len(args) < 2:
-                await update.message.reply_text("Uso: /catalogsync unpin <skill_name> [source_name]")
+                await update.message.reply_text(
+                    "Uso: /catalogsync unpin <skill_name> [source_name]"
+                )
                 return
             skill_name = args[1]
             source_name = args[2] if len(args) > 2 else None
@@ -732,4 +734,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

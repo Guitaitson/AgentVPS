@@ -1,4 +1,4 @@
-﻿"""
+"""
 Skill: skills_catalog_sync
 
 Runs check/apply sync for external skill catalog sources and supports pin/rollback/provenance.

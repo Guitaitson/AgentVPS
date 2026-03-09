@@ -252,7 +252,9 @@ class SkillsCatalogSyncEngine:
             pins = self._load_pins_from_file()
             keys = [key for key in pins if key.startswith(f"{skill_name}:")]
             if source_name:
-                keys = [f"{skill_name}:{source_name}"] if f"{skill_name}:{source_name}" in pins else []
+                keys = (
+                    [f"{skill_name}:{source_name}"] if f"{skill_name}:{source_name}" in pins else []
+                )
             for key in keys:
                 pins.pop(key, None)
             self._save_pins_to_file(pins)
@@ -320,7 +322,9 @@ class SkillsCatalogSyncEngine:
                 "history": [self._serialize_catalog_row(row) for row in history],
             }
         except Exception:
-            return self._provenance_from_files(skill_name=skill_name, source_name=source_name, limit=limit)
+            return self._provenance_from_files(
+                skill_name=skill_name, source_name=source_name, limit=limit
+            )
 
     async def rollback(
         self,
@@ -654,7 +658,11 @@ class SkillsCatalogSyncEngine:
                 changed_keys.append(key)
                 continue
             pinned_version = existing[key].get("pinned_version")
-            if existing[key].get("pinned") and pinned_version and item.get("version") != pinned_version:
+            if (
+                existing[key].get("pinned")
+                and pinned_version
+                and item.get("version") != pinned_version
+            ):
                 pinned_skipped += 1
                 continue
             if existing[key].get("schema_hash") != item.get("schema_hash"):
@@ -871,7 +879,9 @@ class SkillsCatalogSyncEngine:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(payload, dict):
-                return {str(key): value for key, value in payload.items() if isinstance(value, dict)}
+                return {
+                    str(key): value for key, value in payload.items() if isinstance(value, dict)
+                }
             return {}
         except Exception:
             return {}
@@ -1012,7 +1022,9 @@ class SkillsCatalogSyncEngine:
                 return {"success": False, "error": "rollback candidate not found in history"}
 
             catalog = self._load_existing_from_file()
-            key = self._catalog_key(candidate.get("skill_name", ""), candidate.get("source_name", ""))
+            key = self._catalog_key(
+                candidate.get("skill_name", ""), candidate.get("source_name", "")
+            )
             if key == ":":
                 return {"success": False, "error": "invalid candidate key"}
             catalog[key] = candidate
