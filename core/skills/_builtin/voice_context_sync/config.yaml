@@ -1,0 +1,34 @@
+name: voice_context_sync
+description: "Processa inbox de audio, mostra status e comita itens de memoria derivados da captura por voz."
+version: "1.0.0"
+security_level: moderate
+triggers:
+  - contextsync
+  - context status
+  - voice context
+  - processar audio
+  - sincronizar contexto
+parameters_schema:
+  mode:
+    type: string
+    description: "sync, status, commit_review_item ou reject_review_item"
+    required: false
+  item_id:
+    type: integer
+    description: "ID do item de contexto por voz"
+    required: false
+  source:
+    type: string
+    description: "Origem operacional do sync"
+    required: false
+  note:
+    type: string
+    description: "Nota para rejeicao ou auditoria"
+    required: false
+  actor:
+    type: string
+    description: "Ator que executou a acao"
+    required: false
+max_output_chars: 2200
+timeout_seconds: 120
+enabled: true

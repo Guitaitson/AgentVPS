@@ -1,5 +1,5 @@
 name: execute_scheduled
-description: "Executa payload de tarefa agendada (notify, catalog_sync_apply, approve_update_proposals)."
+description: "Executa payload de tarefa agendada (notify, catalog_sync_apply, approve_update_proposals, voice_context_sync)."
 version: "1.0.0"
 security_level: moderate
 triggers:
@@ -26,4 +26,5 @@ parameters_schema:
 max_output_chars: 3000
 timeout_seconds: 60
 enabled: true
+
 

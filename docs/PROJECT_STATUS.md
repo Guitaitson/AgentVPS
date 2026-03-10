@@ -1,6 +1,6 @@
 # Project Status - Source of Truth
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ## Canonical Read Order
 
@@ -48,3 +48,17 @@ Strict gate remains complete. FleetIntel/BrazilCNPJ integration cycle is now in 
 - `.kilocode/rules/memory-bank/brief.md` is now aligned with this file.
 - `.kilocode/rules/memory-bank/deployment-tracker.md` remains detailed tracker context.
 - `archive/plans/deployment-tracker.md` is historical and must not be used as current status.
+
+## Voice Context Capture Status
+
+Implemented locally:
+- `core/voice_context/` with ingestion, deduplication, extraction, review flow and memory commit.
+- New skill `voice_context_sync`.
+- Telegram commands `/contextsync` and `/contextstatus`.
+- Autonomous trigger `voice_context_batch` + transcript cleanup integration.
+- New schema and migration: `configs/migration-voice-context.sql`.
+- Windows companion under `desktop_companion/windows/` for removable-device import and `scp` upload.
+
+Validation in this cycle:
+- `python -m pytest -q tests/test_voice_context.py tests/test_voice_context_skill.py tests/test_execute_scheduled_skill.py` -> passed
+- Full-suite validation pending after final lint/docs sweep.

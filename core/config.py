@@ -215,6 +215,78 @@ class CatalogSettings(BaseSettings):
     )
 
 
+class VoiceContextSettings(BaseSettings):
+    """Configuracoes da captura de contexto por voz."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="VOICE_CONTEXT_",
+        env_file=ENV_FILE_CANDIDATES,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    enabled: bool = Field(default=True, description="Habilita ingestao de contexto por voz")
+    user_id: Optional[str] = Field(
+        default=None,
+        description="User id alvo para memoria derivada dos audios",
+    )
+    inbox_dir: str = Field(
+        default="/opt/vps-agent/data/voice/inbox",
+        description="Diretorio de inbox para audios brutos",
+    )
+    processing_dir: str = Field(
+        default="/opt/vps-agent/data/voice/processing",
+        description="Diretorio temporario de processamento",
+    )
+    archive_dir: str = Field(
+        default="/opt/vps-agent/data/voice/archive",
+        description="Diretorio de arquivamento de audios processados",
+    )
+    failed_dir: str = Field(
+        default="/opt/vps-agent/data/voice/failed",
+        description="Diretorio para arquivos com falha",
+    )
+    transcripts_dir: str = Field(
+        default="/opt/vps-agent/data/voice/transcripts",
+        description="Diretorio para transcripts operacionais de curta retencao",
+    )
+    batch_hour: int = Field(default=2, description="Hora local para lote diario automatico")
+    auto_commit_threshold: float = Field(
+        default=0.75,
+        description="Confianca minima para auto-commit de baixo risco",
+    )
+    transcript_ttl_days: int = Field(
+        default=7,
+        description="Retencao operacional de transcripts brutos",
+    )
+    max_files_per_run: int = Field(
+        default=12,
+        description="Limite de arquivos processados por rodada",
+    )
+    file_extensions: str = Field(
+        default=".mp3,.wav,.ogg,.m4a,.flac,.aac,.mp4",
+        description="Extensoes aceitas na inbox, separadas por virgula",
+    )
+    extract_with_llm: bool = Field(
+        default=True,
+        description="Tenta usar LLM para extracao estruturada antes do fallback heuristico",
+    )
+    create_daily_summary: bool = Field(
+        default=True,
+        description="Gera item de resumo diario na memoria episodica",
+    )
+    whisper_model_size: str = Field(
+        default="tiny",
+        validation_alias="WHISPER_MODEL_SIZE",
+        description="Modelo faster-whisper usado localmente",
+    )
+    whisper_device: str = Field(
+        default="cpu",
+        validation_alias="WHISPER_DEVICE",
+        description="Dispositivo usado na transcricao local",
+    )
+
+
 class AppSettings(BaseSettings):
     """
     ConfiguraÃ§Ãµes principais da aplicaÃ§Ã£o.
@@ -237,6 +309,7 @@ class AppSettings(BaseSettings):
     orchestration: OrchestrationSettings = Field(default_factory=OrchestrationSettings)
     identity: IdentitySettings = Field(default_factory=IdentitySettings)
     catalog: CatalogSettings = Field(default_factory=CatalogSettings)
+    voice_context: VoiceContextSettings = Field(default_factory=VoiceContextSettings)
 
     # ConfiguraÃ§Ãµes gerais
     env: str = Field(default="production", description="Ambiente (production/development)")
@@ -268,6 +341,7 @@ __all__ = [
     "OrchestrationSettings",
     "IdentitySettings",
     "CatalogSettings",
+    "VoiceContextSettings",
     "get_settings",
     "settings",
 ]

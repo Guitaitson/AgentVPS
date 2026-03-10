@@ -103,6 +103,18 @@ OPENROUTER_TEMPERATURE=0.7
 MCP_HOST=127.0.0.1
 MCP_PORT=8765
 MCP_API_KEY=troque-por-uma-chave-forte
+VOICE_CONTEXT_ENABLED=true
+VOICE_CONTEXT_USER_ID=seu-id-telegram
+VOICE_CONTEXT_INBOX_DIR=/opt/vps-agent/data/voice/inbox
+VOICE_CONTEXT_PROCESSING_DIR=/opt/vps-agent/data/voice/processing
+VOICE_CONTEXT_ARCHIVE_DIR=/opt/vps-agent/data/voice/archive
+VOICE_CONTEXT_FAILED_DIR=/opt/vps-agent/data/voice/failed
+VOICE_CONTEXT_TRANSCRIPTS_DIR=/opt/vps-agent/data/voice/transcripts
+VOICE_CONTEXT_BATCH_HOUR=2
+VOICE_CONTEXT_AUTO_COMMIT_THRESHOLD=0.75
+VOICE_CONTEXT_TRANSCRIPT_TTL_DAYS=7
+WHISPER_MODEL_SIZE=tiny
+WHISPER_DEVICE=cpu
 ```
 
 ---
@@ -138,6 +150,10 @@ docker exec -i vps-postgres psql -U vps_agent -d vps_agent \
 # Migration: catÃ¡logo de skills externos
 docker exec -i vps-postgres psql -U vps_agent -d vps_agent \
   < /opt/vps-agent/configs/migration-skills-catalog.sql
+
+# Migration: voice context capture
+docker exec -i vps-postgres psql -U vps_agent -d vps_agent \\
+  < /opt/vps-agent/configs/migration-voice-context.sql
 
 # Verificar tabelas criadas
 docker exec vps-postgres psql -U vps_agent -d vps_agent \
@@ -228,6 +244,8 @@ Comandos uteis no Telegram:
 - `/catalogsync rollback <skill> [source] [target_version]` - rollback para versao anterior
 - `/catalogsync provenance <skill> [source] [limit]` - historico de versoes e origem
 - `/runtimes [list|enable|disable]` - gerencia runtimes externos
+- `/contextsync` - processa audios pendentes da inbox de voz
+- `/contextstatus` - mostra ultimo job, inbox e revisoes pendentes
 - `/updatestatus` - status do updater autonomo e ultimo sync
 - `/proposals` e `/proposal <id>` - inspeciona proposals de update
 
@@ -355,3 +373,33 @@ Para habilitar as skills externas em producao:
 O catalogo padrao usa um snapshot real versionado do repo `https://github.com/Guitaitson/fleetintel-mcp`.
 Para sync vivo via GitHub API em repositorio privado, habilite a fonte `fleetintel_skillpack_repo` e configure `CATALOG_GITHUB_TOKEN`.
 
+
+## Captura de Contexto por Voz
+
+### Dependencias opcionais de transcricao
+
+```bash
+cd /opt/vps-agent
+/opt/vps-agent/core/venv/bin/pip install -e ".[voice]"
+```
+
+### Diretórios operacionais
+
+```bash
+mkdir -p /opt/vps-agent/data/voice/inbox \
+         /opt/vps-agent/data/voice/processing \
+         /opt/vps-agent/data/voice/archive \
+         /opt/vps-agent/data/voice/failed \
+         /opt/vps-agent/data/voice/transcripts
+chown -R vps_agent:vps_agent /opt/vps-agent/data/voice
+```
+
+### Companion Windows
+
+Use `desktop_companion/windows/voice_device_watcher.ps1` no desktop local para detectar o gravador, confirmar envio e publicar os arquivos novos via `scp` para a inbox da VPS.
+
+Fluxo operacional:
+1. conectar o dispositivo
+2. confirmar envio no popup local
+3. validar chegada com `/contextstatus`
+4. processar imediatamente com `/contextsync` ou aguardar o lote automatico

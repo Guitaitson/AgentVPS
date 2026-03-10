@@ -1,0 +1,10 @@
+{
+  "volumeLabel": "VOICE_RECORDER",
+  "importPath": "",
+  "extensions": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
+  "stagingDir": "C:\\Users\\Pc Gamer\\AppData\\Local\\AgentVPS\\voice-staging",
+  "sshTarget": "user@your-vps-host",
+  "sshKeyPath": "",
+  "remoteInboxDir": "/opt/vps-agent/data/voice/inbox",
+  "pollSeconds": 15
+}

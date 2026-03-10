@@ -79,7 +79,7 @@ END
 | Base | `core/skills/base.py` | `SkillBase` — interface que todas as skills implementam |
 | Tool Schemas | `registry.list_tool_schemas()` | JSON Schema para function calling |
 
-**Skills disponíveis (18):**
+**Skills disponiveis (19):**
 
 | Skill | Nível | Descrição |
 |-------|-------|-----------|
@@ -100,7 +100,8 @@ END
 | `log_reader` | safe | Leitura de logs da VPS |
 | `openclaw_exec` | dangerous | Controla OpenClaw via docker exec |
 | `skills_catalog_sync` | moderate | Sync/pin/rollback/provenance do catalogo externo |
-| `execute_scheduled` | dangerous | Executa acoes agendadas e janelas de manutencao |
+| `voice_context_sync` | moderate | Processa inbox de audio, mostra status e comita itens aprovados da captura de voz |
+| `execute_scheduled` | dangerous | Executa acoes agendadas, incluindo context sync de voz |
 
 Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (`on-dangerous`).
 
@@ -287,3 +288,20 @@ Schema: `configs/init-db.sql` + `configs/migration-autonomous.sql`
 | PostgreSQL | container `vps-postgres` (172.28.x.x) |
 | Redis | container `vps-redis` (172.28.x.x) |
 | Logs | `/opt/vps-agent/logs/telegram-bot.log` |
+
+### 5.5 Voice Context Capture (Phase 2)
+
+| Componente | Localizacao | Descricao |
+|---|---|---|
+| Voice Service | `core/voice_context/service.py` | Ingestao da inbox, deduplicacao, propostas de review e commit na memoria |
+| Extractor | `core/voice_context/extraction.py` | Extracao estruturada (`summary`, `episodes`, `facts`, `preferences`, `commitments`) |
+| Transcriber | `core/voice_context/transcription.py` | Transcricao local com `faster-whisper` + `ffmpeg`/`ffprobe` quando disponiveis |
+| Skill Operacional | `core/skills/_builtin/voice_context_sync/` | `sync`, `status`, `commit_review_item`, `reject_review_item` |
+| Telegram | `telegram_bot/bot.py` | `/contextsync` e `/contextstatus` |
+| Scheduler | `core/autonomous/engine.py` (`voice_context_batch`) | Lote diario automatico e limpeza de transcripts |
+| Tabelas | `voice_ingestion_jobs`, `voice_audio_files`, `voice_context_items` | Estado operacional, arquivos, itens extraidos e ligacao logica com proposals |
+
+Politica de commit adotada:
+- `episodic` e `semantic` de baixo risco com confianca >= threshold entram direto.
+- `profile`, `goals` ou dominios sensiveis (`saude_energia`, `financas`, `relacionamentos`, `valores_proposito`) viram proposal `voice_memory_commit`.
+- Transcript bruto e artefato operacional curto; memoria duravel fica somente nos itens estruturados.

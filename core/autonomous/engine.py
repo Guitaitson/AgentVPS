@@ -494,11 +494,13 @@ def get_autonomous_loop() -> AutonomousLoop:
         # Trigger 2: Memory Cleanup
         async def memory_cleanup_action(engine: AutonomousLoop):
             try:
+                from core.voice_context import VoiceContextService
                 from core.vps_langgraph.memory import AgentMemory
 
                 memory = AgentMemory()
                 expired_deleted = memory.cleanup_expired_typed_memory()
                 audit_deleted = memory.cleanup_old_audit_events(older_than_days=90)
+                transcript_deleted = VoiceContextService().cleanup_expired_transcripts()
 
                 conn = engine._get_conn()
                 cur = conn.cursor()
@@ -515,11 +517,13 @@ def get_autonomous_loop() -> AutonomousLoop:
                         conversation_deleted=deleted,
                         expired_typed_deleted=expired_deleted,
                         audit_deleted=audit_deleted,
+                        transcript_deleted=transcript_deleted,
                     )
                 return {
                     "conversation_deleted": deleted,
                     "expired_typed_deleted": expired_deleted,
                     "audit_deleted": audit_deleted,
+                    "transcript_deleted": transcript_deleted,
                 }
             except Exception as e:
                 logger.error("memory_cleanup_error", error=str(e))
@@ -959,6 +963,59 @@ def get_autonomous_loop() -> AutonomousLoop:
                 action=catalog_sync_action,
                 interval=catalog_interval,
                 enabled=bool(catalog_cfg.enabled),
+            )
+        )
+
+        # Trigger 9: Voice context inbox batch
+        voice_cfg = settings.voice_context
+
+        async def voice_context_action(engine: AutonomousLoop):
+            try:
+                from datetime import datetime
+
+                service = __import__(
+                    "core.voice_context", fromlist=["VoiceContextService"]
+                ).VoiceContextService()
+                result = await service.sync_inbox(source="daily_batch")
+                if result.get("success"):
+                    engine._redis.set(
+                        "voice_context:last_batch_date", datetime.utcnow().date().isoformat()
+                    )
+                engine._redis.setex(
+                    "voice_context:last_summary",
+                    60 * 60 * 24,
+                    json.dumps(result),
+                )
+                return result
+            except Exception as exc:
+                logger.error("voice_context_trigger_error", error=str(exc))
+                return {"success": False, "error": str(exc)}
+
+        def voice_context_condition() -> bool:
+            from datetime import datetime
+
+            if not bool(voice_cfg.enabled):
+                return False
+            try:
+                service = __import__(
+                    "core.voice_context",
+                    fromlist=["VoiceContextService"],
+                ).VoiceContextService()
+                last_run_date = _autonomous_loop._redis.get("voice_context:last_batch_date")
+                return service.should_run_daily_batch(
+                    now=datetime.now(),
+                    last_run_date=last_run_date,
+                )
+            except Exception:
+                return False
+
+        _autonomous_loop.register_trigger(
+            Trigger(
+                name="voice_context_batch",
+                condition=voice_context_condition,
+                action=voice_context_action,
+                interval=300,
+                enabled=bool(voice_cfg.enabled),
             )
         )
 
