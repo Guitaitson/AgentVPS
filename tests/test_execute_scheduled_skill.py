@@ -58,3 +58,26 @@ async def test_execute_scheduled_rejects_unknown_action():
 
     with pytest.raises(ValueError):
         await skill._run_payload_action({"action": "not_supported"})
+
+
+@pytest.mark.asyncio
+async def test_execute_scheduled_voice_context_sync(monkeypatch):
+    skill = _skill()
+
+    class FakeService:
+        async def sync_inbox(self, source="scheduled"):
+            return {
+                "success": True,
+                "processed_files": 1,
+                "auto_committed": 2,
+                "pending_review": 1,
+            }
+
+    monkeypatch.setattr(
+        "core.voice_context.VoiceContextService",
+        lambda: FakeService(),
+    )
+
+    output = await skill._run_payload_action({"action": "voice_context_sync"})
+
+    assert "voice context sync done" in output

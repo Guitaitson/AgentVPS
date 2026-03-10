@@ -212,6 +212,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - `/reject <id>` - Rejeita proposal autonoma
 - `/catalogsync <cmd>` - check/apply/pin/unpin/rollback/provenance do catalogo
 - `/runtimes [list|enable|disable]` - Gerencia runtimes externos
+- `/contextsync` - Processa audios pendentes na inbox de voz
+- `/contextstatus` - Mostra status da captura de contexto por voz
 - `/updatestatus` - Mostra status do updater automatico
 - `/help` - Esta ajuda
 
@@ -337,6 +339,16 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         if affected:
+            try:
+                from core.voice_context import VoiceContextService
+
+                VoiceContextService().sync_proposal_state(
+                    proposal_id=proposal_id,
+                    decision="approved",
+                    actor=f"tg:{update.effective_user.id}",
+                )
+            except Exception as sync_exc:
+                logger.error("cmd_approve_voice_sync_error", error=str(sync_exc))
             await update.message.reply_text(
                 f"Proposal #{proposal_id} aprovada. Sera executada no proximo ciclo."
             )
@@ -374,6 +386,16 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         if affected:
+            try:
+                from core.voice_context import VoiceContextService
+
+                VoiceContextService().sync_proposal_state(
+                    proposal_id=proposal_id,
+                    decision="rejected",
+                    actor=f"tg:{update.effective_user.id}",
+                )
+            except Exception as sync_exc:
+                logger.error("cmd_reject_voice_sync_error", error=str(sync_exc))
             await update.message.reply_text(f"Proposal #{proposal_id} rejeitada.")
         else:
             await update.message.reply_text(
@@ -587,6 +609,72 @@ async def cmd_runtimes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @authorized_only
+async def cmd_contextsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /contextsync - processa inbox de audios pendentes."""
+    try:
+        from core.voice_context import VoiceContextService
+
+        result = await VoiceContextService().sync_inbox(
+            source=f"telegram:{update.effective_user.id}"
+        )
+        if not result.get("success"):
+            await update.message.reply_text(
+                f"Erro context sync: {result.get('error', 'unknown_error')}"
+            )
+            return
+        await update.message.reply_text(
+            "voice context sync\n"
+            f"- status: {result.get('status', 'ok')}\n"
+            f"- processed_files: {result.get('processed_files', 0)}\n"
+            f"- duplicates_skipped: {result.get('duplicates_skipped', 0)}\n"
+            f"- failed_files: {result.get('failed_files', 0)}\n"
+            f"- context_items: {result.get('context_items', 0)}\n"
+            f"- auto_committed: {result.get('auto_committed', 0)}\n"
+            f"- pending_review: {result.get('pending_review', 0)}"
+        )
+    except Exception as e:
+        logger.error("cmd_contextsync_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
+async def cmd_contextstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /contextstatus - status do pipeline de voz."""
+    try:
+        from core.voice_context import VoiceContextService
+
+        result = VoiceContextService().get_status()
+        last_job = result.get("last_job") or {}
+        stats = last_job.get("stats") or {}
+        lines = [
+            "voice context status",
+            f"- inbox_files: {result.get('inbox_files', 0)}",
+            f"- pending_review: {result.get('pending_review', 0)}",
+            f"- approved_review: {result.get('approved_review', 0)}",
+            f"- committed_items: {result.get('committed_items', 0)}",
+            f"- rejected_items: {result.get('rejected_items', 0)}",
+        ]
+        if last_job:
+            lines.extend(
+                [
+                    "",
+                    "last_job:",
+                    f"- id: {last_job.get('id')}",
+                    f"- source: {last_job.get('source')}",
+                    f"- batch_date: {last_job.get('batch_date')}",
+                    f"- status: {last_job.get('status')}",
+                    f"- processed_files: {stats.get('processed_files', 0)}",
+                    f"- auto_committed: {stats.get('auto_committed', 0)}",
+                    f"- pending_review: {stats.get('pending_review', 0)}",
+                ]
+            )
+        await update.message.reply_text("\n".join(lines))
+    except Exception as e:
+        logger.error("cmd_contextstatus_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
 async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler para /updatestatus - status do updater autonomo."""
     try:
@@ -721,6 +809,8 @@ def main():
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("catalogsync", cmd_catalogsync))
     app.add_handler(CommandHandler("runtimes", cmd_runtimes))
+    app.add_handler(CommandHandler("contextsync", cmd_contextsync))
+    app.add_handler(CommandHandler("contextstatus", cmd_contextstatus))
     app.add_handler(CommandHandler("updatestatus", cmd_updatestatus))
 
     # Handler para mensagens gerais (LangGraph)

@@ -50,7 +50,7 @@ START → load_context → react → security_check → execute → format_respo
 
 ---
 
-## Skills Disponiveis (18)
+## Skills Disponiveis (19)
 
 | Skill | Descrição | Nível |
 |-------|-----------|-------|
@@ -71,7 +71,8 @@ START → load_context → react → security_check → execute → format_respo
 | `log_reader` | Lê logs da VPS | safe |
 | `openclaw_exec` | Controla OpenClaw via docker exec | dangerous |
 | `skills_catalog_sync` | Sync/pin/rollback/provenance do catalogo externo | normal |
-| `execute_scheduled` | Executa acoes agendadas (notify/catalog apply) | dangerous |
+| `voice_context_sync` | Processa inbox de audio, mostra status e comita contexto de voz | normal |
+| `execute_scheduled` | Executa acoes agendadas (notify/catalog apply/context sync) | dangerous |
 
 Skills com `dangerous` requerem aprovação humana (configurável via `on-dangerous`).
 
@@ -122,6 +123,8 @@ docker compose -f configs/docker-compose.core.yml up -d
 ```bash
 python3 -m venv /opt/vps-agent/core/venv
 /opt/vps-agent/core/venv/bin/pip install -e ".[dev]"
+# se for habilitar transcricao local de audio na VPS:
+/opt/vps-agent/core/venv/bin/pip install -e ".[voice]"
 ```
 
 ### 5. Aplicar Schema do Banco
@@ -129,6 +132,7 @@ python3 -m venv /opt/vps-agent/core/venv
 ```bash
 docker exec -i vps-postgres psql -U vps_agent -d vps_agent < configs/init-db.sql
 docker exec -i vps-postgres psql -U vps_agent -d vps_agent < configs/migration-autonomous.sql
+docker exec -i vps-postgres psql -U vps_agent -d vps_agent < configs/migration-voice-context.sql
 ```
 
 ### 6. Instalar e Iniciar Serviços Systemd
@@ -209,6 +213,13 @@ BRAZILCNPJ_MCP_TOKEN=...      # Token do BrazilCNPJ MCP
 
 ---
 
+## Captura de Contexto por Voz
+
+- Inbox operacional na VPS: `/opt/vps-agent/data/voice/inbox`
+- Processamento: transcricao local opcional com `faster-whisper` via extra `.[voice]`
+- Memoria derivada: `episodic`, `semantic`, `profile`, `goals` com auto-commit de baixo risco e proposals para itens sensiveis
+- Companion Windows: `desktop_companion/windows/voice_device_watcher.ps1` para detectar o gravador e enviar os arquivos via `scp`
+
 ## Comandos Telegram
 
 | Comando | Descrição |
@@ -220,6 +231,8 @@ BRAZILCNPJ_MCP_TOKEN=...      # Token do BrazilCNPJ MCP
 | `/reject <id>` | Rejeitar proposal |
 | `/catalogsync <cmd>` | check/apply/pin/unpin/rollback/provenance do catalogo |
 | `/runtimes [list|enable|disable]` | Gerenciar runtime adapters externos |
+| `/contextsync` | Processar audios pendentes na inbox de voz |
+| `/contextstatus` | Ver status do pipeline de voz, inbox e revisoes |
 | `/updatestatus` | Status do updater e ultimo catalog sync |
 
 ---
@@ -252,3 +265,4 @@ BRAZILCNPJ_MCP_TOKEN=...      # Token do BrazilCNPJ MCP
 ## Licença
 
 MIT — see [LICENSE](LICENSE).
+

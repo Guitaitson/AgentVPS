@@ -178,18 +178,21 @@ class AudioCapabilities:
         Returns:
             Transcrição do áudio
         """
-        # Aqui você pode integrar com:
-        # - Whisper (OpenAI)
-        # - Whisper local
-        # - Google Cloud Speech-to-Text
-        # - AssemblyAI
+        try:
+            from core.voice_context import WhisperTranscriber
 
-        # Por enquanto, retorna mensagem informativa
-        return (
-            "Transcrição de áudio não disponível. "
-            "Configure uma API de speech-to-text (Whisper, Google Cloud, etc) "
-            "para habilitar esta funcionalidade."
-        )
+            result = WhisperTranscriber().transcribe_bytes(
+                audio_data,
+                language=language.split("-")[0].lower(),
+            )
+            if result.text.strip():
+                return result.text.strip()
+            return "Nenhum texto detectado no audio."
+        except Exception as exc:
+            return (
+                "Transcricao de audio indisponivel no momento. "
+                f"Detalhe operacional: {str(exc)[:120]}"
+            )
 
     def get_audio_info(self, audio_data: bytes) -> Dict[str, Any]:
         """

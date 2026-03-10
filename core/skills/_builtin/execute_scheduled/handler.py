@@ -65,6 +65,20 @@ class ExecuteScheduledSkill(SkillBase):
             approved = self._approve_update_proposals(limit=limit, include_manual=include_manual)
             return f"approved {approved} update proposal(s)"
 
+        if action == "voice_context_sync":
+            from core.voice_context import VoiceContextService
+
+            result = await VoiceContextService().sync_inbox(
+                source=str(payload.get("source", "scheduled"))
+            )
+            if not result.get("success"):
+                raise RuntimeError(result.get("error", "voice context sync failed"))
+            return (
+                f"voice context sync done (processed={result.get('processed_files', 0)}, "
+                f"auto_committed={result.get('auto_committed', 0)}, "
+                f"pending_review={result.get('pending_review', 0)})"
+            )
+
         raise ValueError(f"unsupported scheduled action: {action or 'empty'}")
 
     @staticmethod

@@ -51,3 +51,6 @@ sse-starlette>=2.0.0
 Pillow>=10.0.0
 PyPDF2>=3.0.0
 python-docx>=1.0.0
+
+# Optional voice context transcription
+# Install via `pip install -e ".[voice]"` when enabling local Whisper.
