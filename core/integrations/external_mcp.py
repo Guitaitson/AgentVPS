@@ -68,10 +68,7 @@ class RemoteMCPClient:
             )
             init_response.raise_for_status()
             session_id = init_response.headers.get("mcp-session-id")
-            if not session_id:
-                raise RuntimeError(f"{self.server_name} MCP did not return mcp-session-id")
-
-            tool_headers = {**headers, "mcp-session-id": session_id}
+            tool_headers = {**headers, "mcp-session-id": session_id} if session_id else headers
             tool_response = await client.post(
                 self.base_url, json=tool_payload, headers=tool_headers
             )
