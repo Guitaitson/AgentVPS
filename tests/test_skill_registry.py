@@ -115,6 +115,9 @@ class TestSkillRegistry:
         assert registry.get("get_system_status") is not None
         assert registry.get("check_postgres") is not None
         assert registry.get("check_redis") is not None
+        assert registry.get("fleetintel_analyst") is not None
+        assert registry.get("fleetintel_orchestrator") is not None
+        assert registry.get("brazilcnpj") is not None
 
     def test_find_ram_by_trigger(self):
         """Testa encontrar skill ram por trigger."""

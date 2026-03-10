@@ -1,0 +1,27 @@
+name: fleetintel_analyst
+description: "Analisa FleetIntel MCP com foco em sinais de compra, market share, tendencias, entrantes e perfil de contas."
+version: "1.0.0"
+security_level: safe
+triggers:
+  - fleetintel
+  - sinais de compra
+  - buying signals
+  - market share
+  - tendencia
+  - entrantes
+  - emplacamento
+  - frota
+  - priorizar contas
+parameters:
+  query:
+    type: string
+    required: true
+    description: "Pergunta analitica sobre frota, emplacamentos ou contas"
+parameters_schema:
+  query:
+    type: string
+    description: "Pergunta analitica sobre FleetIntel"
+    required: true
+max_output_chars: 3200
+timeout_seconds: 25
+enabled: true

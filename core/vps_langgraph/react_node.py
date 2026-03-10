@@ -14,6 +14,7 @@ import json
 
 import structlog
 
+from ..integrations import detect_external_skill
 from ..skills.registry import get_skill_registry
 from .state import AgentState
 
@@ -87,70 +88,30 @@ async def node_react(state: AgentState) -> AgentState:
         tools_count=len(tools),
     )
 
-    # ── Pre-check: detectar consultas de frota ANTES do LLM ────────────────
-    # O LLM (Gemini Flash) gera texto Python em vez de tool_calls estruturados
-    # para skills novas. Detectamos keywords de frota direto no user_message
-    # e executamos fleetintel inline, sem passar pelo LLM.
-    _fleet_triggers = [
-        "caminhão",
-        "caminhao",
-        "caminhões",
-        "caminhoes",
-        "emplacamento",
-        "emplacamentos",
-        "emplacou",
-        "emplacaram",
-        "frota",
-        "frotas",
-        "veículo pesado",
-        "veiculo pesado",
-        "veículos pesados",
-        "veiculos pesados",
-        "market share",
-        "participação de mercado",
-        "participacao de mercado",
-        "cota de mercado",
-        "top empresas",
-        "maiores compradores",
-        "quem mais comprou",
-        "ranking de compradores",
-        "fleetintel",
-        "implemento",
-        "implementos",
-        "comprou caminhão",
-        "comprou caminhao",
-        "quantos emplacamentos",
-        "base de frota",
-        "dados de frota",
-        "banco de frota",
-        "estatísticas de frota",
-        "estatisticas de frota",
-        "adquiriu caminhão",
-        "adquiriu caminhao",
-    ]
-    _msg_lower = user_message.lower()
-    _fleet_kw = next((kw for kw in _fleet_triggers if kw in _msg_lower), None)
-    if _fleet_kw:
-        _fleet_skill = registry.get("fleetintel")
-        if _fleet_skill:
-            logger.info("react_fleet_shortcut", keyword=_fleet_kw)
+    specialist_name = detect_external_skill(user_message)
+    if specialist_name:
+        specialist = registry.get(specialist_name)
+        if specialist:
+            logger.info("react_external_shortcut", skill=specialist_name)
             try:
-                _fleet_result = await registry.execute_skill(
-                    "fleetintel",
+                specialist_result = await registry.execute_skill(
+                    specialist_name,
                     {"raw_input": user_message, "query": user_message},
                 )
                 return {
                     **state,
                     "intent": "task",
                     "action_required": False,
-                    "response": str(_fleet_result),
+                    "response": str(specialist_result),
                     "plan": None,
                 }
-            except Exception as _fleet_err:
-                logger.error("react_fleet_shortcut_error", error=str(_fleet_err))
-                # Falhou — continua para o loop LLM normal
-    # ───────────────────────────────────────────────────────────────────────
-
+            except Exception as specialist_err:
+                logger.error(
+                    "react_external_shortcut_error",
+                    skill=specialist_name,
+                    error=str(specialist_err),
+                )
+                # Falhou; continua para o loop LLM normal.
     provider = get_llm_provider()
     system_prompt = build_react_system_prompt()
 

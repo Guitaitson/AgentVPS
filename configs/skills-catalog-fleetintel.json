@@ -1,0 +1,43 @@
+{
+  "skills": [
+    {
+      "name": "fleetintel-orchestrator",
+      "description": "Coordinate FleetIntel MCP and BrazilCNPJ MCP for external-agent workflows. Use when the user asks broad commercial intelligence questions, wants account prioritization, asks what changed after the last sync, or needs a single answer that combines fleet behavior with CNPJ enrichment.",
+      "version": "eb13b2bf486b",
+      "security_level": "safe",
+      "metadata": {
+        "repository": "https://github.com/Guitaitson/fleetintel-mcp",
+        "skill_path": "skills/fleetintel-orchestrator/SKILL.md",
+        "runtimes": "Claude,Codex",
+        "mcp_servers": "fleetintel-mcp,brazilcnpj-mcp",
+        "snapshot": true
+      }
+    },
+    {
+      "name": "fleetintel-analyst",
+      "description": "Analyze FleetIntel MCP data for buying signals, market share, new entrants, trend shifts, and company-level fleet behavior. Use when the user asks commercial or analytical questions focused on truck fleet movement in Brazil.",
+      "version": "eb13b2bf486b",
+      "security_level": "safe",
+      "metadata": {
+        "repository": "https://github.com/Guitaitson/fleetintel-mcp",
+        "skill_path": "skills/fleetintel-analyst/SKILL.md",
+        "runtimes": "Claude,Codex",
+        "mcp_servers": "fleetintel-mcp",
+        "snapshot": true
+      }
+    },
+    {
+      "name": "brazilcnpj-enricher",
+      "description": "Enrich Brazilian companies with BrazilCNPJ MCP using CNPJ, socios, CNAE, and grupo economico data. Use when the user asks for cadastral validation, company profile, ownership structure, group discovery, or CNPJ-based follow-up on FleetIntel leads.",
+      "version": "eb13b2bf486b",
+      "security_level": "safe",
+      "metadata": {
+        "repository": "https://github.com/Guitaitson/fleetintel-mcp",
+        "skill_path": "skills/brazilcnpj-enricher/SKILL.md",
+        "runtimes": "Claude,Codex",
+        "mcp_servers": "brazilcnpj-mcp",
+        "snapshot": true
+      }
+    }
+  ]
+}

@@ -8,6 +8,8 @@ from typing import Any
 
 import structlog
 
+from ..integrations import detect_external_skill
+
 try:
     from pydantic.v1 import BaseModel, Field
 except ImportError:
@@ -94,60 +96,17 @@ async def classify_intent_llm(
             "reasoning": "Saudação curta detectada - forçar chat",
         }
 
-    # ============ PRE-CHECK: FleetIntel — ANTES do LLM ============
-    # O LLM (Gemini Flash) nao gera tool_calls corretos para fleetintel.
-    # Detectar consultas de frota ANTES de chamar o LLM para garantir
-    # que o roteamento aconteca via react_node (pre-suggestion path).
-    _fleet_keywords = [
-        "caminhão",
-        "caminhao",
-        "caminhões",
-        "caminhoes",
-        "emplacamento",
-        "emplacamentos",
-        "emplacou",
-        "emplacaram",
-        "frota",
-        "frotas",
-        "veículo pesado",
-        "veiculo pesado",
-        "veículos pesados",
-        "veiculos pesados",
-        "market share",
-        "participação de mercado",
-        "participacao de mercado",
-        "cota de mercado",
-        "top empresas",
-        "maiores compradores",
-        "quem mais comprou",
-        "ranking de compradores",
-        "quantos emplacamentos",
-        "base de frota",
-        "dados de frota",
-        "fleetintel",
-        "implemento",
-        "implementos",
-        "comprou caminhão",
-        "comprou caminhao",
-        "adquiriu caminhão",
-        "adquiriu caminhao",
-        "estatísticas de frota",
-        "estatisticas de frota",
-        "estatísticas gerais de frota",
-        "banco de frota",
-    ]
-    for _kw in _fleet_keywords:
-        if _kw in msg_lower:
-            logger.info("intent_pre_fleet", keyword=_kw)
-            return {
-                "intent": "task",
-                "confidence": 0.97,
-                "entities": ["fleetintel"],
-                "action_required": True,
-                "tool_suggestion": "fleetintel",
-                "reasoning": f"Consulta de frota detectada (pre-LLM): '{_kw}'",
-            }
-
+    specialist = detect_external_skill(message)
+    if specialist:
+        logger.info("intent_pre_external_skill", tool_suggestion=specialist)
+        return {
+            "intent": "task",
+            "confidence": 0.97,
+            "entities": [specialist],
+            "action_required": True,
+            "tool_suggestion": specialist,
+            "reasoning": f"Consulta especialista detectada antes do LLM: '{specialist}'",
+        }
     try:
         # Tentar usar o novo LLM Provider unificado
         from ..llm.unified_provider import classify_intent_with_llm
@@ -426,52 +385,16 @@ def infer_intent_from_message(message: str) -> dict[str, Any]:
                 "reasoning": f"Comando Telegram detectado: {cmd_pattern}",
             }
 
-    # ========================================
-    # PRIORIDADE 4.5: FleetIntel — Dados de frota
-    # ========================================
-    fleet_patterns = [
-        "caminhão",
-        "caminhao",
-        "caminhões",
-        "caminhoes",
-        "emplacamento",
-        "emplacamentos",
-        "emplacou",
-        "emplacaram",
-        "frota",
-        "frotas",
-        "veículo pesado",
-        "veiculo pesado",
-        "market share",
-        "participação de mercado",
-        "cota de mercado",
-        "top empresas",
-        "maiores compradores",
-        "ranking de compras",
-        "quem mais comprou",
-        "fleet",
-        "fleetintel",
-        "implemento",
-        "implementos",
-        "ônibus pesado",
-        "onibus pesado",
-        "comprou caminhão",
-        "comprou caminhao",
-        "adquiriu caminhão",
-        "quantos emplacamentos",
-        "base de frota",
-        "dados de frota",
-    ]
-    for pattern in fleet_patterns:
-        if pattern in msg_lower:
-            return {
-                "intent": "task",
-                "confidence": 0.95,
-                "entities": ["fleetintel"],
-                "action_required": True,
-                "tool_suggestion": "fleetintel",
-                "reasoning": f"Consulta de dados de frota detectada: {pattern}",
-            }
+    specialist = detect_external_skill(message)
+    if specialist:
+        return {
+            "intent": "task",
+            "confidence": 0.95,
+            "entities": [specialist],
+            "action_required": True,
+            "tool_suggestion": specialist,
+            "reasoning": f"Consulta especialista detectada por fallback local: {specialist}",
+        }
 
     # ========================================
     # PRIORIDADE 5: Self-Improve

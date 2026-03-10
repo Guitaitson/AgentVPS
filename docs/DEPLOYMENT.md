@@ -342,3 +342,16 @@ sudo docker exec repo-openclaw-gateway-1 timeout 10 \
 | Ver containers | `docker ps` |
 | Reiniciar containers | `docker compose -f configs/docker-compose.core.yml restart` |
 | Ver uso de RAM | `free -m && docker stats --no-stream` |
+
+## FleetIntel e BrazilCNPJ
+
+Para habilitar as skills externas em producao:
+
+- definir `FLEETINTEL_MCP_URL` e `FLEETINTEL_MCP_TOKEN`
+- definir `BRAZILCNPJ_MCP_URL` e `BRAZILCNPJ_MCP_TOKEN`
+- manter `configs/skills-catalog-sources.json` com a fonte `fleetintel_skillpack_snapshot` habilitada
+- executar `/catalogsync check` e depois `/catalogsync apply`
+
+O catalogo padrao usa um snapshot real versionado do repo `https://github.com/Guitaitson/fleetintel-mcp`.
+Para sync vivo via GitHub API em repositorio privado, habilite a fonte `fleetintel_skillpack_repo` e configure `CATALOG_GITHUB_TOKEN`.
+

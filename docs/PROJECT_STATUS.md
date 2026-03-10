@@ -1,6 +1,6 @@
 # Project Status - Source of Truth
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Canonical Read Order
 
@@ -12,9 +12,9 @@ Last updated: 2026-03-08
 ## Branch and Sync Snapshot
 
 - Canonical branch on GitHub: `origin/main`
-- Current `origin/main` tip at review time: `27c1d69` (2026-03-08 sync)
-- Current worktree branch: `claude/pr2-runtime-gate`
-- Local worktree contains additional uncommitted changes (tracked + untracked)
+- Current `origin/main` tip at review time: `4427a60` (post-merge PR #13)
+- Current worktree branch: `claude/pr3-fleetintel-integration`
+- Local worktree contains FleetIntel/BrazilCNPJ integration work in progress
 
 ## Master Plan Status (Strict 100% Gate)
 
@@ -30,14 +30,18 @@ Last updated: 2026-03-08
 - Catalog operations: pin, unpin, rollback, provenance (DB + fallback file)
 - Real semantic memory integration with Qdrant in runtime path (save + recall)
 - Regression coverage for delegated runtime and semantic memory paths
+- External specialist routing for `fleetintel_analyst`, `brazilcnpj` and `fleetintel_orchestrator`
+- Reusable remote MCP client for authenticated FleetIntel/BrazilCNPJ servers
+- Skills catalog source now supports direct GitHub repo discovery for LangChain-style `SKILL.md` packs
+- Default catalog source now ships with a real FleetIntel snapshot and optional live GitHub sync
 
 Validation at review time:
-- `python -m ruff check .` -> OK
-- `python -m pytest -q` -> 218 passed, 2 skipped
+- targeted: `python -m pytest -q tests/test_catalog_sync_engine.py tests/test_external_specialist_skills.py tests/test_skill_registry.py` -> 25 passed
+- pending final full-suite run after docs finish
 
 ## Decision Gate for Next Features
 
-Strict gate is complete. Next feature cycle is unblocked.
+Strict gate remains complete. FleetIntel/BrazilCNPJ integration cycle is now in implementation/validation.
 
 ## Notes About Conflicting Historical Files
 
