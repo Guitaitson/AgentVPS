@@ -166,3 +166,86 @@ async def test_catalog_sync_parses_langchain_skills_source(tmp_path):
     assert result["success"] is True
     assert result["skills_discovered"] == 1
     assert result["added"] == 1
+
+
+class _MockResponse:
+    def __init__(self, *, status_code=200, json_data=None, text=""):
+        self.status_code = status_code
+        self._json_data = json_data
+        self.text = text
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"http {self.status_code}")
+
+    def json(self):
+        if self._json_data is None:
+            raise RuntimeError("json not available")
+        return self._json_data
+
+
+@pytest.mark.asyncio
+async def test_catalog_sync_parses_langchain_skills_github_repo_source(tmp_path, monkeypatch):
+    sources_file = tmp_path / "sources.json"
+    cache_file = tmp_path / "cache.json"
+    _write_json(
+        sources_file,
+        {
+            "sources": [
+                {
+                    "name": "fleetintel_repo",
+                    "type": "langchain_skills_github_repo",
+                    "location": "https://github.com/Guitaitson/fleetintel-mcp",
+                    "enabled": True,
+                }
+            ]
+        },
+    )
+
+    async def fake_get(self, url, headers=None):
+        if "commits/main" in url:
+            return _MockResponse(json_data={"sha": "abcdef1234567890"})
+        if "/git/trees/" in url:
+            return _MockResponse(
+                json_data={
+                    "tree": [
+                        {"path": "skills/fleetintel-orchestrator/SKILL.md"},
+                        {"path": "skills/brazilcnpj-enricher/SKILL.md"},
+                    ]
+                }
+            )
+        if "fleetintel-orchestrator/SKILL.md" in url:
+            return _MockResponse(
+                text=(
+                    "---\n"
+                    "name: fleetintel-orchestrator\n"
+                    "description: Coordinate FleetIntel and BrazilCNPJ\n"
+                    "metadata:\n"
+                    "  mcp_servers: fleetintel-mcp,brazilcnpj-mcp\n"
+                    "---\n"
+                    "# FleetIntel Orchestrator\n"
+                )
+            )
+        if "brazilcnpj-enricher/SKILL.md" in url:
+            return _MockResponse(
+                text=(
+                    "---\n"
+                    "name: brazilcnpj-enricher\n"
+                    "description: Enrich companies with CNPJ data\n"
+                    "---\n"
+                    "# BrazilCNPJ Enricher\n"
+                )
+            )
+        raise AssertionError(f"unexpected url: {url}")
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+
+    engine = SkillsCatalogSyncEngine(sources_file=str(sources_file))
+    engine._fallback_cache_path = str(cache_file)
+    engine._get_conn = _raise_db_unavailable
+
+    result = await engine.sync(mode="check")
+
+    assert result["success"] is True
+    assert result["skills_discovered"] == 2
+    assert result["added"] == 2

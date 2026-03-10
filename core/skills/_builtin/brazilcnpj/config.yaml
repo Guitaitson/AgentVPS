@@ -1,0 +1,26 @@
+name: brazilcnpj
+description: "Consulta e enriquece dados empresariais via BrazilCNPJ MCP. Use para CNPJ, socios, grupo economico, CNAE e validacao cadastral."
+version: "1.0.0"
+security_level: safe
+triggers:
+  - cnpj
+  - socios
+  - grupo economico
+  - cnae
+  - cadastro
+  - cadastral
+  - enriquecer cnpj
+  - receita federal
+parameters:
+  query:
+    type: string
+    required: true
+    description: "Pergunta sobre cadastro, socios, CNPJ ou CNAE"
+parameters_schema:
+  query:
+    type: string
+    description: "Pergunta sobre dados empresariais e CNPJ"
+    required: true
+max_output_chars: 3000
+timeout_seconds: 25
+enabled: true

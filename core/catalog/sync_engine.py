@@ -7,14 +7,17 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 import psycopg2
 import structlog
+import yaml
 from psycopg2.extras import Json, RealDictCursor
 
 from core.config import get_settings
@@ -40,6 +43,12 @@ class SkillsCatalogSyncEngine:
         self._fallback_cache_path = self.settings.fallback_cache_file
         self._history_file_path = self.settings.history_file
         self._pins_file_path = self.settings.pins_file
+        self._github_token = (
+            os.getenv("CATALOG_GITHUB_TOKEN")
+            or os.getenv("GITHUB_TOKEN")
+            or os.getenv("GH_TOKEN")
+            or ""
+        )
         self._db_config = {
             "host": os.getenv("POSTGRES_HOST", "127.0.0.1"),
             "port": int(os.getenv("POSTGRES_PORT", 5432)),
@@ -496,12 +505,112 @@ class SkillsCatalogSyncEngine:
                 payload = response.json()
                 return self._extract_langchain_skills(payload)
 
+        if source.source_type == "langchain_skills_github_repo":
+            return await self._fetch_langchain_skills_github_repo(source.location)
+
         logger.warning(
             "catalog.unsupported_source_type",
             source=source.name,
             source_type=source.source_type,
         )
         return []
+
+    async def _fetch_langchain_skills_github_repo(self, location: str) -> list[dict[str, Any]]:
+        owner, repo, ref = self._parse_github_repo_location(location)
+        if not owner or not repo:
+            logger.warning("catalog.github_repo_invalid_location", location=location)
+            return []
+
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "AgentVPS-CatalogSync/1.0",
+        }
+        if self._github_token:
+            headers["Authorization"] = f"Bearer {self._github_token}"
+        async with httpx.AsyncClient(timeout=self.settings.http_timeout_seconds) as client:
+            commit_resp = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/commits/{ref}",
+                headers=headers,
+            )
+            if commit_resp.status_code == 404 and not self._github_token:
+                raise RuntimeError(
+                    "GitHub repository not accessible without token. "
+                    "Set CATALOG_GITHUB_TOKEN, GITHUB_TOKEN, or GH_TOKEN."
+                )
+            commit_resp.raise_for_status()
+            commit_sha = str(commit_resp.json().get("sha", ref))
+
+            tree_resp = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/git/trees/{ref}?recursive=1",
+                headers=headers,
+            )
+            tree_resp.raise_for_status()
+            tree_payload = tree_resp.json()
+
+            skills: list[dict[str, Any]] = []
+            for item in tree_payload.get("tree", []):
+                if not isinstance(item, dict):
+                    continue
+                path = str(item.get("path", ""))
+                if not re.fullmatch(r"skills/[^/]+/SKILL\.md", path):
+                    continue
+                raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}"
+                raw_resp = await client.get(raw_url, headers=headers)
+                raw_resp.raise_for_status()
+                parsed = self._parse_langchain_skill_markdown(raw_resp.text)
+                if not parsed:
+                    continue
+                parsed.setdefault("name", path.split("/")[1])
+                parsed.setdefault("version", commit_sha[:12])
+                parsed.setdefault("metadata", {})
+                parsed["metadata"].setdefault("repository", f"https://github.com/{owner}/{repo}")
+                parsed["metadata"].setdefault("homepage", f"https://github.com/{owner}/{repo}")
+                parsed["metadata"].setdefault("git_ref", ref)
+                parsed["metadata"].setdefault("git_commit", commit_sha)
+                parsed["metadata"].setdefault("skill_path", path)
+                skills.append(parsed)
+            return skills
+
+    @staticmethod
+    def _parse_github_repo_location(location: str) -> tuple[str, str, str]:
+        value = location.strip()
+        if value.startswith("http://") or value.startswith("https://"):
+            parsed = urlparse(value)
+            parts = [part for part in parsed.path.strip("/").split("/") if part]
+            if len(parts) >= 2:
+                owner = parts[0]
+                repo = parts[1].removesuffix(".git")
+                ref = "main"
+                if len(parts) >= 4 and parts[2] == "tree":
+                    ref = parts[3]
+                return owner, repo, ref
+            return "", "", "main"
+
+        ref = "main"
+        repo_part = value
+        if "@" in value:
+            repo_part, ref = value.split("@", 1)
+        parts = [part for part in repo_part.strip("/").split("/") if part]
+        if len(parts) != 2:
+            return "", "", ref or "main"
+        return parts[0], parts[1].removesuffix(".git"), ref or "main"
+
+    @staticmethod
+    def _parse_langchain_skill_markdown(content: str) -> dict[str, Any] | None:
+        match = re.match(r"^---\s*\n(.*?)\n---\s*\n?", content, re.DOTALL)
+        if not match:
+            return None
+        try:
+            payload = yaml.safe_load(match.group(1))
+        except Exception:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        if "description" not in payload:
+            body = content[match.end() :].strip()
+            if body:
+                payload["description"] = body.splitlines()[0][:300]
+        return payload
 
     @staticmethod
     def _extract_skills(payload: Any) -> list[dict[str, Any]]:

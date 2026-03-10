@@ -1,0 +1,25 @@
+name: fleetintel_orchestrator
+description: "Orquestra FleetIntel MCP e BrazilCNPJ MCP numa unica resposta, com preflight, shortlist e enriquecimento seletivo."
+version: "1.0.0"
+security_level: safe
+triggers:
+  - priorizar
+  - prospeccao
+  - cruzar fleet com cnpj
+  - sinais de compra
+  - enriquecer lead
+  - o que mudou
+  - resposta unica
+parameters:
+  query:
+    type: string
+    required: true
+    description: "Pergunta cruzando intel comercial de frota com enriquecimento cadastral"
+parameters_schema:
+  query:
+    type: string
+    description: "Pergunta cruzando FleetIntel e BrazilCNPJ"
+    required: true
+max_output_chars: 3500
+timeout_seconds: 30
+enabled: true

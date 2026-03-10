@@ -1,9 +1,15 @@
 {
   "sources": [
     {
-      "name": "langchain_skills_curated",
-      "type": "langchain_skills_url_json",
-      "location": "https://example.invalid/langchain-skills/catalog.json",
+      "name": "fleetintel_skillpack_snapshot",
+      "type": "local_json",
+      "location": "configs/skills-catalog-fleetintel.json",
+      "enabled": true
+    },
+    {
+      "name": "fleetintel_skillpack_repo",
+      "type": "langchain_skills_github_repo",
+      "location": "https://github.com/Guitaitson/fleetintel-mcp",
       "enabled": false
     }
   ]

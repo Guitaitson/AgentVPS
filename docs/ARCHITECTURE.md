@@ -79,7 +79,7 @@ END
 | Base | `core/skills/base.py` | `SkillBase` — interface que todas as skills implementam |
 | Tool Schemas | `registry.list_tool_schemas()` | JSON Schema para function calling |
 
-**Skills disponíveis (13):**
+**Skills disponíveis (18):**
 
 | Skill | Nível | Descrição |
 |-------|-------|-----------|
@@ -93,6 +93,9 @@ END
 | `memory_query` | safe | Consulta memória persistida (PostgreSQL) |
 | `web_search` | normal | Busca web (DuckDuckGo fallback) |
 | `fleetintel` | normal | Consulta eventos e dados de frota via FleetIntel MCP |
+| `fleetintel_analyst` | safe | Especialista FleetIntel para sinais, tendencias e market share |
+| `brazilcnpj` | safe | Especialista BrazilCNPJ para CNPJ, socios, CNAE e grupo economico |
+| `fleetintel_orchestrator` | safe | Coordena FleetIntel e BrazilCNPJ numa unica resposta |
 | `self_edit` | dangerous | Auto-edição de código da VPS |
 | `log_reader` | safe | Leitura de logs da VPS |
 | `openclaw_exec` | dangerous | Controla OpenClaw via docker exec |
@@ -100,6 +103,11 @@ END
 | `execute_scheduled` | dangerous | Executa acoes agendadas e janelas de manutencao |
 
 Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (`on-dangerous`).
+
+Roteamento externo:
+- `detect_external_skill()` decide entre `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator`
+- `RemoteMCPClient` encapsula autenticacao + initialize + tools/call para MCP remoto
+- `configs/skills-catalog-sources.json` usa snapshot local real do `Guitaitson/fleetintel-mcp` e pode alternar para sync vivo via GitHub token
 
 ### 4. Hook System
 

@@ -50,7 +50,7 @@ START → load_context → react → security_check → execute → format_respo
 
 ---
 
-## Skills Disponiveis (15)
+## Skills Disponiveis (18)
 
 | Skill | Descrição | Nível |
 |-------|-----------|-------|
@@ -64,6 +64,9 @@ START → load_context → react → security_check → execute → format_respo
 | `memory_query` | Consulta memória persistida | safe |
 | `web_search` | Busca na web (fallback DuckDuckGo) | normal |
 | `fleetintel` | Consulta eventos e dados de frota via FleetIntel MCP | normal |
+| `fleetintel_analyst` | Analise comercial via FleetIntel MCP (signals, trends, market share) | safe |
+| `brazilcnpj` | Enriquecimento cadastral e societario via BrazilCNPJ MCP | safe |
+| `fleetintel_orchestrator` | Cruza FleetIntel + BrazilCNPJ numa resposta unica | safe |
 | `self_edit` | Auto-edição de código | dangerous |
 | `log_reader` | Lê logs da VPS | safe |
 | `openclaw_exec` | Controla OpenClaw via docker exec | dangerous |
@@ -71,6 +74,8 @@ START → load_context → react → security_check → execute → format_respo
 | `execute_scheduled` | Executa acoes agendadas (notify/catalog apply) | dangerous |
 
 Skills com `dangerous` requerem aprovação humana (configurável via `on-dangerous`).
+
+Os especialistas `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator` usam MCP remoto autenticado e sao escolhidos automaticamente quando a pergunta pede inteligencia de frota, enriquecimento CNPJ ou cruzamento dos dois dominios.
 
 ---
 
@@ -198,6 +203,8 @@ TELEGRAM_ALLOWED_USERS=...    # IDs separados por vírgula
 POSTGRES_PASSWORD=...         # Senha PostgreSQL
 OPENROUTER_API_KEY=...        # Chave OpenRouter
 OPENROUTER_MODEL=minimax/minimax-m2.5
+FLEETINTEL_MCP_TOKEN=...      # Token do FleetIntel MCP
+BRAZILCNPJ_MCP_TOKEN=...      # Token do BrazilCNPJ MCP
 ```
 
 ---
