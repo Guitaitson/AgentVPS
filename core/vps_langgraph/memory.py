@@ -732,6 +732,67 @@ class AgentMemory:
 
         return deleted
 
+    def delete_typed_memory(
+        self,
+        *,
+        user_id: str,
+        key: str,
+        memory_type: MemoryType | str,
+        scope: MemoryScope | str | None = None,
+    ) -> bool:
+        """Delete one typed memory entry and any semantic index associated with it."""
+        typed = self._normalize_memory_type(memory_type)
+        if scope is None:
+            resolved_scope = MemoryScope.USER
+        elif isinstance(scope, MemoryScope):
+            resolved_scope = scope
+        else:
+            resolved_scope = MemoryScope(scope)
+
+        target_user = self._resolve_user_for_scope(user_id, resolved_scope)
+        deleted = False
+
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM agent_memory
+                WHERE user_id = %s AND memory_type = %s AND key = %s
+                """,
+                (target_user, typed.value, key),
+            )
+            deleted = cur.rowcount > 0
+            conn.commit()
+            conn.close()
+        except Exception as exc:
+            logger.warning(
+                "memory.delete_typed_fallback_local",
+                error=str(exc),
+                user_id=user_id,
+                memory_type=typed.value,
+                key=key,
+            )
+            per_type = self._local_typed.get(target_user, {}).get(typed, {})
+            deleted = per_type.pop(key, None) is not None
+
+        if deleted and typed == MemoryType.SEMANTIC:
+            self._delete_semantic_entries(user_id=target_user, keys=[key])
+        if deleted:
+            self._cache_delete_pattern("typed_memory:*")
+            self._record_audit(
+                action="delete",
+                memory_type=typed,
+                user_id=user_id,
+                key=key,
+                scope=resolved_scope,
+                project_id=None,
+                redacted=False,
+                outcome="success",
+                details={"source": "voice_context_discard"},
+            )
+        return deleted
+
     def prepare_for_delegation(
         self,
         context: dict[str, Any] | None,

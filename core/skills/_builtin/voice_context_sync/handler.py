@@ -65,4 +65,20 @@ class VoiceContextSyncSkill(SkillBase):
                 return "ERROR: reject failed"
             return f"voice context item rejected: {item_id}"
 
-        return "ERROR: invalid mode. Use sync, status, commit_review_item or reject_review_item."
+        if mode == "discard_job":
+            job_id = int(args.get("job_id", 0))
+            result = service.discard_job(
+                job_id=job_id,
+                actor=str(args.get("actor", "voice_context_sync")),
+                note=str(args.get("note", "")).strip() or None,
+            )
+            if not result.get("success"):
+                return "ERROR: discard failed"
+            return (
+                f"voice context job discarded: {job_id} "
+                f"(items={result.get('discarded_items', 0)}, "
+                f"memories={result.get('deleted_memories', 0)}, "
+                f"proposals={result.get('rejected_proposals', 0)})"
+            )
+
+        return "ERROR: invalid mode. Use sync, status, commit_review_item, reject_review_item or discard_job."

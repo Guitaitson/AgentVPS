@@ -8,7 +8,11 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import structlog
+
 from core.config import get_settings
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -70,7 +74,14 @@ class WhisperTranscriber:
         current_offset = 0.0
 
         try:
-            for chunk_path in chunk_paths:
+            total_chunks = len(chunk_paths)
+            for index, chunk_path in enumerate(chunk_paths, start=1):
+                logger.info(
+                    "voice_context.transcription_chunk_started",
+                    chunk_index=index,
+                    total_chunks=total_chunks,
+                    chunk_path=str(chunk_path),
+                )
                 segments, info = model.transcribe(
                     str(chunk_path),
                     language=language,
@@ -95,6 +106,13 @@ class WhisperTranscriber:
                     )
                     full_text.append(text)
                 current_offset += chunk_duration
+                logger.info(
+                    "voice_context.transcription_chunk_finished",
+                    chunk_index=index,
+                    total_chunks=total_chunks,
+                    chunk_duration_seconds=round(chunk_duration, 2),
+                    accumulated_duration_seconds=round(current_offset, 2),
+                )
 
             detected_language = (
                 getattr(info, "language", language) if "info" in locals() else language

@@ -263,6 +263,10 @@ class VoiceContextSettings(BaseSettings):
         default=12,
         description="Limite de arquivos processados por rodada",
     )
+    auto_commit_max_duration_minutes: int = Field(
+        default=30,
+        description="Audios acima desse limite exigem revisao humana para todos os itens",
+    )
     file_extensions: str = Field(
         default=".mp3,.wav,.ogg,.m4a,.flac,.aac,.mp4",
         description="Extensoes aceitas na inbox, separadas por virgula",
