@@ -5,6 +5,7 @@
   "stagingDir": "C:\\Users\\Pc Gamer\\AppData\\Local\\AgentVPS\\voice-staging",
   "sshTarget": "user@your-vps-host",
   "sshKeyPath": "",
+  "remoteStagingDir": "/tmp/agentvps-voice-inbox",
   "remoteInboxDir": "/opt/vps-agent/data/voice/inbox",
   "pollSeconds": 15
 }

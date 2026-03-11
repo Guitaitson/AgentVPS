@@ -37,6 +37,38 @@ function Save-State {
     $State | ConvertTo-Json -Depth 5 | Set-Content $path
 }
 
+function Get-ScpPath {
+    $scp = (Get-Command scp.exe -ErrorAction SilentlyContinue).Source
+    if (-not $scp) {
+        throw 'scp.exe not found. Install OpenSSH Client on Windows.'
+    }
+    return $scp
+}
+
+function Get-SshPath {
+    $ssh = (Get-Command ssh.exe -ErrorAction SilentlyContinue).Source
+    if (-not $ssh) {
+        throw 'ssh.exe not found. Install OpenSSH Client on Windows.'
+    }
+    return $ssh
+}
+
+function Quote-Posix {
+    param([string]$Value)
+    return "'" + ($Value -replace "'", "'\"'\"'") + "'"
+}
+
+function Invoke-Process {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList
+    )
+    $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Wait -PassThru -NoNewWindow
+    if ($process.ExitCode -ne 0) {
+        throw "$([System.IO.Path]::GetFileName($FilePath)) failed with exit code $($process.ExitCode)"
+    }
+}
+
 function Get-EligibleDrives {
     param($Config)
     $drives = Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DriveType -eq 2 }
@@ -92,25 +124,60 @@ function Confirm-Send {
 
 function Send-FilesToVps {
     param($Files, $Config, $State)
-    $scp = (Get-Command scp.exe -ErrorAction SilentlyContinue).Source
-    if (-not $scp) {
-        throw 'scp.exe not found. Install OpenSSH Client on Windows.'
-    }
+    $scp = Get-ScpPath
+    $ssh = Get-SshPath
     New-Item -ItemType Directory -Force -Path $Config.stagingDir | Out-Null
+    $remoteStagingDir = if ([string]::IsNullOrWhiteSpace($Config.remoteStagingDir)) {
+        '/tmp/agentvps-voice-inbox'
+    } else {
+        $Config.remoteStagingDir
+    }
     foreach ($file in $Files) {
         $stagedName = "{0}_{1}" -f $file.Hash.Substring(0, 12), $file.Name
         $stagedPath = Join-Path $Config.stagingDir $stagedName
         Copy-Item -Path $file.Path -Destination $stagedPath -Force
+        $remoteTempPath = "$remoteStagingDir/$stagedName"
+        $remoteFinalPath = "$($Config.remoteInboxDir)/$stagedName"
 
-        $arguments = @()
+        $prepareArguments = @('-F', 'NUL')
         if (-not [string]::IsNullOrWhiteSpace($Config.sshKeyPath)) {
-            $arguments += @('-i', $Config.sshKeyPath)
+            $prepareArguments += @('-i', $Config.sshKeyPath)
         }
-        $arguments += @($stagedPath, "$($Config.sshTarget):$($Config.remoteInboxDir)/$stagedName")
+        $prepareArguments += @($Config.sshTarget, "mkdir -p $(Quote-Posix $remoteStagingDir)")
+        Invoke-Process -FilePath $ssh -ArgumentList $prepareArguments
 
-        $process = Start-Process -FilePath $scp -ArgumentList $arguments -Wait -PassThru -NoNewWindow
-        if ($process.ExitCode -ne 0) {
-            throw "scp failed for $($file.Name) with exit code $($process.ExitCode)"
+        $scpArguments = @('-F', 'NUL')
+        if (-not [string]::IsNullOrWhiteSpace($Config.sshKeyPath)) {
+            $scpArguments += @('-i', $Config.sshKeyPath)
+        }
+        $scpArguments += @($stagedPath, "$($Config.sshTarget):$remoteTempPath")
+        Invoke-Process -FilePath $scp -ArgumentList $scpArguments
+
+        $remoteCommand = @(
+            'set -e'
+            "mkdir -p $(Quote-Posix $remoteStagingDir)"
+            "sudo install -o vps_agent -g vps_agent -m 0644 $(Quote-Posix $remoteTempPath) $(Quote-Posix $remoteFinalPath)"
+            "rm -f $(Quote-Posix $remoteTempPath)"
+            "test -f $(Quote-Posix $remoteFinalPath)"
+        ) -join '; '
+
+        $sshArguments = @('-F', 'NUL')
+        if (-not [string]::IsNullOrWhiteSpace($Config.sshKeyPath)) {
+            $sshArguments += @('-i', $Config.sshKeyPath)
+        }
+        $sshArguments += @($Config.sshTarget, $remoteCommand)
+        try {
+            Invoke-Process -FilePath $ssh -ArgumentList $sshArguments
+        }
+        catch {
+            $cleanupCommand = "rm -f $(Quote-Posix $remoteTempPath)"
+            $cleanupArguments = @('-F', 'NUL')
+            if (-not [string]::IsNullOrWhiteSpace($Config.sshKeyPath)) {
+                $cleanupArguments += @('-i', $Config.sshKeyPath)
+            }
+            $cleanupArguments += @($Config.sshTarget, $cleanupCommand)
+            Start-Process -FilePath $ssh -ArgumentList $cleanupArguments -Wait -NoNewWindow | Out-Null
+            throw "remote install failed for $($file.Name): $($_.Exception.Message)"
         }
 
         $State.files[$file.Hash] = @{

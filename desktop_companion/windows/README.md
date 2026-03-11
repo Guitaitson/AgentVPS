@@ -1,6 +1,6 @@
 # Voice Device Companion (Windows)
 
-Este helper monitora drives removiveis, detecta o gravador de voz, pergunta se deve enviar os arquivos novos para a VPS e usa `scp` para publicar na inbox do AgentVPS.
+Este helper monitora drives removiveis, detecta o gravador de voz, pergunta se deve enviar os arquivos novos para a VPS e usa `scp` + `ssh` para publicar na inbox do AgentVPS com verificacao remota.
 
 ## Arquivos
 - `voice-device-config.example.json`: modelo de configuracao.
@@ -14,11 +14,12 @@ Este helper monitora drives removiveis, detecta o gravador de voz, pergunta se d
 
 ## Passos
 1. Copie `voice-device-config.example.json` para `voice-device-config.json`.
-2. Ajuste `volumeLabel`, `importPath`, `extensions`, `stagingDir`, `sshTarget` e `remoteInboxDir`.
+2. Ajuste `volumeLabel`, `importPath`, `extensions`, `stagingDir`, `sshTarget`, `remoteStagingDir` e `remoteInboxDir`.
 3. Se usar chave dedicada, preencha `sshKeyPath`.
 4. Rode `./start_voice_device_watcher.ps1`.
 
 ## Observacoes
 - O helper mantem um manifesto local em `%LOCALAPPDATA%\\AgentVPS\\voice-device-state.json` para nao reenviar arquivos duplicados.
+- O upload passa primeiro por `remoteStagingDir` e so marca sucesso apos o arquivo existir em `remoteInboxDir`.
 - A pergunta aparece apenas quando um drive elegivel e conectado com arquivos novos.
 - O processamento do audio acontece na VPS via `/contextsync` ou lote automatico.
