@@ -151,6 +151,18 @@ sudo systemctl status telegram-bot mcp-server
 sudo tail -f /opt/vps-agent/logs/telegram-bot.log
 ```
 
+## Fluxo de Entrega
+
+O fluxo recomendado para manter GitHub, PRs e VPS sincronizados e auditaveis e:
+
+1. criar branch de trabalho a partir de `main`
+2. abrir PR para `main`
+3. mergear apenas depois do CI verde
+4. publicar uma release no GitHub
+5. deixar o workflow `.github/workflows/release-deploy.yml` fazer o deploy na VPS
+
+Enquanto o deploy automatico por release nao for o caminho exclusivo, qualquer deploy manual deve terminar com a VPS alinhada em `main`, nao em branch temporaria.
+
 ---
 
 ## Estrutura de Diretórios

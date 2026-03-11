@@ -284,7 +284,7 @@ class VoiceContextExtractor:
         for output in outputs:
             for item in output.get(key, []) or []:
                 if key == "preferences":
-                    stable = f"{item.get('key','')}|{item.get('value','')}".strip().lower()
+                    stable = f"{item.get('key', '')}|{item.get('value', '')}".strip().lower()
                 else:
                     stable = str(item.get("text") or item.get("value") or "").strip().lower()
                 if not stable or stable in seen:
