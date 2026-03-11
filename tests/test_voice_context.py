@@ -111,3 +111,79 @@ def test_voice_context_service_assess_item_decision(monkeypatch):
     )
     assert finance_item.auto_commit is False
     assert finance_item.risk_level == "high"
+
+    long_audio_item = service.assess_item_decision(
+        {
+            "memory_target": "episodic",
+            "domain": "operacoes_dia_a_dia",
+            "confidence": 0.99,
+            "payload": {"force_review": True},
+        }
+    )
+    assert long_audio_item.auto_commit is False
+    assert long_audio_item.risk_level == "low"
+
+
+def test_voice_context_service_discard_job(monkeypatch):
+    class FakeCursor:
+        def __init__(self):
+            self._rows = [
+                {
+                    "id": 10,
+                    "memory_target": "episodic",
+                    "memory_key": "voice:summary:2:e195cc299eb1",
+                    "proposal_id": 33,
+                },
+                {
+                    "id": 11,
+                    "memory_target": "semantic",
+                    "memory_key": None,
+                    "proposal_id": None,
+                },
+            ]
+            self.rowcount = 0
+
+        def execute(self, query, params=None):
+            normalized = " ".join(str(query).split())
+            if "SELECT id, memory_target, memory_key, proposal_id" in normalized:
+                self.rowcount = len(self._rows)
+            elif "UPDATE agent_proposals" in normalized:
+                self.rowcount = 1
+            elif "UPDATE voice_context_items" in normalized:
+                self.rowcount = 2
+            elif "UPDATE voice_ingestion_jobs" in normalized:
+                self.rowcount = 1
+            else:
+                self.rowcount = 0
+
+        def fetchall(self):
+            return self._rows
+
+    class FakeConn:
+        def __init__(self):
+            self.cursor_obj = FakeCursor()
+
+        def cursor(self, cursor_factory=None):
+            return self.cursor_obj
+
+        def commit(self):
+            return None
+
+        def close(self):
+            return None
+
+    deleted = []
+    fake_memory = SimpleNamespace(
+        delete_typed_memory=lambda **kwargs: deleted.append(kwargs) or True,
+    )
+    service = VoiceContextService(memory=fake_memory)
+    monkeypatch.setattr(service, "_get_conn", lambda: FakeConn())
+    monkeypatch.setattr(service, "resolve_user_id", lambda user_id=None: "u1")
+
+    result = service.discard_job(job_id=2, actor="test")
+
+    assert result["success"] is True
+    assert result["discarded_items"] == 2
+    assert result["deleted_memories"] == 1
+    assert result["rejected_proposals"] == 1
+    assert deleted[0]["key"] == "voice:summary:2:e195cc299eb1"

@@ -195,6 +195,10 @@ class VoiceContextService:
 
         try:
             transcript = self.transcriber.transcribe_file(processing_path)
+            force_review = (
+                float(transcript.duration_seconds)
+                >= float(self.settings.auto_commit_max_duration_minutes) * 60.0
+            )
             transcript_path = self._write_transcript(sha256=sha256, transcript=transcript)
             extracted = await self.extractor.extract_structured_context(
                 transcript.text,
@@ -205,6 +209,8 @@ class VoiceContextService:
                 job_id=job_id,
                 file_id=file_id,
                 batch_date=datetime.utcnow().date().isoformat(),
+                transcript_duration_seconds=float(transcript.duration_seconds),
+                force_review=force_review,
             )
             commit_stats = self._persist_context_items(
                 job_id=job_id,
@@ -220,6 +226,7 @@ class VoiceContextService:
                 duration_seconds=transcript.duration_seconds,
                 transcript_path=str(transcript_path),
                 archive_path=str(archive_path),
+                error=("long_audio_force_review" if force_review else None),
             )
             return {"success": True, **commit_stats}
         except Exception as exc:
@@ -242,6 +249,8 @@ class VoiceContextService:
         job_id: int,
         file_id: int,
         batch_date: str,
+        transcript_duration_seconds: float,
+        force_review: bool,
     ) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
 
@@ -258,6 +267,8 @@ class VoiceContextService:
                         "job_id": job_id,
                         "file_id": file_id,
                         "batch_date": batch_date,
+                        "transcript_duration_seconds": transcript_duration_seconds,
+                        "force_review": force_review,
                     },
                 }
             )
@@ -276,7 +287,15 @@ class VoiceContextService:
                     domain = "operacoes_dia_a_dia"
                 confidence = max(0.0, min(float(entry.get("confidence", 0.7)), 1.0))
                 payload = dict(entry)
-                payload.update({"job_id": job_id, "file_id": file_id, "batch_date": batch_date})
+                payload.update(
+                    {
+                        "job_id": job_id,
+                        "file_id": file_id,
+                        "batch_date": batch_date,
+                        "transcript_duration_seconds": transcript_duration_seconds,
+                        "force_review": force_review,
+                    }
+                )
                 items.append(
                     {
                         "item_type": item_type,
@@ -292,6 +311,8 @@ class VoiceContextService:
         memory_target = str(item.get("memory_target") or MemoryType.SEMANTIC.value)
         domain = str(item.get("domain") or "operacoes_dia_a_dia")
         confidence = float(item.get("confidence", 0.0))
+        payload = item.get("payload") or {}
+        force_review = bool(payload.get("force_review"))
 
         risk_level = "low"
         if memory_target in {MemoryType.PROFILE.value, MemoryType.GOALS.value}:
@@ -303,6 +324,7 @@ class VoiceContextService:
             memory_target in {MemoryType.EPISODIC.value, MemoryType.SEMANTIC.value}
             and risk_level == "low"
             and confidence >= float(self.settings.auto_commit_threshold)
+            and not force_review
         )
         return VoiceContextItemDecision(
             auto_commit=auto_commit,
@@ -518,6 +540,86 @@ class VoiceContextService:
         finally:
             conn.close()
         return {"success": updated > 0, "updated": updated}
+
+    def discard_job(
+        self, *, job_id: int, actor: str = "system", note: str | None = None
+    ) -> dict[str, Any]:
+        conn = self._get_conn()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        deleted_memories = 0
+        affected_items = 0
+        affected_proposals = 0
+
+        try:
+            cur.execute(
+                """
+                SELECT id, memory_target, memory_key, proposal_id
+                FROM voice_context_items
+                WHERE job_id = %s
+                ORDER BY id
+                """,
+                (job_id,),
+            )
+            items = cur.fetchall()
+            user_id = self.resolve_user_id()
+
+            for item in items:
+                memory_key = item.get("memory_key")
+                memory_target = item.get("memory_target")
+                if memory_key and memory_target:
+                    deleted = self.memory.delete_typed_memory(
+                        user_id=user_id,
+                        key=str(memory_key),
+                        memory_type=str(memory_target),
+                        scope=(
+                            MemoryScope.PROJECT
+                            if str(memory_target) == MemoryType.GOALS.value
+                            else MemoryScope.USER
+                        ),
+                    )
+                    deleted_memories += int(deleted)
+
+                proposal_id = item.get("proposal_id")
+                if proposal_id:
+                    cur.execute(
+                        """
+                        UPDATE agent_proposals
+                        SET status = 'rejected'
+                        WHERE id = %s AND status = 'pending'
+                        """,
+                        (proposal_id,),
+                    )
+                    affected_proposals += cur.rowcount
+
+            review_note = note or f"discarded by {actor}"
+            cur.execute(
+                """
+                UPDATE voice_context_items
+                SET commit_status = 'discarded', review_note = %s, memory_key = NULL
+                WHERE job_id = %s
+                """,
+                (review_note, job_id),
+            )
+            affected_items = cur.rowcount
+            cur.execute(
+                """
+                UPDATE voice_ingestion_jobs
+                SET status = 'discarded', error_message = %s
+                WHERE id = %s
+                """,
+                (review_note, job_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "discarded_items": affected_items,
+            "deleted_memories": deleted_memories,
+            "rejected_proposals": affected_proposals,
+        }
 
     def sync_proposal_state(
         self, *, proposal_id: int, decision: str, actor: str = "telegram"

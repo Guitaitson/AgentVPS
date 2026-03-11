@@ -208,6 +208,17 @@ O fluxo faz:
 - reinstala os units systemd versionados
 - reinicia `telegram-bot` e `mcp-server`
 
+Protecoes atuais:
+- se houver processamento de voz em andamento, o deploy nao reinicia os servicos
+- nesse caso, o script agenda nova tentativa automatica alguns minutos depois
+- isso evita quebrar transcricao/ingestao longa por causa de release publicada
+
+Seguranca dos secrets do GitHub:
+- secrets de Actions nao ficam publicos no repositorio
+- eles ficam cifrados e so sao expostos ao runtime do workflow
+- ainda assim, vazam se um workflow imprimir os valores ou enviar para fora
+- por isso, workflows de deploy devem ser curtos, revisados e sem execucao de codigo nao confiavel
+
 ---
 
 ## Verificação Pós-Deploy

@@ -113,3 +113,27 @@ def test_search_semantic_memory_fallbacks_to_local_when_qdrant_unavailable(monke
 
     assert result
     assert result[0]["key"] == "semantic:local"
+
+
+def test_delete_typed_memory_fallback_removes_local_semantic(monkeypatch):
+    fake_qdrant = _FakeQdrant()
+    monkeypatch.setattr(AgentMemory, "_init_redis_client", lambda self: None)
+    monkeypatch.setattr(AgentMemory, "_init_qdrant_client", lambda self: fake_qdrant)
+    memory = AgentMemory()
+    monkeypatch.setattr(memory, "_get_conn", _raise_db_unavailable)
+
+    memory.save_typed_memory(
+        user_id="u1",
+        key="semantic:delete-me",
+        value={"text": "teste de exclusao"},
+        memory_type=MemoryType.SEMANTIC,
+    )
+
+    deleted = memory.delete_typed_memory(
+        user_id="u1",
+        key="semantic:delete-me",
+        memory_type=MemoryType.SEMANTIC,
+    )
+
+    assert deleted is True
+    assert fake_qdrant.delete_calls
