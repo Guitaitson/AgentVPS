@@ -26,6 +26,7 @@ class VoiceContextSyncSkill(SkillBase):
                 f"- processed_files: {result.get('processed_files', 0)}\n"
                 f"- duplicates_skipped: {result.get('duplicates_skipped', 0)}\n"
                 f"- failed_files: {result.get('failed_files', 0)}\n"
+                f"- discarded_low_quality: {result.get('discarded_low_quality', 0)}\n"
                 f"- context_items: {result.get('context_items', 0)}\n"
                 f"- auto_committed: {result.get('auto_committed', 0)}\n"
                 f"- pending_review: {result.get('pending_review', 0)}"
@@ -40,6 +41,7 @@ class VoiceContextSyncSkill(SkillBase):
                 f"- pending_review: {result.get('pending_review', 0)}\n"
                 f"- approved_review: {result.get('approved_review', 0)}\n"
                 f"- committed_items: {result.get('committed_items', 0)}\n"
+                f"- discarded_items: {result.get('discarded_items', 0)}\n"
                 f"- last_job_id: {last_job.get('id', '-')}\n"
                 f"- last_job_status: {last_job.get('status', '-')}"
             )

@@ -68,3 +68,30 @@ async def test_voice_context_sync_skill_discards_job(monkeypatch):
     output = await skill.execute({"mode": "discard_job", "job_id": 2})
 
     assert "voice context job discarded: 2" in output
+
+
+@pytest.mark.asyncio
+async def test_voice_context_sync_skill_reports_low_quality_count(monkeypatch):
+    class FakeService:
+        async def sync_inbox(self, source="skill"):
+            return {
+                "success": True,
+                "status": "ok",
+                "processed_files": 1,
+                "duplicates_skipped": 0,
+                "failed_files": 0,
+                "discarded_low_quality": 1,
+                "context_items": 0,
+                "auto_committed": 0,
+                "pending_review": 0,
+            }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.voice_context_sync.handler.VoiceContextService",
+        lambda: FakeService(),
+    )
+    skill = VoiceContextSyncSkill(config=SkillConfig(name="voice_context_sync", description="test"))
+
+    output = await skill.execute({"mode": "sync"})
+
+    assert "discarded_low_quality: 1" in output

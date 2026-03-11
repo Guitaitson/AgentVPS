@@ -23,3 +23,4 @@ Este helper monitora drives removiveis, detecta o gravador de voz, pergunta se d
 - O upload passa primeiro por `remoteStagingDir` e so marca sucesso apos o arquivo existir em `remoteInboxDir`.
 - A pergunta aparece apenas quando um drive elegivel e conectado com arquivos novos.
 - O processamento do audio acontece na VPS via `/contextsync` ou lote automatico.
+- Para melhorar a qualidade de entrada, revise tambem [docs/VOICE_RECORDER_TUNING.md](C:\Users\Pc Gamer\.claude-worktrees\AgenteVPS\vigorous-elbakyan\docs\VOICE_RECORDER_TUNING.md) e o `FACTORY.TXT` do gravador.

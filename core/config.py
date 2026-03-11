@@ -267,6 +267,18 @@ class VoiceContextSettings(BaseSettings):
         default=30,
         description="Audios acima desse limite exigem revisao humana para todos os itens",
     )
+    quality_warn_score: float = Field(
+        default=0.65,
+        description="Abaixo disso o lote e marcado como qualidade questionavel e vai para revisao",
+    )
+    quality_min_score: float = Field(
+        default=0.35,
+        description="Abaixo disso o arquivo e descartado por baixa qualidade",
+    )
+    notify_on_job_completion: bool = Field(
+        default=True,
+        description="Envia resumo do lote de voz via Telegram quando um job termina",
+    )
     file_extensions: str = Field(
         default=".mp3,.wav,.ogg,.m4a,.flac,.aac,.mp4",
         description="Extensoes aceitas na inbox, separadas por virgula",
