@@ -182,6 +182,32 @@ chgrp vps_agent /opt/vps-agent/.env
 chmod 640 /opt/vps-agent/.env
 ```
 
+### Deploy Automatico por Release
+
+Existe suporte para deploy automatico quando uma release do GitHub e publicada:
+
+```text
+.github/workflows/release-deploy.yml
+scripts/deploy_release.sh
+```
+
+Secrets necessarios no GitHub:
+
+```text
+VPS_HOST
+VPS_USER
+VPS_SSH_KEY
+VPS_KNOWN_HOSTS   # opcional, mas recomendado
+```
+
+O fluxo faz:
+- `git pull --ff-only` em `main`
+- `pip install -e ".[dev,voice]"`
+- aplica migrations idempotentes
+- sobe/atualiza o Qdrant
+- reinstala os units systemd versionados
+- reinicia `telegram-bot` e `mcp-server`
+
 ---
 
 ## Verificação Pós-Deploy
