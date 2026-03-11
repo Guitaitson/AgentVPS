@@ -14,9 +14,30 @@ Campos relevantes observados:
 - `GAIN`: sensibilidade do microfone
 - `SECTION`: autosplit de arquivo em minutos
 
-## Perfil recomendado para AgentVPS
+## Perfil em teste atual
 
-As configuracoes abaixo sao uma inferencia pragmatica a partir do comportamento do dispositivo e do resultado ruim do primeiro lote de 5h. O objetivo nao e audio "bonito"; e ASR mais estavel.
+Configuracao aplicada agora no dispositivo:
+
+```text
+VOR:3
+DENOISE:20
+AGC:20
+BIT RATE:7
+GAIN:5
+SECTION:(060)
+```
+
+Leitura tecnica:
+- `VOR:3`: corta mais silencio/ambiente que o perfil anterior
+- `DENOISE:20`: filtro mais forte contra ruido constante
+- `AGC:20`: sobe a captacao, mas ainda abaixo do maximo absoluto
+- `BIT RATE:7`: privilegia fidelidade para ASR
+- `GAIN:5`: aumenta a sensibilidade do microfone
+- `SECTION:(060)`: continua quebrando lotes longos em partes mais trataveis
+
+## Perfil conservador alternativo
+
+As configuracoes abaixo ficam como fallback caso o perfil atual gere artefatos excessivos ou palavras "inventadas" pelo modelo.
 
 ```text
 VOR:1
@@ -28,12 +49,8 @@ SECTION:(060)
 ```
 
 Racional:
-- `VOR:1`: reduz silencio/ambiente sem cortar tanto quanto sensibilidades mais agressivas
-- `DENOISE:10`: menos agressivo que o valor anterior, para evitar artefatos
-- `AGC:16`: sai do maximo, que tende a puxar ruido ambiente
-- `BIT RATE:6`: sai do modo `4` observado como `Translate ON`
-- `GAIN:4`: leve aumento de captacao sem exagerar
-- `SECTION:(060)`: evita lotes gigantes e facilita revisao/descartes
+- o perfil atual prioriza captacao e fidelidade
+- o perfil conservador reduz risco de superprocessamento do audio pelo proprio gravador
 
 ## Processo seguro
 

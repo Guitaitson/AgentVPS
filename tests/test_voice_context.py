@@ -193,13 +193,7 @@ def test_voice_context_service_discard_job(monkeypatch):
 def test_voice_context_quality_report_flags_noisy_long_audio():
     service = VoiceContextService(memory=SimpleNamespace())
     transcript = TranscriptResult(
-        text=(
-            "E ai? achei que era cabeca\n"
-            "ta bom?\n"
-            "nao e o pago\n"
-            "eu gosto de um pouco\n"
-        )
-        * 120,
+        text=("E ai? achei que era cabeca\nta bom?\nnao e o pago\neu gosto de um pouco\n") * 120,
         duration_seconds=5 * 60 * 60,
         model="faster-whisper:tiny",
     )

@@ -1057,12 +1057,12 @@ class VoiceContextService:
         alpha_tokens = [token for token in tokens if any(ch.isalpha() for ch in token)]
         lines = [line.strip() for line in body.splitlines() if line.strip()]
 
-        short_ratio = (
-            sum(1 for token in alpha_tokens if len(token) <= 2) / max(1, len(alpha_tokens))
+        short_ratio = sum(1 for token in alpha_tokens if len(token) <= 2) / max(
+            1, len(alpha_tokens)
         )
         unique_ratio = len(set(alpha_tokens)) / max(1, len(alpha_tokens))
-        avg_words_per_line = (
-            sum(len(re.findall(r"\b\w+\b", line)) for line in lines) / max(1, len(lines))
+        avg_words_per_line = sum(len(re.findall(r"\b\w+\b", line)) for line in lines) / max(
+            1, len(lines)
         )
 
         score = 1.0
