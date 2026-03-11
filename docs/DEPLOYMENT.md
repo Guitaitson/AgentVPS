@@ -176,6 +176,10 @@ systemctl start telegram-bot mcp-server
 
 # Verificar status
 systemctl status telegram-bot mcp-server
+
+# Permitir execucao manual do app como usuario de servico sem expor o .env ao usuario de login
+chgrp vps_agent /opt/vps-agent/.env
+chmod 640 /opt/vps-agent/.env
 ```
 
 ---
