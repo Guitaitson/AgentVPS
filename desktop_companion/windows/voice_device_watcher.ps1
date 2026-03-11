@@ -24,7 +24,18 @@ function Load-State {
         return @{ files = @{} }
     }
     try {
-        return Get-Content $path -Raw | ConvertFrom-Json -AsHashtable
+        $raw = Get-Content $path -Raw | ConvertFrom-Json
+        $files = @{}
+        if ($null -ne $raw -and $null -ne $raw.files) {
+            foreach ($prop in $raw.files.PSObject.Properties) {
+                $files[$prop.Name] = @{
+                    name = $prop.Value.name
+                    uploadedAt = $prop.Value.uploadedAt
+                    stagedName = $prop.Value.stagedName
+                }
+            }
+        }
+        return @{ files = $files }
     }
     catch {
         return @{ files = @{} }
@@ -55,7 +66,8 @@ function Get-SshPath {
 
 function Quote-Posix {
     param([string]$Value)
-    return "'" + ($Value -replace "'", "'\"'\"'") + "'"
+    $replacement = [string]::Concat("'", [char]34, "'", [char]34, "'")
+    return "'" + ($Value -replace "'", $replacement) + "'"
 }
 
 function Invoke-Process {

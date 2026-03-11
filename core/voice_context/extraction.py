@@ -20,6 +20,10 @@ SUPPORTED_DOMAINS = (
     "lazer_contribuicao",
 )
 
+LLM_TRANSCRIPT_MAX_CHARS = 12000
+LLM_CHUNK_TARGET_CHARS = 8000
+LLM_MAX_CHUNKS = 24
+
 
 class VoiceContextExtractor:
     """Turns transcripts into structured context with LLM-first, heuristic fallback."""
@@ -147,6 +151,34 @@ class VoiceContextExtractor:
         *,
         source_name: str | None = None,
     ) -> dict[str, Any] | None:
+        chunks = self._chunk_transcript_for_llm(transcript)
+        if not chunks:
+            return None
+
+        if len(chunks) == 1:
+            return await self._extract_llm_chunk(chunks[0], source_name=source_name)
+
+        merged_outputs: list[dict[str, Any]] = []
+        for index, chunk in enumerate(chunks, start=1):
+            chunk_source = source_name
+            if chunk_source:
+                chunk_source = f"{chunk_source} [parte {index}/{len(chunks)}]"
+            else:
+                chunk_source = f"parte {index}/{len(chunks)}"
+            chunk_output = await self._extract_llm_chunk(chunk, source_name=chunk_source)
+            if chunk_output:
+                merged_outputs.append(chunk_output)
+
+        if not merged_outputs:
+            return None
+        return self._merge_llm_outputs(merged_outputs)
+
+    async def _extract_llm_chunk(
+        self,
+        transcript: str,
+        *,
+        source_name: str | None = None,
+    ) -> dict[str, Any] | None:
         provider = get_llm_provider()
         if not provider.api_key:
             return None
@@ -172,7 +204,7 @@ class VoiceContextExtractor:
             prompt += f"\nOrigem: {source_name}"
 
         response = await provider.generate(
-            user_message=transcript[:12000],
+            user_message=transcript[:LLM_TRANSCRIPT_MAX_CHARS],
             system_prompt=prompt,
             json_mode=True,
         )
@@ -188,6 +220,79 @@ class VoiceContextExtractor:
             return json.loads(content.strip())
         except Exception:
             return None
+
+    def _chunk_transcript_for_llm(self, transcript: str) -> list[str]:
+        cleaned = self._normalize_text(transcript)
+        if not cleaned:
+            return []
+        if len(cleaned) <= LLM_TRANSCRIPT_MAX_CHARS:
+            return [cleaned]
+
+        sentences = self._split_sentences(cleaned)
+        if not sentences:
+            return [
+                cleaned[i : i + LLM_CHUNK_TARGET_CHARS]
+                for i in range(0, len(cleaned), LLM_CHUNK_TARGET_CHARS)
+            ][:LLM_MAX_CHUNKS]
+
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+
+        for sentence in sentences:
+            sentence_len = len(sentence) + (1 if current else 0)
+            if current and current_len + sentence_len > LLM_CHUNK_TARGET_CHARS:
+                chunks.append(" ".join(current).strip())
+                current = [sentence]
+                current_len = len(sentence)
+            else:
+                current.append(sentence)
+                current_len += sentence_len
+
+        if current:
+            chunks.append(" ".join(current).strip())
+
+        return chunks[:LLM_MAX_CHUNKS]
+
+    def _merge_llm_outputs(self, outputs: list[dict[str, Any]]) -> dict[str, Any]:
+        merged = self._empty_output()
+        normalized_outputs = [self._normalize_output(output) for output in outputs]
+
+        summary_parts: list[str] = []
+        for output in normalized_outputs:
+            summary = str(output.get("summary", "")).strip()
+            if summary and summary not in summary_parts:
+                summary_parts.append(summary)
+
+        merged["summary"] = " ".join(summary_parts[:4])[:1000]
+
+        caps = {
+            "episodes": 8,
+            "facts": 12,
+            "preferences": 6,
+            "commitments": 8,
+        }
+        for key, limit in caps.items():
+            deduped = self._dedupe_items(normalized_outputs, key)
+            merged[key] = deduped[:limit]
+        return merged
+
+    @staticmethod
+    def _dedupe_items(outputs: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+        deduped: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for output in outputs:
+            for item in output.get(key, []) or []:
+                if key == "preferences":
+                    stable = f"{item.get('key','')}|{item.get('value','')}".strip().lower()
+                else:
+                    stable = str(item.get("text") or item.get("value") or "").strip().lower()
+                if not stable or stable in seen:
+                    continue
+                seen.add(stable)
+                deduped.append(item)
+        deduped.sort(key=lambda item: float(item.get("confidence", 0.0)), reverse=True)
+        return deduped
 
     def _heuristic_extract(self, transcript: str) -> dict[str, Any]:
         sentences = self._split_sentences(transcript)
