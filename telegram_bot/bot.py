@@ -214,6 +214,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - `/runtimes [list|enable|disable]` - Gerencia runtimes externos
 - `/contextsync` - Processa audios pendentes na inbox de voz
 - `/contextstatus` - Mostra status da captura de contexto por voz
+- `/contextdiscard <job_id>` - Descarta lote de voz ruim e remove memoria derivada
 - `/updatestatus` - Mostra status do updater automatico
 - `/help` - Esta ajuda
 
@@ -628,6 +629,7 @@ async def cmd_contextsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- processed_files: {result.get('processed_files', 0)}\n"
             f"- duplicates_skipped: {result.get('duplicates_skipped', 0)}\n"
             f"- failed_files: {result.get('failed_files', 0)}\n"
+            f"- discarded_low_quality: {result.get('discarded_low_quality', 0)}\n"
             f"- context_items: {result.get('context_items', 0)}\n"
             f"- auto_committed: {result.get('auto_committed', 0)}\n"
             f"- pending_review: {result.get('pending_review', 0)}"
@@ -653,6 +655,7 @@ async def cmd_contextstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- approved_review: {result.get('approved_review', 0)}",
             f"- committed_items: {result.get('committed_items', 0)}",
             f"- rejected_items: {result.get('rejected_items', 0)}",
+            f"- discarded_items: {result.get('discarded_items', 0)}",
         ]
         if last_job:
             lines.extend(
@@ -664,6 +667,7 @@ async def cmd_contextstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- batch_date: {last_job.get('batch_date')}",
                     f"- status: {last_job.get('status')}",
                     f"- processed_files: {stats.get('processed_files', 0)}",
+                    f"- discarded_low_quality: {stats.get('discarded_low_quality', 0)}",
                     f"- auto_committed: {stats.get('auto_committed', 0)}",
                     f"- pending_review: {stats.get('pending_review', 0)}",
                 ]
@@ -680,10 +684,13 @@ async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from datetime import datetime, timezone
 
+        from core.updater.deploy_safety import collect_deploy_safety_snapshot
+
         redis_conn = get_redis()
         last_check_raw = redis_conn.get("updater:last_check")
         last_summary_raw = redis_conn.get("updater:last_summary")
         summary = _parse_db_json(last_summary_raw)
+        deploy_safety = collect_deploy_safety_snapshot()
 
         last_check_text = "never"
         if last_check_raw:
@@ -718,6 +725,16 @@ async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Updater status",
             f"- last_check_utc: {last_check_text}",
             f"- open_update_proposals: {open_proposals}",
+            f"- safe_to_release_deploy: {str(deploy_safety.safe_to_deploy).lower()}",
+            (
+                "- active_blockers: "
+                f"voice_jobs={deploy_safety.voice_jobs_running}, "
+                f"voice_files={deploy_safety.voice_files_processing}, "
+                f"missions={deploy_safety.running_missions}, "
+                f"proposals={deploy_safety.executing_proposals}, "
+                f"tasks={deploy_safety.running_tasks}, "
+                f"manual={deploy_safety.manual_blockers}"
+            ),
         ]
 
         jobs = summary.get("jobs", []) if isinstance(summary, dict) else []
@@ -727,6 +744,16 @@ async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- job {item.get('job', '?')}: {item.get('status', '?')} "
                     f"(changes={item.get('changes', 0)})"
                 )
+
+        lines.extend(
+            [
+                "",
+                "Update policy:",
+                "- AgentVPS core usa release + deploy gate automatico",
+                "- skills/tools/agentes externos do acervo entram por catalog sync e approval workflow",
+                "- jobs longos podem criar blockers em runtime/deploy-blockers para adiar deploys",
+            ]
+        )
 
         if latest_sync:
             run_mode, status, stats_json, created_at = latest_sync
@@ -742,12 +769,52 @@ async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- added: {stats.get('added', 0)}",
                     f"- updated: {stats.get('updated', 0)}",
                     f"- removed: {stats.get('removed', 0)}",
+                    f"- pinned_skipped: {stats.get('pinned_skipped', 0)}",
                 ]
             )
 
         await update.message.reply_text("\n".join(lines))
     except Exception as e:
         logger.error("cmd_updatestatus_error", error=str(e))
+        await update.message.reply_text(f"Erro: {str(e)[:100]}")
+
+
+@authorized_only
+async def cmd_contextdiscard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler para /contextdiscard [job_id] - descarta lote de voz."""
+    try:
+        from core.voice_context import VoiceContextService
+
+        service = VoiceContextService()
+        if context.args:
+            job_id = int(context.args[0])
+        else:
+            last_job = service.get_status().get("last_job") or {}
+            job_id = int(last_job.get("id", 0))
+
+        if not job_id:
+            await update.message.reply_text("Uso: /contextdiscard <job_id>")
+            return
+
+        result = service.discard_job(
+            job_id=job_id,
+            actor=f"tg:{update.effective_user.id}",
+            note="discarded via telegram after user review",
+        )
+        if not result.get("success"):
+            await update.message.reply_text("Erro ao descartar lote de voz.")
+            return
+        await update.message.reply_text(
+            "voice context discarded\n"
+            f"- job_id: {job_id}\n"
+            f"- discarded_items: {result.get('discarded_items', 0)}\n"
+            f"- deleted_memories: {result.get('deleted_memories', 0)}\n"
+            f"- rejected_proposals: {result.get('rejected_proposals', 0)}"
+        )
+    except ValueError:
+        await update.message.reply_text("Uso: /contextdiscard <job_id>")
+    except Exception as e:
+        logger.error("cmd_contextdiscard_error", error=str(e))
         await update.message.reply_text(f"Erro: {str(e)[:100]}")
 
 
@@ -811,6 +878,7 @@ def main():
     app.add_handler(CommandHandler("runtimes", cmd_runtimes))
     app.add_handler(CommandHandler("contextsync", cmd_contextsync))
     app.add_handler(CommandHandler("contextstatus", cmd_contextstatus))
+    app.add_handler(CommandHandler("contextdiscard", cmd_contextdiscard))
     app.add_handler(CommandHandler("updatestatus", cmd_updatestatus))
 
     # Handler para mensagens gerais (LangGraph)

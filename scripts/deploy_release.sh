@@ -10,15 +10,29 @@ POSTGRES_USER="${POSTGRES_USER:-vps_agent}"
 DEPLOY_ATTEMPT="${DEPLOY_ATTEMPT:-0}"
 DEPLOY_DEFER_MINUTES="${DEPLOY_DEFER_MINUTES:-15}"
 DEPLOY_MAX_DEFERRALS="${DEPLOY_MAX_DEFERRALS:-16}"
+DEPLOY_BLOCKER_DIR="${DEPLOY_BLOCKER_DIR:-$APP_DIR/runtime/deploy-blockers}"
+
+sql_count() {
+  local sql
+  sql="$1"
+  docker exec -i "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At \
+    -c "$sql" 2>/dev/null || echo "0"
+}
 
 has_active_voice_processing() {
   local running_jobs processing_count
-  running_jobs="$(
-    docker exec -i "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At \
-      -c "select count(*) from voice_ingestion_jobs where status = 'running';" 2>/dev/null || echo "0"
-  )"
+  running_jobs="$(sql_count "select count(*) from voice_ingestion_jobs where status = 'running';")"
   processing_count="$(find "$APP_DIR/data/voice/processing" -type f 2>/dev/null | wc -l | tr -d ' ')"
   [[ "${running_jobs:-0}" != "0" || "${processing_count:-0}" != "0" ]]
+}
+
+has_active_runtime_work() {
+  local running_missions executing_proposals running_tasks blocker_files
+  running_missions="$(sql_count "select count(*) from agent_missions where status = 'running';")"
+  executing_proposals="$(sql_count "select count(*) from agent_proposals where status = 'executing';")"
+  running_tasks="$(sql_count "select count(*) from scheduled_tasks where status = 'running';")"
+  blocker_files="$(find "$DEPLOY_BLOCKER_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')"
+  [[ "${running_missions:-0}" != "0" || "${executing_proposals:-0}" != "0" || "${running_tasks:-0}" != "0" || "${blocker_files:-0}" != "0" ]]
 }
 
 schedule_deferred_retry() {
@@ -38,8 +52,9 @@ schedule_deferred_retry() {
 }
 
 cd "$APP_DIR"
+mkdir -p "$DEPLOY_BLOCKER_DIR"
 
-if has_active_voice_processing; then
+if has_active_voice_processing || has_active_runtime_work; then
   if (( DEPLOY_ATTEMPT >= DEPLOY_MAX_DEFERRALS )); then
     echo "deploy postponed too many times; aborting"
     exit 1

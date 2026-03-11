@@ -163,6 +163,15 @@ O fluxo recomendado para manter GitHub, PRs e VPS sincronizados e auditaveis e:
 
 Enquanto o deploy automatico por release nao for o caminho exclusivo, qualquer deploy manual deve terminar com a VPS alinhada em `main`, nao em branch temporaria.
 
+O deploy automatico por release nao reinicia o AgentVPS no meio de trabalho critico. O script `scripts/deploy_release.sh` adia a tentativa quando detecta:
+- transcricao/ingestao de voz em andamento
+- missions em execucao
+- proposals em estado `executing`
+- tarefas agendadas rodando
+- blockers manuais em `runtime/deploy-blockers`
+
+Para o acervo externo, a estrategia e diferente: skills/tools/agentes entram por catalog sync com proposal/approval, sem substituir automaticamente o core do AgentVPS.
+
 ---
 
 ## Estrutura de Diretórios

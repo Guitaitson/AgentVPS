@@ -5,6 +5,7 @@ import pytest
 from core.config import get_settings
 from core.voice_context.extraction import VoiceContextExtractor
 from core.voice_context.service import VoiceContextService
+from core.voice_context.transcription import TranscriptResult
 
 
 @pytest.fixture(autouse=True)
@@ -187,3 +188,53 @@ def test_voice_context_service_discard_job(monkeypatch):
     assert result["deleted_memories"] == 1
     assert result["rejected_proposals"] == 1
     assert deleted[0]["key"] == "voice:summary:2:e195cc299eb1"
+
+
+def test_voice_context_quality_report_flags_noisy_long_audio():
+    service = VoiceContextService(memory=SimpleNamespace())
+    transcript = TranscriptResult(
+        text=("E ai? achei que era cabeca\nta bom?\nnao e o pago\neu gosto de um pouco\n") * 120,
+        duration_seconds=5 * 60 * 60,
+        model="faster-whisper:tiny",
+    )
+
+    report = service.evaluate_transcript_quality(transcript)
+
+    assert report.status in {"warn", "discard"}
+    assert report.score < 0.65
+    assert report.reasons
+
+
+def test_voice_context_feedback_mentions_memory_targets_and_discard_reason():
+    service = VoiceContextService(memory=SimpleNamespace())
+
+    text = service._format_job_feedback(  # noqa: SLF001 - targeted regression coverage
+        {
+            "job_id": 9,
+            "status": "completed",
+            "processed_files": 1,
+            "duplicates_skipped": 0,
+            "discarded_low_quality": 1,
+            "auto_committed": 2,
+            "pending_review": 1,
+            "committed_targets": {"episodic": 1, "semantic": 1},
+            "pending_targets": {"goals": 1},
+            "proposal_ids": [41],
+            "files": [
+                {
+                    "file_name": "morning.wav",
+                    "status": "discarded_quality",
+                    "quality_score": 0.31,
+                    "quality_status": "discard",
+                    "duration_minutes": 52.0,
+                    "reason": "review_required; quality_discard:0.31",
+                    "quality_reasons": ["baixa estabilidade lexical na transcricao"],
+                }
+            ],
+        }
+    )
+
+    assert "memory_committed: episodic=1, semantic=1" in text
+    assert "memory_review: goals=1" in text
+    assert "disposition: review_required; quality_discard:0.31" in text
+    assert "/contextdiscard 9" in text
