@@ -6,8 +6,10 @@ import re
 import unicodedata
 
 FLEET_KEYWORDS = [
+    "camin",
     "caminhao",
     "caminhoes",
+    "emplac",
     "emplacamento",
     "frota",
     "market share",

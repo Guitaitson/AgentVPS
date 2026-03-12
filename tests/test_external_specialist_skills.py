@@ -163,6 +163,52 @@ async def test_fleetintel_analyst_degrades_with_preflight_when_primary_call_fail
 
 
 @pytest.mark.asyncio
+async def test_fleetintel_analyst_refines_company_count_when_entity_not_resolved(monkeypatch):
+    calls = []
+
+    async def fake_call(self, tool_name, arguments=None):
+        calls.append((tool_name, arguments or {}))
+        if tool_name == "count_empresa_registrations":
+            return {"count": 0, "empresas": [], "error": "Empresa nao encontrada"}
+        if tool_name == "search_empresas":
+            return {
+                "empresas": [
+                    {
+                        "razao_social": "VAMOS LOCACAO DE CAMINHOES",
+                        "cnpj": "11111111000111",
+                        "grupo_locadora": "VAMOS",
+                    },
+                    {
+                        "razao_social": "VAMOS COMERCIO DE VEICULOS",
+                        "cnpj": "22222222000122",
+                        "grupo_locadora": "VAMOS",
+                    },
+                ]
+            }
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.RemoteMCPClient.call_tool", fake_call
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "Quantos caminhoes o Grupo Vamos comprou em 2025?"})
+
+    assert ("count_empresa_registrations", {"razao_social": "Grupo Vamos", "ano": 2025}) in calls
+    assert ("search_empresas", {"razao_social": "Grupo Vamos", "limit": 5}) in calls
+    assert "Nao consegui travar a entidade exata" in result
+    assert "VAMOS LOCACAO DE CAMINHOES" in result
+
+
+@pytest.mark.asyncio
 async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
     calls = []
 

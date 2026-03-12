@@ -55,6 +55,14 @@ class FleetIntelAnalystSkill(SkillBase):
                 error=exc,
                 tool_name=tool_name,
             )
+        if tool_name == "count_empresa_registrations":
+            refined = await self._maybe_refine_company_count(
+                client=client,
+                tool_args=tool_args,
+                result=result,
+            )
+            if refined is not None:
+                return refined
         return self._format(tool_name, result)
 
     def _route(self, query: str) -> tuple[str, dict[str, Any]]:
@@ -262,3 +270,49 @@ class FleetIntelAnalystSkill(SkillBase):
             f"{health_summary}\n"
             "Posso tentar novamente depois ou seguir por outra leitura comercial."
         )
+
+    async def _maybe_refine_company_count(
+        self,
+        *,
+        client: RemoteMCPClient,
+        tool_args: dict[str, Any],
+        result: Any,
+    ) -> str | None:
+        if not isinstance(result, dict):
+            return None
+        empresas = result.get("empresas")
+        if isinstance(empresas, list) and empresas:
+            return None
+        company_name = str(tool_args.get("razao_social") or "").strip()
+        if not company_name:
+            return None
+
+        try:
+            search_result = await client.call_tool(
+                "search_empresas",
+                {"razao_social": company_name, "limit": 5},
+            )
+        except Exception:
+            return None
+
+        if not isinstance(search_result, dict):
+            return None
+        matches = search_result.get("empresas") or search_result.get("results") or []
+        if not isinstance(matches, list) or not matches:
+            return None
+
+        lines = [
+            "FleetIntel",
+            "",
+            f"Nao consegui travar a entidade exata para `{company_name}` so pelo nome.",
+            "Encontrei estas empresas parecidas:",
+        ]
+        for item in matches[:5]:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- {item.get('razao_social') or item.get('nome_fantasia') or 'empresa'} | "
+                f"CNPJ {item.get('cnpj', '-')} | grupo {item.get('grupo_locadora', '-')}"
+            )
+        lines.append("Se quiser, eu sigo com o CNPJ ou com o nome juridico exato.")
+        return "\n".join(lines)
