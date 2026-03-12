@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 FLEET_KEYWORDS = [
     "caminhao",
     "caminhoes",
@@ -44,6 +46,24 @@ ORCHESTRATION_KEYWORDS = [
     "unica resposta",
 ]
 
+COMPANY_VOLUME_VERBS = [
+    "comprou",
+    "compraram",
+    "emplacou",
+    "emplacaram",
+    "registrou",
+    "registraram",
+    "adquiriu",
+    "adquiriram",
+]
+
+COMPANY_VOLUME_NOUNS = [
+    "caminh",
+    "veicul",
+    "emplac",
+    "unidad",
+]
+
 
 def detect_external_skill(message: str) -> str | None:
     msg = message.lower().strip()
@@ -57,4 +77,46 @@ def detect_external_skill(message: str) -> str | None:
         return "brazilcnpj"
     if has_fleet:
         return "fleetintel_analyst"
+    return None
+
+
+def extract_company_count_query(message: str) -> dict[str, int | str] | None:
+    lowered = message.lower()
+    year_match = re.search(r"\b(20\d{2})\b", lowered)
+    has_company_volume_shape = any(verb in lowered for verb in COMPANY_VOLUME_VERBS) and any(
+        noun in lowered for noun in COMPANY_VOLUME_NOUNS
+    )
+    if not has_company_volume_shape:
+        return None
+
+    company_name = _extract_company_name(message)
+    if not company_name:
+        return None
+
+    result: dict[str, int | str] = {"razao_social": company_name}
+    if year_match:
+        result["ano"] = int(year_match.group(1))
+    return result
+
+
+def _extract_company_name(message: str) -> str | None:
+    patterns = [
+        r"\b(?:quantos|quantas|quantidade de|qtd de)\b.*?\b(?:o|a)\s+(?P<company>.+?)\s+\b(?:comprou|compraram|emplacou|emplacaram|registrou|registraram|adquiriu|adquiriram)\b",
+        r"\b(?:empresa|grupo|conta)\s+(?P<company>.+?)\s+\b(?:comprou|compraram|emplacou|emplacaram|registrou|registraram|adquiriu|adquiriram)\b",
+        r"\b(?:o|a)\s+(?P<company>.+?)\s+\b(?:comprou|compraram|emplacou|emplacaram|registrou|registraram|adquiriu|adquiriram)\b",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message, flags=re.IGNORECASE)
+        if not match:
+            continue
+        company = match.group("company").strip(" ?.,")
+        company = re.sub(
+            r"^(?:empresa|conta)\s+",
+            "",
+            company,
+            flags=re.IGNORECASE,
+        ).strip(" ?.,")
+        if company:
+            return company
     return None

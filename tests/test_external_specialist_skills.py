@@ -1,6 +1,6 @@
 import pytest
 
-from core.integrations import detect_external_skill
+from core.integrations import RemoteMCPError, detect_external_skill, extract_company_count_query
 from core.skills._builtin.brazilcnpj.handler import BrazilCNPJSkill
 from core.skills._builtin.fleetintel_analyst.handler import FleetIntelAnalystSkill
 from core.skills._builtin.fleetintel_orchestrator.handler import FleetIntelOrchestratorSkill
@@ -19,6 +19,12 @@ def test_detect_external_skill_routes():
     assert detect_external_skill("cruze sinais de compra com cnpj das contas") == (
         "fleetintel_orchestrator"
     )
+
+
+def test_extract_company_count_query_for_company_year_volume():
+    args = extract_company_count_query("Quantos caminhões o Grupo Vamos comprou em 2025?")
+
+    assert args == {"razao_social": "Grupo Vamos", "ano": 2025}
 
 
 @pytest.mark.asyncio
@@ -75,6 +81,82 @@ async def test_fleetintel_analyst_routes_priority_queries(monkeypatch):
     assert calls[0][0] == "fleetintel"
     assert calls[0][1] == "buying_signals"
     assert "Empresa A" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_analyst_routes_company_volume_queries(monkeypatch):
+    calls = []
+
+    async def fake_call(self, tool_name, arguments=None):
+        calls.append((self.server_name, tool_name, arguments or {}))
+        return {
+            "count": 42,
+            "ano": 2025,
+            "empresas": [{"razao_social": "Grupo Vamos", "cnpj": "12345678000199"}],
+        }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.RemoteMCPClient.call_tool", fake_call
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "Quantos caminhões o Grupo Vamos comprou em 2025?"})
+
+    assert calls[0][1] == "count_empresa_registrations"
+    assert calls[0][2] == {"razao_social": "Grupo Vamos", "ano": 2025}
+    assert "42" in result
+    assert "Grupo Vamos" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_analyst_degrades_with_preflight_when_primary_call_fails(monkeypatch):
+    calls = []
+
+    async def fake_call(self, tool_name, arguments=None):
+        calls.append((tool_name, arguments or {}))
+        if tool_name == "count_empresa_registrations":
+            raise RemoteMCPError(
+                server_name="fleetintel",
+                stage="tools/call",
+                error_type="http_5xx",
+                message="bad gateway",
+                status_code=502,
+            )
+        if tool_name == "get_operations_status":
+            return {
+                "status": "warning",
+                "freshness": "stale",
+                "generated_at": "2026-03-12T10:00:00Z",
+            }
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.RemoteMCPClient.call_tool", fake_call
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "Quantos caminhões o Grupo Vamos comprou em 2025?"})
+
+    assert ("count_empresa_registrations", {"razao_social": "Grupo Vamos", "ano": 2025}) in calls
+    assert ("get_operations_status", {}) in calls
+    assert "HTTP 502" in result
+    assert "status=warning" in result
 
 
 @pytest.mark.asyncio

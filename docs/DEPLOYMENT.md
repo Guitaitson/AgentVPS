@@ -88,6 +88,8 @@ chown root:root /opt/vps-agent/.env
 ```env
 TELEGRAM_BOT_TOKEN=seu-token-aqui
 TELEGRAM_ALLOWED_USERS=seu-id-numerico
+TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS=2.0
+TELEGRAM_TYPING_INTERVAL_SECONDS=4.0
 POSTGRES_USER=vps_agent
 POSTGRES_PASSWORD=senha-forte-aqui
 POSTGRES_HOST=127.0.0.1
@@ -414,6 +416,7 @@ Para habilitar as skills externas em producao:
 
 - definir `FLEETINTEL_MCP_URL`, `FLEETINTEL_CF_ACCESS_CLIENT_ID` e `FLEETINTEL_CF_ACCESS_CLIENT_SECRET`
 - definir `BRAZILCNPJ_MCP_URL`, `BRAZILCNPJ_CF_ACCESS_CLIENT_ID` e `BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET`
+- opcionalmente ajustar `TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS` e `TELEGRAM_TYPING_INTERVAL_SECONDS` para o feedback visual do bot
 - manter `configs/skills-catalog-sources.json` com a fonte `fleetintel_skillpack_snapshot` habilitada
 - executar `/catalogsync check` e depois `/catalogsync apply`
 
@@ -422,6 +425,7 @@ Para sync vivo via GitHub API em repositorio privado, habilite a fonte `fleetint
 
 Migracao de auth externa:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
+- FleetIntel/BrazilCNPJ agora usam retry curto para falhas transitórias (`502/503/504`, timeout e connect error) e resposta degradada com preflight quando o MCP responde mas a consulta principal falha
 - use apenas os endpoints `https://agent-fleet.gtaitson.space/mcp` e `https://agent-cnpj.gtaitson.space/mcp`
 - a autenticacao externa agora e feita por Cloudflare Access Service Tokens
 - nao existe compatibilidade reversa com bearer token legado no lado AgentVPS

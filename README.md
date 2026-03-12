@@ -78,6 +78,8 @@ Skills com `dangerous` requerem aprovação humana (configurável via `on-danger
 
 Os especialistas `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator` usam MCP remoto autenticado por Cloudflare Access Service Tokens e sao escolhidos automaticamente quando a pergunta pede inteligencia de frota, enriquecimento CNPJ ou cruzamento dos dois dominios.
 
+No Telegram, requests lentos agora mostram `typing` recorrente e uma unica mensagem de progresso editavel, em vez de parecerem travados.
+
 ---
 
 ## Segurança
@@ -225,6 +227,8 @@ Ver `configs/.env.example` para a lista completa. Mínimo necessário:
 ```env
 TELEGRAM_BOT_TOKEN=...        # Token do BotFather
 TELEGRAM_ALLOWED_USERS=...    # IDs separados por vírgula
+TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS=2.0
+TELEGRAM_TYPING_INTERVAL_SECONDS=4.0
 POSTGRES_PASSWORD=...         # Senha PostgreSQL
 OPENROUTER_API_KEY=...        # Chave OpenRouter
 OPENROUTER_MODEL=minimax/minimax-m2.5
@@ -240,6 +244,8 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
 - os clientes externos agora autenticam na borda Cloudflare com `CF-Access-Client-Id` e `CF-Access-Client-Secret`
 - nao ha compatibilidade reversa com bearer token legado no AgentVPS
+- consultas FleetIntel/BrazilCNPJ usam retry curto para `502/503/504`, timeout e erro de conexao
+- em falha, o AgentVPS tenta preflight (`get_operations_status` ou `health_check`) antes de responder ao usuario
 
 ---
 

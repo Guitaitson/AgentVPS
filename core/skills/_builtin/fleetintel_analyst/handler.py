@@ -8,7 +8,12 @@ from typing import Any
 
 import structlog
 
-from core.integrations import RemoteMCPClient, render_result_block
+from core.integrations import (
+    RemoteMCPClient,
+    RemoteMCPError,
+    extract_company_count_query,
+    render_result_block,
+)
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
@@ -42,11 +47,21 @@ class FleetIntelAnalystSkill(SkillBase):
 
         tool_name, tool_args = self._route(query)
         logger.info("fleetintel_analyst_execute", tool=tool_name)
-        result = await client.call_tool(tool_name, tool_args)
+        try:
+            result = await client.call_tool(tool_name, tool_args)
+        except RemoteMCPError as exc:
+            return await self._format_remote_failure(
+                client=client,
+                error=exc,
+                tool_name=tool_name,
+            )
         return self._format(tool_name, result)
 
     def _route(self, query: str) -> tuple[str, dict[str, Any]]:
         msg = query.lower()
+        company_count_args = extract_company_count_query(query)
+        if company_count_args:
+            return "count_empresa_registrations", company_count_args
         if any(
             keyword in msg
             for keyword in ("saude", "status operacional", "fresh", "sincron", "health")
@@ -137,6 +152,28 @@ class FleetIntelAnalystSkill(SkillBase):
                 f"freshness={freshness}\n"
                 f"generated_at={result.get('generated_at') or result.get('timestamp', '-')}"
             )
+        if tool_name == "count_empresa_registrations" and isinstance(result, dict):
+            if result.get("ambiguous"):
+                empresas = result.get("empresas") or []
+                lines = ["FleetIntel", "", result.get("message", "Empresa ambigua.")]
+                for empresa in empresas[:5]:
+                    if not isinstance(empresa, dict):
+                        continue
+                    lines.append(
+                        f"- {empresa.get('razao_social') or empresa.get('nome_fantasia') or 'empresa'} | "
+                        f"CNPJ {empresa.get('cnpj', '-')} | segmento {empresa.get('segmento_cliente', '-')}"
+                    )
+                return "\n".join(lines)
+            empresas = result.get("empresas") or []
+            empresa = empresas[0] if empresas and isinstance(empresas[0], dict) else {}
+            ano = result.get("ano")
+            periodo = f" em {ano}" if ano else ""
+            return (
+                "FleetIntel\n\n"
+                f"{empresa.get('razao_social') or 'Empresa'} registrou {result.get('count', 0)} "
+                f"emplacamentos{periodo}.\n"
+                f"CNPJ: {empresa.get('cnpj', '-')}"
+            )
         if tool_name == "list_suggested_questions" and isinstance(result, dict):
             items = (
                 result.get("questions")
@@ -195,3 +232,33 @@ class FleetIntelAnalystSkill(SkillBase):
             details = f" ({', '.join(suffix)})" if suffix else ""
             lines.append(f"- {name}{details}")
         return "\n".join(lines)
+
+    async def _format_remote_failure(
+        self,
+        *,
+        client: RemoteMCPClient,
+        error: RemoteMCPError,
+        tool_name: str,
+    ) -> str:
+        health_summary = ""
+        if tool_name != "get_operations_status":
+            try:
+                health = await client.call_tool("get_operations_status", {})
+                if isinstance(health, dict):
+                    health_summary = (
+                        "\n"
+                        f"Preflight FleetIntel: status={health.get('status', '-')} "
+                        f"freshness={health.get('data_freshness') or health.get('freshness') or '-'} "
+                        f"generated_at={health.get('generated_at') or health.get('timestamp', '-')}"
+                    )
+            except Exception:
+                health_summary = "\nPreflight FleetIntel indisponivel no momento."
+
+        status_fragment = f"HTTP {error.status_code}" if error.status_code else error.error_type
+        return (
+            "FleetIntel\n\n"
+            f"A consulta falhou ao executar `{tool_name}`.\n"
+            f"Falha detectada: {status_fragment} na etapa `{error.stage}`."
+            f"{health_summary}\n"
+            "Posso tentar novamente depois ou seguir por outra leitura comercial."
+        )

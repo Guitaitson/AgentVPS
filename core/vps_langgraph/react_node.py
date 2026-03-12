@@ -15,6 +15,7 @@ import json
 import structlog
 
 from ..integrations import detect_external_skill
+from ..progress import emit_progress
 from ..skills.registry import get_skill_registry
 from .state import AgentState
 
@@ -94,6 +95,10 @@ async def node_react(state: AgentState) -> AgentState:
         if specialist:
             logger.info("react_external_shortcut", skill=specialist_name)
             try:
+                if specialist_name.startswith("fleetintel"):
+                    await emit_progress("external_call", server="fleetintel", status="start")
+                elif specialist_name == "brazilcnpj":
+                    await emit_progress("external_call", server="brazilcnpj", status="start")
                 specialist_result = await registry.execute_skill(
                     specialist_name,
                     {"raw_input": user_message, "query": user_message},
@@ -316,6 +321,7 @@ async def node_format_response(state: AgentState) -> AgentState:
         )
 
     provider = get_llm_provider()
+    await emit_progress("formatting", tool=tool_name or "response")
 
     # Usar identidade condensada para que o LLM NUNCA esqueça que é o VPS-Agent
     from ..llm.agent_identity import get_identity_prompt_condensed

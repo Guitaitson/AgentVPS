@@ -8,7 +8,13 @@ from typing import Any
 
 import structlog
 
-from core.integrations import RemoteMCPClient, extract_cnpjs, render_result_block
+from core.integrations import (
+    RemoteMCPClient,
+    RemoteMCPError,
+    extract_cnpjs,
+    extract_company_count_query,
+    render_result_block,
+)
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
@@ -49,9 +55,15 @@ class FleetIntelOrchestratorSkill(SkillBase):
             )
 
         logger.info("fleetintel_orchestrator_execute", query=query[:120])
-        ops = await fleet_client.call_tool("get_operations_status", {})
+        try:
+            ops = await fleet_client.call_tool("get_operations_status", {})
+        except RemoteMCPError as exc:
+            return self._format_fleet_failure(error=exc, query=query)
         fleet_tool, fleet_args = self._route_fleet_query(query)
-        fleet_result = await fleet_client.call_tool(fleet_tool, fleet_args)
+        try:
+            fleet_result = await fleet_client.call_tool(fleet_tool, fleet_args)
+        except RemoteMCPError as exc:
+            return self._format_fleet_failure(error=exc, query=query, ops=ops, tool_name=fleet_tool)
 
         needs_cnpj = self._needs_cnpj(query)
         cnpj_health = None
@@ -63,12 +75,15 @@ class FleetIntelOrchestratorSkill(SkillBase):
             candidate_cnpjs.insert(0, explicit_cnpj)
 
         if needs_cnpj and cnpj_client.is_configured:
-            cnpj_health = await cnpj_client.call_tool("health_check", {})
-            if isinstance(cnpj_health, dict) and cnpj_health.get("status") == "ok":
-                for cnpj in candidate_cnpjs[:3]:
-                    enrichments.append(
-                        await cnpj_client.call_tool("get_cached_cnpj_profile", {"cnpj": cnpj})
-                    )
+            try:
+                cnpj_health = await cnpj_client.call_tool("health_check", {})
+                if isinstance(cnpj_health, dict) and cnpj_health.get("status") == "ok":
+                    for cnpj in candidate_cnpjs[:3]:
+                        enrichments.append(
+                            await cnpj_client.call_tool("get_cached_cnpj_profile", {"cnpj": cnpj})
+                        )
+            except RemoteMCPError as exc:
+                logger.warning("fleetintel_orchestrator_cnpj_degraded", error=str(exc))
 
         return self._format(
             query=query,
@@ -113,6 +128,9 @@ class FleetIntelOrchestratorSkill(SkillBase):
 
     def _route_fleet_query(self, query: str) -> tuple[str, dict[str, Any]]:
         msg = query.lower()
+        company_count_args = extract_company_count_query(query)
+        if company_count_args:
+            return "count_empresa_registrations", company_count_args
         args: dict[str, Any] = {"limit": 5}
         uf = self._extract_uf(query)
         if uf:
@@ -138,6 +156,33 @@ class FleetIntelOrchestratorSkill(SkillBase):
         if explicit_cnpj:
             return "empresa_profile", {"cnpj": explicit_cnpj}
         return "top_empresas_by_registrations", args
+
+    @staticmethod
+    def _format_fleet_failure(
+        *,
+        error: RemoteMCPError,
+        query: str,
+        ops: Any | None = None,
+        tool_name: str | None = None,
+    ) -> str:
+        lines = ["FleetIntel Orchestrator", ""]
+        lines.append(f"Consulta: {query}")
+        if tool_name:
+            lines.append(f"Tool principal: {tool_name}")
+        lines.append(
+            f"Falha FleetIntel: {'HTTP ' + str(error.status_code) if error.status_code else error.error_type} "
+            f"na etapa `{error.stage}`."
+        )
+        if isinstance(ops, dict):
+            lines.append(
+                "Preflight FleetIntel: "
+                f"status={ops.get('status', '-')} "
+                f"freshness={ops.get('data_freshness') or ops.get('freshness') or '-'}"
+            )
+        else:
+            lines.append("Preflight FleetIntel indisponivel no momento.")
+        lines.append("Posso tentar novamente depois ou responder sem enriquecimento externo.")
+        return "\n".join(lines)
 
     def _format(
         self,
