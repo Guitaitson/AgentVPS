@@ -111,6 +111,10 @@ class FleetIntelSkill(SkillBase):
         ):
             return "top_empresas_by_registrations", self._build_top_empresas_args(msg)
 
+        cnpj = self._extract_cnpj(message)
+        if cnpj:
+            return "empresa_profile", {"cnpj": cnpj}
+
         empresa = self._extract_empresa(msg)
         if empresa and any(
             p in msg
@@ -194,6 +198,11 @@ class FleetIntelSkill(SkillBase):
     def _extract_year(self, msg: str) -> Optional[int]:
         match = re.search(r"\b(20[0-2][0-9])\b", msg)
         return int(match.group(1)) if match else None
+
+    def _extract_cnpj(self, text: str) -> Optional[str]:
+        digits = re.sub(r"\D", "", text)
+        match = re.search(r"\b\d{14}\b", digits)
+        return match.group(0) if match else None
 
     def _extract_uf(self, msg: str) -> Optional[str]:
         uf_map = {
@@ -355,6 +364,8 @@ class FleetIntelSkill(SkillBase):
                 return self._fmt_top_empresas(result)
             if tool_name == "count_empresa_registrations":
                 return self._fmt_count_empresa(result)
+            if tool_name == "empresa_profile":
+                return self._fmt_empresa_profile(result)
             if tool_name == "search_empresas":
                 return self._fmt_search_empresas(result)
             if tool_name == "search_vehicles":
@@ -442,6 +453,34 @@ class FleetIntelSkill(SkillBase):
         year = data.get("ano", data.get("year", ""))
         year_str = f" em {year}" if year else ""
         return f"{empresa}{year_str}\n\nEmplacamentos: {count}"
+
+    def _fmt_empresa_profile(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Perfil da Empresa\n\n{data}"
+        if not isinstance(data, dict):
+            return f"Perfil da Empresa\n\n{data}"
+        if data.get("error"):
+            return "Perfil da Empresa\n\nEmpresa nao encontrada na base FleetIntel."
+        empresa = data.get("empresa", {})
+        resumo = data.get("entity_summary", {}).get("resumo", data.get("resumo", {}))
+        lines = ["Perfil da Empresa", ""]
+        lines.append(
+            f"Empresa: {empresa.get('razao_social', '?')} | CNPJ: {empresa.get('cnpj', '-')}"
+        )
+        if resumo:
+            total = resumo.get("total_emplacamentos", 0)
+            valor_total = float(resumo.get("valor_total", 0) or 0)
+            primeira = resumo.get("primeira_compra_historico", "-")
+            ultima = resumo.get("ultima_compra_historico", "-")
+            marcas = resumo.get("marcas_distintas", 0)
+            ufs = resumo.get("ufs_distintas", 0)
+            valor_formatado = (
+                f"R$ {valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
+            lines.append(f"Historico: {total} emplacamentos | {valor_formatado}")
+            lines.append(f"Janela: {primeira} ate {ultima}")
+            lines.append(f"Diversidade: {marcas} marcas | {ufs} UFs")
+        return "\n".join(lines)
 
     def _fmt_search_empresas(self, data: Any) -> str:
         if isinstance(data, str):

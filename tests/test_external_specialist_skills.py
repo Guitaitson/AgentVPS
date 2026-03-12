@@ -2,6 +2,7 @@ import pytest
 
 from core.integrations import RemoteMCPError, detect_external_skill, extract_company_count_query
 from core.skills._builtin.brazilcnpj.handler import BrazilCNPJSkill
+from core.skills._builtin.fleetintel.handler import FleetIntelSkill
 from core.skills._builtin.fleetintel_analyst.handler import FleetIntelAnalystSkill
 from core.skills._builtin.fleetintel_orchestrator.handler import FleetIntelOrchestratorSkill
 from core.skills.base import SecurityLevel, SkillConfig
@@ -124,6 +125,47 @@ async def test_fleetintel_analyst_routes_company_volume_queries(monkeypatch):
     assert calls[0][2] == {"razao_social": "Grupo Vamos", "ano": 2025}
     assert "42" in result
     assert "Grupo Vamos" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_analyst_formats_empresa_profile_summary(monkeypatch):
+    async def fake_call(self, tool_name, arguments=None):
+        assert tool_name == "empresa_profile"
+        return {
+            "empresa": {
+                "cnpj": "48430290000130",
+                "razao_social": "ADDIANTE S.A",
+            },
+            "resumo": {
+                "total_emplacamentos": 914,
+                "valor_total": 2921246934.76,
+                "primeira_compra_historico": "2023-04-11",
+                "ultima_compra_historico": "2026-02-24",
+                "marcas_distintas": 7,
+                "ufs_distintas": 1,
+            },
+        }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.RemoteMCPClient.call_tool", fake_call
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute(
+        {"query": "Use o FleetIntel para analisar o CNPJ 48.430.290/0001-30"}
+    )
+
+    assert "ADDIANTE S.A" in result
+    assert "914 emplacamentos" in result
+    assert "Janela observada" in result
 
 
 @pytest.mark.asyncio
@@ -305,6 +347,50 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
         server == "brazilcnpj" and tool == "get_cached_cnpj_profile" for server, tool, _ in calls
     )
     assert "Enriquecimento seletivo" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_skill_routes_explicit_cnpj_to_empresa_profile(monkeypatch):
+    calls = []
+
+    async def fake_call(self, tool_name, arguments=None):
+        calls.append((self.server_name, tool_name, arguments or {}))
+        return {
+            "empresa": {
+                "cnpj": "23373000000132",
+                "razao_social": "VAMOS LOCACAO DE CAMINHOES, MAQUINAS E EQUIPAMENTOS S.A.",
+            },
+            "resumo": {
+                "total_emplacamentos": 203,
+                "valor_total": 570215790.0,
+                "primeira_compra_historico": "2017-05-05",
+                "ultima_compra_historico": "2024-08-19",
+                "marcas_distintas": 4,
+                "ufs_distintas": 2,
+            },
+        }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel.handler.RemoteMCPClient.call_tool", fake_call
+    )
+
+    skill = FleetIntelSkill(_config("fleetintel"))
+    result = await skill.execute(
+        {"query": "Use a skill fleetintel para consultar o CNPJ 23.373.000/0001-32"}
+    )
+
+    assert calls[0][1] == "empresa_profile"
+    assert calls[0][2] == {"cnpj": "23373000000132"}
+    assert "Perfil da Empresa" in result
+    assert "203 emplacamentos" in result
 
 
 @pytest.mark.asyncio
