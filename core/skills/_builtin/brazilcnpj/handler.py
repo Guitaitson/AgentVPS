@@ -8,7 +8,7 @@ from typing import Any
 
 import structlog
 
-from core.integrations import RemoteMCPClient, render_result_block
+from core.integrations import RemoteMCPClient, RemoteMCPError, render_result_block
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
@@ -42,7 +42,10 @@ class BrazilCNPJSkill(SkillBase):
 
         tool_name, tool_args = self._route(query)
         logger.info("brazilcnpj_execute", tool=tool_name)
-        result = await client.call_tool(tool_name, tool_args)
+        try:
+            result = await client.call_tool(tool_name, tool_args)
+        except RemoteMCPError as exc:
+            return await self._format_remote_failure(client=client, error=exc, tool_name=tool_name)
         return self._format(tool_name, result)
 
     def _route(self, query: str) -> tuple[str, dict[str, Any]]:
@@ -132,3 +135,33 @@ class BrazilCNPJSkill(SkillBase):
                 )
             return "\n".join(lines)
         return render_result_block(title, result)
+
+    async def _format_remote_failure(
+        self,
+        *,
+        client: RemoteMCPClient,
+        error: RemoteMCPError,
+        tool_name: str,
+    ) -> str:
+        health_summary = ""
+        if tool_name != "health_check":
+            try:
+                health = await client.call_tool("health_check", {})
+                if isinstance(health, dict):
+                    health_summary = (
+                        "\n"
+                        f"Preflight BrazilCNPJ: status={health.get('status', '-')} "
+                        f"database_ok={health.get('database_ok', '-')} "
+                        f"schema_ok={health.get('schema_ok', '-')}"
+                    )
+            except Exception:
+                health_summary = "\nPreflight BrazilCNPJ indisponivel no momento."
+
+        status_fragment = f"HTTP {error.status_code}" if error.status_code else error.error_type
+        return (
+            "BrazilCNPJ\n\n"
+            f"A consulta falhou ao executar `{tool_name}`.\n"
+            f"Falha detectada: {status_fragment} na etapa `{error.stage}`."
+            f"{health_summary}\n"
+            "Posso tentar novamente depois ou limitar a resposta ao que ja estiver em cache."
+        )

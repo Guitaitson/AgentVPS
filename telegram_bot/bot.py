@@ -3,13 +3,17 @@ VPS-Agent Telegram Bot Ã¢â‚¬â€ Interface principal
 VersÃƒÂ£o: 2.0 Ã¢â‚¬â€ Com LangGraph e timeout otimizado
 """
 
+import asyncio
 import logging
 import os
+import time
 
 import psycopg2
 import redis
 import structlog
 from telegram import Update
+from telegram.constants import ChatAction
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -39,6 +43,114 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ALLOWED_USERS = [
     int(uid.strip()) for uid in os.getenv("TELEGRAM_ALLOWED_USERS", "").split(",") if uid.strip()
 ]
+PROGRESS_MESSAGE_THRESHOLD_SECONDS = float(
+    os.getenv("TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS", "2.0")
+)
+TYPING_INTERVAL_SECONDS = float(os.getenv("TELEGRAM_TYPING_INTERVAL_SECONDS", "4.0"))
+
+
+class TelegramProgressSession:
+    """Typing indicator plus a single editable status message."""
+
+    PHASE_LABELS = {
+        "received": "Analisando mensagem...",
+        "routing": "Definindo a melhor rota...",
+        "formatting": "Escrevendo resposta...",
+        "done": "Finalizando resposta...",
+        "error": "Tratando erro...",
+    }
+
+    SERVER_LABELS = {
+        "fleetintel": "Consultando FleetIntel...",
+        "brazilcnpj": "Consultando BrazilCNPJ...",
+    }
+
+    def __init__(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self.update = update
+        self.context = context
+        self.chat_id = update.effective_chat.id
+        self.start_time = time.monotonic()
+        self._typing_task: asyncio.Task | None = None
+        self._delayed_task: asyncio.Task | None = None
+        self._status_message = None
+        self._last_label = "Analisando mensagem..."
+        self._closed = False
+
+    async def start(self) -> None:
+        self._typing_task = asyncio.create_task(self._typing_loop())
+        self._delayed_task = asyncio.create_task(self._show_status_after_threshold())
+
+    async def on_progress(self, event: str, payload: dict[str, object]) -> None:
+        label = self._resolve_label(event, payload)
+        if not label or label == self._last_label:
+            return
+        self._last_label = label
+        if self._status_message is None:
+            if time.monotonic() - self.start_time < PROGRESS_MESSAGE_THRESHOLD_SECONDS:
+                return
+            await self._ensure_status_message()
+        await self._edit_status_message(label)
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        for task in (self._typing_task, self._delayed_task):
+            if task is None:
+                continue
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        if self._status_message is not None:
+            try:
+                await self._status_message.delete()
+            except Exception:
+                try:
+                    await self._status_message.edit_text("Resposta pronta.")
+                except Exception:
+                    pass
+
+    async def _typing_loop(self) -> None:
+        while not self._closed:
+            try:
+                await self.context.bot.send_chat_action(
+                    chat_id=self.chat_id, action=ChatAction.TYPING
+                )
+            except Exception as exc:
+                logger.debug("typing_indicator_error", error=str(exc))
+                return
+            await asyncio.sleep(TYPING_INTERVAL_SECONDS)
+
+    async def _show_status_after_threshold(self) -> None:
+        await asyncio.sleep(PROGRESS_MESSAGE_THRESHOLD_SECONDS)
+        if self._closed or self._status_message is not None:
+            return
+        await self._ensure_status_message()
+
+    async def _ensure_status_message(self) -> None:
+        if self._status_message is not None or self._closed:
+            return
+        self._status_message = await self.update.message.reply_text(self._last_label)
+
+    async def _edit_status_message(self, label: str) -> None:
+        if self._status_message is None or self._closed:
+            return
+        try:
+            await self._status_message.edit_text(label)
+        except BadRequest as exc:
+            if "message is not modified" not in str(exc).lower():
+                logger.debug("progress_edit_ignored", error=str(exc))
+        except Exception as exc:
+            logger.debug("progress_edit_failed", error=str(exc))
+
+    def _resolve_label(self, event: str, payload: dict[str, object]) -> str:
+        if event == "external_call":
+            server = str(payload.get("server") or "").lower()
+            return self.SERVER_LABELS.get(server, "Executando integracao externa...")
+        return self.PHASE_LABELS.get(event, "Processando...")
 
 
 # ConexÃƒÂµes
@@ -91,6 +203,21 @@ def authorized_only(func):
     return wrapper
 
 
+async def _run_agent_request(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    user_id: str,
+    message: str,
+) -> str:
+    progress = TelegramProgressSession(update, context)
+    await progress.start()
+    try:
+        return await process_message_async(user_id, message, progress_callback=progress.on_progress)
+    finally:
+        await progress.close()
+
+
 # Handlers
 @authorized_only
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -120,7 +247,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         # Processar atravÃƒÂ©s do LangGraph
-        response = await process_message_async(user_id, message)
+        response = await _run_agent_request(
+            update,
+            context,
+            user_id=user_id,
+            message=message,
+        )
 
         # Garantir que temos uma resposta vÃƒÂ¡lida
         if not response:
@@ -157,7 +289,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("comando_status", user_id=user_id)
 
     # Roteia pelo grafo com /status para ativar intent de comando
-    response = await process_message_async(user_id, "/status")
+    response = await _run_agent_request(update, context, user_id=user_id, message="/status")
     await update.message.reply_text(response)
 
 
@@ -168,7 +300,7 @@ async def cmd_ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("comando_ram", user_id=user_id)
 
     # Roteia pelo grafo com /ram para ativar intent de comando
-    response = await process_message_async(user_id, "/ram")
+    response = await _run_agent_request(update, context, user_id=user_id, message="/ram")
     await update.message.reply_text(response)
 
 
@@ -179,7 +311,7 @@ async def cmd_containers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("comando_containers", user_id=user_id)
 
     # Roteia pelo grafo com /containers para ativar intent de comando
-    response = await process_message_async(user_id, "/containers")
+    response = await _run_agent_request(update, context, user_id=user_id, message="/containers")
     await update.message.reply_text(response)
 
 
@@ -190,7 +322,7 @@ async def cmd_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("comando_health", user_id=user_id)
 
     # Roteia pelo grafo com /health para ativar intent de comando
-    response = await process_message_async(user_id, "/health")
+    response = await _run_agent_request(update, context, user_id=user_id, message="/health")
     await update.message.reply_text(response)
 
 
