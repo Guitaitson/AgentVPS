@@ -35,15 +35,18 @@ async def test_remote_mcp_client_supports_stateless_http_without_session(monkeyp
             }
         ),
     ]
+    seen_headers = []
 
     async def fake_post(self, url, json=None, headers=None):
+        seen_headers.append(headers or {})
         return responses.pop(0)
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
 
     client = RemoteMCPClient(
         base_url="https://example.com/mcp",
-        token="token",
+        access_client_id="client-id",
+        access_client_secret="client-secret",
         client_name="test-client",
         server_name="fleetintel",
     )
@@ -52,3 +55,6 @@ async def test_remote_mcp_client_supports_stateless_http_without_session(monkeyp
 
     assert result["status"] == "ok"
     assert result["service"] == "fleetintel"
+    assert seen_headers[0]["CF-Access-Client-Id"] == "client-id"
+    assert seen_headers[0]["CF-Access-Client-Secret"] == "client-secret"
+    assert "Authorization" not in seen_headers[0]

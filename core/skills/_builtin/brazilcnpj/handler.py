@@ -13,8 +13,9 @@ from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
 
-BRAZILCNPJ_MCP_URL = os.getenv("BRAZILCNPJ_MCP_URL", "https://cnpj-mcp.gtaitson.space/mcp")
-BRAZILCNPJ_MCP_TOKEN = os.getenv("BRAZILCNPJ_MCP_TOKEN", "")
+BRAZILCNPJ_MCP_URL = os.getenv("BRAZILCNPJ_MCP_URL", "https://agent-cnpj.gtaitson.space/mcp")
+BRAZILCNPJ_CF_ACCESS_CLIENT_ID = os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_ID", "")
+BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET = os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET", "")
 
 _CNPJ_RE = re.compile(r"\b(\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}|\d{14})\b")
 
@@ -28,13 +29,15 @@ class BrazilCNPJSkill(SkillBase):
 
         client = RemoteMCPClient(
             base_url=BRAZILCNPJ_MCP_URL,
-            token=BRAZILCNPJ_MCP_TOKEN,
+            access_client_id=BRAZILCNPJ_CF_ACCESS_CLIENT_ID,
+            access_client_secret=BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET,
             client_name="agentvps-brazilcnpj",
             server_name="brazilcnpj",
         )
         if not client.is_configured:
             return (
-                "BrazilCNPJ MCP nao configurado. Ajuste BRAZILCNPJ_MCP_URL e BRAZILCNPJ_MCP_TOKEN."
+                "BrazilCNPJ MCP nao configurado. Ajuste BRAZILCNPJ_MCP_URL, "
+                "BRAZILCNPJ_CF_ACCESS_CLIENT_ID e BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET."
             )
 
         tool_name, tool_args = self._route(query)
