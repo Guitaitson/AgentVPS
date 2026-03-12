@@ -16,6 +16,9 @@ def test_detect_external_skill_routes():
     assert detect_external_skill("quais contas devo priorizar por sinais de compra?") == (
         "fleetintel_analyst"
     )
+    assert detect_external_skill("Quantos caminhões o Grupo Vamos comprou em 2025?") == (
+        "fleetintel_analyst"
+    )
     assert detect_external_skill("cruze sinais de compra com cnpj das contas") == (
         "fleetintel_orchestrator"
     )

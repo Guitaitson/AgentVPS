@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 FLEET_KEYWORDS = [
     "caminhao",
@@ -66,7 +67,7 @@ COMPANY_VOLUME_NOUNS = [
 
 
 def detect_external_skill(message: str) -> str | None:
-    msg = message.lower().strip()
+    msg = _normalize_text(message)
     has_fleet = any(keyword in msg for keyword in FLEET_KEYWORDS)
     has_cnpj = any(keyword in msg for keyword in CNPJ_KEYWORDS)
     wants_orchestration = any(keyword in msg for keyword in ORCHESTRATION_KEYWORDS)
@@ -78,6 +79,11 @@ def detect_external_skill(message: str) -> str | None:
     if has_fleet:
         return "fleetintel_analyst"
     return None
+
+
+def _normalize_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.lower().strip())
+    return "".join(char for char in normalized if not unicodedata.combining(char))
 
 
 def extract_company_count_query(message: str) -> dict[str, int | str] | None:
