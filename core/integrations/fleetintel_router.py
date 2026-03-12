@@ -28,9 +28,9 @@ FLEET_KEYWORDS = [
 
 CNPJ_KEYWORDS = [
     "cnpj",
+    "grupo economico",
     "socio",
     "socios",
-    "grupo economico",
     "cnae",
     "cadastro",
     "cadastral",
@@ -47,6 +47,20 @@ ORCHESTRATION_KEYWORDS = [
     "combine",
     "o que mudou",
     "unica resposta",
+]
+
+CNPJ_ENRICHMENT_KEYWORDS = [
+    "grupo economico",
+    "socio",
+    "socios",
+    "cnae",
+    "cadastro",
+    "cadastral",
+    "receita federal",
+    "enriquecer",
+    "enriqueca",
+    "enrichment",
+    "empresa completa",
 ]
 
 COMPANY_VOLUME_VERBS = [
@@ -70,11 +84,19 @@ COMPANY_VOLUME_NOUNS = [
 
 def detect_external_skill(message: str) -> str | None:
     msg = _normalize_text(message)
+    if "skill fleetintel" in msg or "use a skill fleetintel" in msg:
+        return "fleetintel"
+    if "skill fleetintel_analyst" in msg or "fleetintel analyst" in msg:
+        return "fleetintel_analyst"
+    if "skill brazilcnpj" in msg:
+        return "brazilcnpj"
+
     has_fleet = any(keyword in msg for keyword in FLEET_KEYWORDS)
     has_cnpj = any(keyword in msg for keyword in CNPJ_KEYWORDS)
+    has_cnpj_enrichment = any(keyword in msg for keyword in CNPJ_ENRICHMENT_KEYWORDS)
     wants_orchestration = any(keyword in msg for keyword in ORCHESTRATION_KEYWORDS)
 
-    if has_fleet and (has_cnpj or wants_orchestration):
+    if has_fleet and (wants_orchestration or has_cnpj_enrichment):
         return "fleetintel_orchestrator"
     if has_cnpj and not has_fleet:
         return "brazilcnpj"

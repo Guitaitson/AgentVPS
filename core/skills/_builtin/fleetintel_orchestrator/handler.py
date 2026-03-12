@@ -205,7 +205,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
         lines.append(f"Tool principal: {fleet_tool}")
         lines.append("")
         lines.append("Resultado FleetIntel:")
-        lines.append(render_result_block("", fleet_result, max_chars=1400).strip())
+        lines.append(self._format_fleet_result(fleet_tool=fleet_tool, fleet_result=fleet_result))
 
         if cnpj_health is not None:
             lines.append("")
@@ -232,3 +232,58 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 lines.append(f"- {name or 'empresa'} | CNPJ {cnpj} | UF {uf} | porte {porte}")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_fleet_result(*, fleet_tool: str, fleet_result: Any) -> str:
+        if fleet_tool == "empresa_profile" and isinstance(fleet_result, dict):
+            if fleet_result.get("error"):
+                return str(fleet_result.get("error"))
+
+            empresa = fleet_result.get("empresa") or {}
+            resumo = (
+                fleet_result.get("entity_summary", {}).get("resumo")
+                or fleet_result.get("resumo")
+                or {}
+            )
+            group_summary = fleet_result.get("group_summary") or {}
+            lines = []
+            lines.append(
+                f"- empresa: {empresa.get('razao_social') or 'empresa'} | CNPJ {empresa.get('cnpj', '-')}"
+            )
+            if resumo:
+                lines.append(
+                    "- historico: "
+                    f"{resumo.get('total_emplacamentos', 0)} emplacamentos, "
+                    f"R$ {float(resumo.get('valor_total', 0) or 0):,.2f}".replace(",", "X")
+                    .replace(".", ",")
+                    .replace("X", ".")
+                )
+                if resumo.get("primeira_compra_historico") or resumo.get("ultima_compra_historico"):
+                    lines.append(
+                        "- janela: "
+                        f"{resumo.get('primeira_compra_historico', '-')} ate "
+                        f"{resumo.get('ultima_compra_historico', '-')}"
+                    )
+                if (
+                    resumo.get("marcas_distintas") is not None
+                    or resumo.get("ufs_distintas") is not None
+                ):
+                    lines.append(
+                        "- diversidade: "
+                        f"{resumo.get('marcas_distintas', 0)} marcas, "
+                        f"{resumo.get('ufs_distintas', 0)} UFs"
+                    )
+            if group_summary:
+                members = group_summary.get("group_members") or []
+                lines.append(
+                    "- grupo: "
+                    f"{len(members)} membros, "
+                    f"{group_summary.get('total_emplacamentos', 0)} emplacamentos totais"
+                )
+                if group_summary.get("ultima_compra_grupo"):
+                    lines.append(
+                        f"- ultima compra do grupo: {group_summary['ultima_compra_grupo']}"
+                    )
+            return "\n".join(lines)
+
+        return render_result_block("", fleet_result, max_chars=1400).strip()
