@@ -296,10 +296,18 @@ class FleetIntelAnalystSkill(SkillBase):
             return None
 
         if not isinstance(search_result, dict):
-            return None
+            return (
+                "FleetIntel\n\n"
+                f"Nao consegui resolver a empresa `{company_name}` por nome na base atual.\n"
+                "Se voce me passar o CNPJ ou o nome juridico exato, eu refaco a consulta."
+            )
         matches = search_result.get("empresas") or search_result.get("results") or []
         if not isinstance(matches, list) or not matches:
-            return None
+            return (
+                "FleetIntel\n\n"
+                f"Nao encontrei uma entidade exata para `{company_name}` na base FleetIntel.\n"
+                "Se voce me passar o CNPJ ou o nome juridico exato, eu refaco a consulta."
+            )
 
         lines = [
             "FleetIntel",

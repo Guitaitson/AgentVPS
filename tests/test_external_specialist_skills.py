@@ -209,6 +209,36 @@ async def test_fleetintel_analyst_refines_company_count_when_entity_not_resolved
 
 
 @pytest.mark.asyncio
+async def test_fleetintel_analyst_returns_explicit_resolution_failure_when_no_match_exists(
+    monkeypatch,
+):
+    async def fake_call(self, tool_name, arguments=None):
+        if tool_name == "count_empresa_registrations":
+            return {"count": 0, "empresas": [], "error": "Empresa nao encontrada"}
+        if tool_name == "search_empresas":
+            return {"status": "ok", "count": 0, "empresas": []}
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.RemoteMCPClient.call_tool", fake_call
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "Quantos caminhoes o Grupo Vamos comprou em 2025?"})
+
+    assert "Nao encontrei uma entidade exata" in result
+    assert "CNPJ" in result
+
+
+@pytest.mark.asyncio
 async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
     calls = []
 
