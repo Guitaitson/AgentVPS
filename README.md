@@ -76,7 +76,7 @@ START → load_context → react → security_check → execute → format_respo
 
 Skills com `dangerous` requerem aprovação humana (configurável via `on-dangerous`).
 
-Os especialistas `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator` usam MCP remoto autenticado e sao escolhidos automaticamente quando a pergunta pede inteligencia de frota, enriquecimento CNPJ ou cruzamento dos dois dominios.
+Os especialistas `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator` usam MCP remoto autenticado por Cloudflare Access Service Tokens e sao escolhidos automaticamente quando a pergunta pede inteligencia de frota, enriquecimento CNPJ ou cruzamento dos dois dominios.
 
 ---
 
@@ -228,9 +228,18 @@ TELEGRAM_ALLOWED_USERS=...    # IDs separados por vírgula
 POSTGRES_PASSWORD=...         # Senha PostgreSQL
 OPENROUTER_API_KEY=...        # Chave OpenRouter
 OPENROUTER_MODEL=minimax/minimax-m2.5
-FLEETINTEL_MCP_TOKEN=...      # Token do FleetIntel MCP
-BRAZILCNPJ_MCP_TOKEN=...      # Token do BrazilCNPJ MCP
+FLEETINTEL_MCP_URL=https://agent-fleet.gtaitson.space/mcp
+FLEETINTEL_CF_ACCESS_CLIENT_ID=...
+FLEETINTEL_CF_ACCESS_CLIENT_SECRET=...
+BRAZILCNPJ_MCP_URL=https://agent-cnpj.gtaitson.space/mcp
+BRAZILCNPJ_CF_ACCESS_CLIENT_ID=...
+BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET=...
 ```
+
+Migracao de auth externa FleetIntel/BrazilCNPJ:
+- o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
+- os clientes externos agora autenticam na borda Cloudflare com `CF-Access-Client-Id` e `CF-Access-Client-Secret`
+- nao ha compatibilidade reversa com bearer token legado no AgentVPS
 
 ---
 

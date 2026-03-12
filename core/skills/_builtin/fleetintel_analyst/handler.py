@@ -13,8 +13,9 @@ from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
 
-FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://mcp.gtaitson.space/mcp")
-FLEETINTEL_MCP_TOKEN = os.getenv("FLEETINTEL_MCP_TOKEN", "")
+FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://agent-fleet.gtaitson.space/mcp")
+FLEETINTEL_CF_ACCESS_CLIENT_ID = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_ID", "")
+FLEETINTEL_CF_ACCESS_CLIENT_SECRET = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_SECRET", "")
 
 
 class FleetIntelAnalystSkill(SkillBase):
@@ -28,13 +29,15 @@ class FleetIntelAnalystSkill(SkillBase):
 
         client = RemoteMCPClient(
             base_url=FLEETINTEL_MCP_URL,
-            token=FLEETINTEL_MCP_TOKEN,
+            access_client_id=FLEETINTEL_CF_ACCESS_CLIENT_ID,
+            access_client_secret=FLEETINTEL_CF_ACCESS_CLIENT_SECRET,
             client_name="agentvps-fleetintel-analyst",
             server_name="fleetintel",
         )
         if not client.is_configured:
             return (
-                "FleetIntel MCP nao configurado. Ajuste FLEETINTEL_MCP_URL e FLEETINTEL_MCP_TOKEN."
+                "FleetIntel MCP nao configurado. Ajuste FLEETINTEL_MCP_URL, "
+                "FLEETINTEL_CF_ACCESS_CLIENT_ID e FLEETINTEL_CF_ACCESS_CLIENT_SECRET."
             )
 
         tool_name, tool_args = self._route(query)

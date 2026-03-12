@@ -1,88 +1,68 @@
-"""
-Skill: FleetIntel — Dados de emplacamentos de veículos pesados do Brasil.
+"""FleetIntel skill backed by the external FleetIntel MCP server."""
 
-Conecta-se ao servidor MCP FleetIntel via HTTPS e executa consultas
-sobre a base de dados de emplacamentos (~1M registros, ~170k empresas).
-
-Variáveis de ambiente necessárias:
-    FLEETINTEL_MCP_URL   — URL do MCP server (ex: https://mcp.gtaitson.space/mcp)
-    FLEETINTEL_MCP_TOKEN — Bearer token de autenticação
-"""
+from __future__ import annotations
 
 import json
 import os
 import re
 from typing import Any, Dict, Optional, Tuple
 
-import httpx
 import structlog
 
+from core.integrations import RemoteMCPClient
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
 
-FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://mcp.gtaitson.space/mcp")
-FLEETINTEL_MCP_TOKEN = os.getenv("FLEETINTEL_MCP_TOKEN", "")
+FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://agent-fleet.gtaitson.space/mcp")
+FLEETINTEL_CF_ACCESS_CLIENT_ID = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_ID", "")
+FLEETINTEL_CF_ACCESS_CLIENT_SECRET = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_SECRET", "")
 
-# Limite de caracteres para resposta no Telegram
 MAX_CHARS = 3000
 
 
 class FleetIntelSkill(SkillBase):
-    """
-    Skill para consultas de dados de frota de veículos pesados.
+    """Skill para consultas de dados de frota de veiculos pesados."""
 
-    Roteia automaticamente a pergunta do usuário para a tool MCP correta:
-    - get_stats            → estatísticas gerais do banco
-    - get_market_share     → market share por marca
-    - top_empresas_by_registrations → ranking de maiores compradores
-    - count_empresa_registrations   → volume de uma empresa específica
-    - search_empresas      → busca de empresa por nome/CNPJ
-    - search_vehicles      → busca de veículo por marca/modelo/chassi
-    - search_registrations → busca de emplacamentos por período/estado/preço
-    """
-
-    async def execute(self, args: Dict[str, Any] = None) -> str:
+    async def execute(self, args: Dict[str, Any] | None = None) -> str:
         args = args or {}
         raw_input = args.get("raw_input", args.get("query", ""))
 
         if not raw_input:
+            return "Qual dado de frota voce quer consultar? Ex: 'market share de caminhoes em 2024'"
+
+        logger.info("fleetintel_execute", query=str(raw_input)[:100])
+
+        client = RemoteMCPClient(
+            base_url=FLEETINTEL_MCP_URL,
+            access_client_id=FLEETINTEL_CF_ACCESS_CLIENT_ID,
+            access_client_secret=FLEETINTEL_CF_ACCESS_CLIENT_SECRET,
+            client_name="agentvps-fleetintel",
+            server_name="fleetintel",
+        )
+        if not client.is_configured:
             return (
-                "❓ Qual dado de frota você quer consultar? Ex: 'market share de caminhões em 2024'"
+                "FleetIntel MCP nao configurado. Ajuste FLEETINTEL_MCP_URL, "
+                "FLEETINTEL_CF_ACCESS_CLIENT_ID e FLEETINTEL_CF_ACCESS_CLIENT_SECRET."
             )
 
-        logger.info("fleetintel_execute", query=raw_input[:100])
-
-        if not FLEETINTEL_MCP_TOKEN:
-            return "❌ FLEETINTEL_MCP_TOKEN não configurado. Verifique o arquivo .env."
-
-        # Rotear para a tool correta
-        tool_name, tool_args = self._route(raw_input)
-
+        tool_name, tool_args = self._route(str(raw_input))
         logger.info("fleetintel_routing", tool=tool_name, args=tool_args)
 
         try:
-            result = await self._call_mcp(tool_name, tool_args)
-            return self._format_response(tool_name, result, raw_input)
-        except Exception as e:
-            logger.error("fleetintel_error", error=str(e))
-            return f"❌ Erro ao consultar dados de frota: {e}"
+            result = await self._call_mcp(client, tool_name, tool_args)
+            return self._format_response(tool_name, result, str(raw_input))
+        except Exception as exc:
+            logger.error("fleetintel_error", error=str(exc))
+            return f"Erro ao consultar dados de frota: {exc}"
 
-    # ─────────────────────────────────────────────
-    # Roteamento por padrões de linguagem natural
-    # ─────────────────────────────────────────────
-
-    def _route(self, message: str) -> Tuple[str, Dict]:
-        """Roteia a mensagem para a tool MCP correta."""
+    def _route(self, message: str) -> Tuple[str, Dict[str, Any]]:
         msg = message.lower().strip()
 
-        # 1. Estatísticas gerais
         if any(
             p in msg
             for p in [
-                "estatística",
                 "estatistica",
-                "quantos veículo",
                 "quantos veiculo",
                 "total de ",
                 "quantos no banco",
@@ -94,21 +74,17 @@ class FleetIntelSkill(SkillBase):
                 "stats",
             ]
         ):
-            # Se menciona empresa específica, vai para count_empresa
             empresa = self._extract_empresa(msg)
             if empresa and any(
-                p in msg
-                for p in ["emplacou", "emplacaram", "comprou", "comprou", "adquiriu", "quantos da"]
+                p in msg for p in ["emplacou", "emplacaram", "comprou", "adquiriu", "quantos da"]
             ):
                 return "count_empresa_registrations", self._build_count_empresa_args(msg, empresa)
             return "get_stats", {}
 
-        # 2. Market share / participação de mercado
         if any(
             p in msg
             for p in [
                 "market share",
-                "participação de mercado",
                 "participacao de mercado",
                 "cota de mercado",
                 "fatia de mercado",
@@ -118,7 +94,6 @@ class FleetIntelSkill(SkillBase):
         ):
             return "get_market_share", self._build_market_share_args(msg)
 
-        # 3. Top empresas / Ranking de compradores
         if any(
             p in msg
             for p in [
@@ -136,7 +111,6 @@ class FleetIntelSkill(SkillBase):
         ):
             return "top_empresas_by_registrations", self._build_top_empresas_args(msg)
 
-        # 4. Count de uma empresa específica
         empresa = self._extract_empresa(msg)
         if empresa and any(
             p in msg
@@ -147,20 +121,18 @@ class FleetIntelSkill(SkillBase):
                 "adquiriu",
                 "quantos da",
                 "quantas da",
-                "quantos caminhões da",
+                "quantos caminhoes da",
                 "quantos caminh",
             ]
         ):
             return "count_empresa_registrations", self._build_count_empresa_args(msg, empresa)
 
-        # 5. Busca de empresa por nome
         if any(
             p in msg
             for p in [
                 "encontre a empresa",
                 "busca a empresa",
                 "dados da empresa",
-                "informações da empresa",
                 "informacoes da empresa",
                 "cnpj",
                 "procure a empresa",
@@ -169,32 +141,28 @@ class FleetIntelSkill(SkillBase):
         ):
             return "search_empresas", self._build_search_empresas_args(msg)
 
-        # 6. Busca de veículo específico
         if any(
             p in msg
             for p in [
                 "chassi",
                 "placa",
-                "buscar veículo",
                 "buscar veiculo",
-                "encontrar caminhão",
                 "encontrar caminhao",
             ]
         ):
             return "search_vehicles", self._build_search_vehicles_args(msg)
 
-        # 7. Busca de emplacamentos por período/estado/preço
         if any(
             p in msg
             for p in [
                 "emplacamentos em ",
                 "emplacados em ",
                 "emplacado em ",
-                "emplacamentos do mês",
+                "emplacamentos do mes",
                 "emplacamentos de ",
                 "em janeiro",
                 "em fevereiro",
-                "em março",
+                "em marco",
                 "em abril",
                 "em maio",
                 "em junho",
@@ -204,8 +172,8 @@ class FleetIntelSkill(SkillBase):
                 "em outubro",
                 "em novembro",
                 "em dezembro",
-                "no paraná",
-                "em são paulo",
+                "no parana",
+                "em sao paulo",
                 "no rio",
                 "em minas",
                 "no rs",
@@ -219,26 +187,16 @@ class FleetIntelSkill(SkillBase):
         ):
             return "search_registrations", self._build_search_registrations_args(msg)
 
-        # 8. Fallback: se menciona empresa, tenta count; senão tenta stats
         if empresa:
             return "count_empresa_registrations", self._build_count_empresa_args(msg, empresa)
-
-        # Fallback final: get_stats
         return "get_stats", {}
 
-    # ─────────────────────────────────────────────
-    # Extração de parâmetros
-    # ─────────────────────────────────────────────
-
     def _extract_year(self, msg: str) -> Optional[int]:
-        """Extrai ano da mensagem (2020-2026)."""
         match = re.search(r"\b(20[0-2][0-9])\b", msg)
         return int(match.group(1)) if match else None
 
     def _extract_uf(self, msg: str) -> Optional[str]:
-        """Extrai UF da mensagem."""
         uf_map = {
-            "são paulo": "SP",
             "sao paulo": "SP",
             " sp ": "SP",
             "rio de janeiro": "RJ",
@@ -246,7 +204,6 @@ class FleetIntelSkill(SkillBase):
             "minas gerais": "MG",
             "minas ": "MG",
             " mg ": "MG",
-            "paraná": "PR",
             "parana": "PR",
             " pr ": "PR",
             "rio grande do sul": "RS",
@@ -255,7 +212,6 @@ class FleetIntelSkill(SkillBase):
             " sc ": "SC",
             "bahia": "BA",
             " ba ": "BA",
-            "goiás": "GO",
             "goias": "GO",
             " go ": "GO",
             "mato grosso do sul": "MS",
@@ -264,15 +220,12 @@ class FleetIntelSkill(SkillBase):
             " mt ": "MT",
             "pernambuco": "PE",
             " pe ": "PE",
-            "ceará": "CE",
             "ceara": "CE",
             " ce ": "CE",
             "amazonas": "AM",
             " am ": "AM",
-            "pará": "PA",
             "para ": "PA",
             " pa ": "PA",
-            "espírito santo": "ES",
             "espirito santo": "ES",
             " es ": "ES",
         }
@@ -283,25 +236,22 @@ class FleetIntelSkill(SkillBase):
         return None
 
     def _extract_empresa(self, msg: str) -> Optional[str]:
-        """Tenta extrair nome de empresa da mensagem."""
-        # Padrões: "a empresa X", "a X", "da empresa X", "da X"
         patterns = [
-            r"a empresa ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)",
-            r"da empresa ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou)",
-            r"da ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)",
-            r"a ([A-Za-zÀ-ÖØ-öø-ÿ0-9\s&\.\-]+?) (?:emplacou|emplacaram|comprou|adquiriu)",
+            r"a empresa ([A-Za-z0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)",
+            r"da empresa ([A-Za-z0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou)",
+            r"da ([A-Za-z0-9\s&\.\-]+?) (?:em|de|no|na|comprou|emplacou|emplacaram)",
+            r"a ([A-Za-z0-9\s&\.\-]+?) (?:emplacou|emplacaram|comprou|adquiriu)",
         ]
         for pattern in patterns:
             match = re.search(pattern, msg, re.IGNORECASE)
-            if match:
-                empresa = match.group(1).strip()
-                # Filtrar artigos e preposições soltos
-                if len(empresa) > 2 and empresa.lower() not in ["que", "qual", "quem", "quanto"]:
-                    return empresa
+            if not match:
+                continue
+            empresa = match.group(1).strip()
+            if len(empresa) > 2 and empresa.lower() not in ["que", "qual", "quem", "quanto"]:
+                return empresa
         return None
 
     def _extract_limit(self, msg: str, default: int = 10) -> int:
-        """Extrai número de resultados desejados."""
         match = re.search(r"top\s+(\d+)", msg)
         if match:
             return min(int(match.group(1)), 50)
@@ -310,10 +260,9 @@ class FleetIntelSkill(SkillBase):
             return min(int(match.group(1)), 50)
         return default
 
-    def _build_market_share_args(self, msg: str) -> Dict:
-        # Parâmetros reais da tool: ano (required), uf (optional), top_n (optional)
+    def _build_market_share_args(self, msg: str) -> Dict[str, Any]:
         year = self._extract_year(msg)
-        args = {"ano": year if year else 2024}
+        args: Dict[str, Any] = {"ano": year if year else 2024}
         uf = self._extract_uf(msg)
         if uf:
             args["uf"] = uf
@@ -322,37 +271,31 @@ class FleetIntelSkill(SkillBase):
             args["top_n"] = limit
         return args
 
-    def _build_top_empresas_args(self, msg: str) -> Dict:
-        # Parâmetros reais da tool: ano (required), uf (optional), top_n (optional)
+    def _build_top_empresas_args(self, msg: str) -> Dict[str, Any]:
         year = self._extract_year(msg)
-        args = {"ano": year if year else 2024}
-        limit = self._extract_limit(msg, default=10)
-        args["top_n"] = limit
+        args: Dict[str, Any] = {"ano": year if year else 2024}
+        args["top_n"] = self._extract_limit(msg, default=10)
         uf = self._extract_uf(msg)
         if uf:
             args["uf"] = uf
         return args
 
-    def _build_count_empresa_args(self, msg: str, empresa: str) -> Dict:
-        # Parâmetros reais da tool: razao_social (required), ano (optional)
-        args = {"razao_social": empresa}
+    def _build_count_empresa_args(self, msg: str, empresa: str) -> Dict[str, Any]:
+        args: Dict[str, Any] = {"razao_social": empresa}
         year = self._extract_year(msg)
         if year:
             args["ano"] = year
         return args
 
-    def _build_search_empresas_args(self, msg: str) -> Dict:
-        # Parâmetros reais da tool: cnpj, razao_social, nome_fantasia, segmento_cliente, grupo_locadora, limit
-        args = {}
+    def _build_search_empresas_args(self, msg: str) -> Dict[str, Any]:
+        args: Dict[str, Any] = {"limit": 5}
         empresa = self._extract_empresa(msg)
         if empresa:
             args["razao_social"] = empresa
-        args["limit"] = 5
         return args
 
-    def _build_search_vehicles_args(self, msg: str) -> Dict:
-        # Parâmetros reais da tool: chassi, placa, marca, modelo, ano_fabricacao_min, ano_fabricacao_max, limit
-        args = {}
+    def _build_search_vehicles_args(self, msg: str) -> Dict[str, Any]:
+        args: Dict[str, Any] = {}
         chassi_match = re.search(r"\b([A-HJ-NPR-Z0-9]{17})\b", msg.upper())
         if chassi_match:
             args["chassi"] = chassi_match.group(1)
@@ -380,10 +323,8 @@ class FleetIntelSkill(SkillBase):
         args["limit"] = 10
         return args
 
-    def _build_search_registrations_args(self, msg: str) -> Dict:
-        # Parâmetros reais da tool: data_emplacamento_inicio, data_emplacamento_fim,
-        # municipio_emplacamento, uf_emplacamento, preco_min, preco_max, marca, modelo, limit
-        args = {}
+    def _build_search_registrations_args(self, msg: str) -> Dict[str, Any]:
+        args: Dict[str, Any] = {"limit": 50}
         year = self._extract_year(msg)
         if year:
             args["data_emplacamento_inicio"] = f"{year}-01-01"
@@ -394,231 +335,127 @@ class FleetIntelSkill(SkillBase):
         preco_match = re.search(r"acima de r\$\s*([\d\.]+)", msg)
         if preco_match:
             args["preco_min"] = float(preco_match.group(1).replace(".", ""))
-        args["limit"] = 50
         return args
 
-    # ─────────────────────────────────────────────
-    # Chamada ao MCP server via HTTPS
-    # ─────────────────────────────────────────────
-
-    async def _call_mcp(self, tool_name: str, tool_args: Dict) -> Any:
-        """Chama uma tool no FleetIntel MCP server.
-
-        O protocolo MCP streamable-http requer dois passos:
-        1. POST initialize → obter mcp-session-id
-        2. POST tools/call com mcp-session-id no header
-        """
-        base_headers = {
-            "Authorization": f"Bearer {FLEETINTEL_MCP_TOKEN}",
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-        }
-
-        async with httpx.AsyncClient(timeout=25.0) as client:
-            # ── Passo 1: Initialize — obter session ID ──────────────────
-            init_payload = {
-                "jsonrpc": "2.0",
-                "id": "init-1",
-                "method": "initialize",
-                "params": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {},
-                    "clientInfo": {"name": "agenvps-fleetintel", "version": "1.0"},
-                },
-            }
-            init_resp = await client.post(
-                FLEETINTEL_MCP_URL, json=init_payload, headers=base_headers
-            )
-
-            if init_resp.status_code != 200:
-                raise RuntimeError(
-                    f"MCP initialize falhou HTTP {init_resp.status_code}: {init_resp.text[:200]}"
-                )
-
-            session_id = init_resp.headers.get("mcp-session-id")
-            if not session_id:
-                raise RuntimeError("MCP server não retornou mcp-session-id no initialize")
-
-            # ── Passo 2: Chamar a tool com o session ID ─────────────────
-            tool_headers = {**base_headers, "mcp-session-id": session_id}
-            tool_payload = {
-                "jsonrpc": "2.0",
-                "id": "call-1",
-                "method": "tools/call",
-                "params": {
-                    "name": tool_name,
-                    "arguments": tool_args,
-                },
-            }
-            tool_resp = await client.post(
-                FLEETINTEL_MCP_URL, json=tool_payload, headers=tool_headers
-            )
-
-        if tool_resp.status_code != 200:
-            raise RuntimeError(
-                f"MCP tools/call retornou HTTP {tool_resp.status_code}: {tool_resp.text[:200]}"
-            )
-
-        # O MCP pode retornar SSE ou JSON puro
-        content_type = tool_resp.headers.get("content-type", "")
-        if "text/event-stream" in content_type:
-            return self._parse_sse(tool_resp.text)
-        else:
-            data = tool_resp.json()
-            return self._extract_mcp_result(data)
-
-    def _parse_sse(self, sse_text: str) -> Any:
-        """Extrai o resultado de uma resposta SSE do MCP."""
-        for line in sse_text.splitlines():
-            if line.startswith("data: "):
-                try:
-                    data = json.loads(line[6:])
-                    return self._extract_mcp_result(data)
-                except json.JSONDecodeError:
-                    continue
-        return None
-
-    def _extract_mcp_result(self, data: dict) -> Any:
-        """Extrai o conteúdo de uma resposta JSON-RPC MCP."""
-        if "error" in data:
-            raise RuntimeError(f"MCP error: {data['error']}")
-        result = data.get("result", {})
-        content = result.get("content", [])
-        if content and isinstance(content, list):
-            # Pegar o primeiro bloco de texto
-            for block in content:
-                if block.get("type") == "text":
-                    text = block.get("text", "")
-                    # Tentar deserializar como JSON para formatar melhor
-                    try:
-                        return json.loads(text)
-                    except Exception:
-                        return text
-        return result
-
-    # ─────────────────────────────────────────────
-    # Formatação de respostas
-    # ─────────────────────────────────────────────
+    async def _call_mcp(
+        self, client: RemoteMCPClient, tool_name: str, tool_args: Dict[str, Any]
+    ) -> Any:
+        return await client.call_tool(tool_name, tool_args)
 
     def _format_response(self, tool_name: str, result: Any, original_query: str) -> str:
-        """Formata a resposta do MCP para exibição no Telegram."""
         if result is None:
-            return "⚠️ Nenhum dado encontrado para esta consulta."
+            return "Nenhum dado encontrado para esta consulta."
 
         try:
             if tool_name == "get_stats":
                 return self._fmt_stats(result)
-            elif tool_name == "get_market_share":
+            if tool_name == "get_market_share":
                 return self._fmt_market_share(result)
-            elif tool_name == "top_empresas_by_registrations":
+            if tool_name == "top_empresas_by_registrations":
                 return self._fmt_top_empresas(result)
-            elif tool_name == "count_empresa_registrations":
+            if tool_name == "count_empresa_registrations":
                 return self._fmt_count_empresa(result)
-            elif tool_name == "search_empresas":
+            if tool_name == "search_empresas":
                 return self._fmt_search_empresas(result)
-            elif tool_name == "search_vehicles":
+            if tool_name == "search_vehicles":
                 return self._fmt_search_vehicles(result)
-            elif tool_name == "search_registrations":
+            if tool_name == "search_registrations":
                 return self._fmt_search_registrations(result)
-            else:
-                # Fallback genérico
-                if isinstance(result, str):
-                    return f"📊 **FleetIntel**\n\n{result[:MAX_CHARS]}"
-                return f"📊 **FleetIntel**\n\n```\n{json.dumps(result, ensure_ascii=False, indent=2)[:MAX_CHARS]}\n```"
-        except Exception as e:
-            logger.error("fleetintel_format_error", error=str(e))
-            return f"📊 Dados recebidos:\n{str(result)[:MAX_CHARS]}"
+            if isinstance(result, str):
+                return f"FleetIntel\n\n{result[:MAX_CHARS]}"
+            return (
+                "FleetIntel\n\n```\n"
+                f"{json.dumps(result, ensure_ascii=False, indent=2)[:MAX_CHARS]}\n```"
+            )
+        except Exception as exc:
+            logger.error("fleetintel_format_error", error=str(exc), query=original_query[:80])
+            return f"FleetIntel\n\n{str(result)[:MAX_CHARS]}"
 
-    def _fmt_stats(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"📊 **Estatísticas FleetIntel**\n\n{r}"
-        r = r if isinstance(r, dict) else {}
-        # A resposta real do servidor tem formato: {"stats": {...}, "timestamp": "..."}
-        data = r.get("stats", r)
-        lines = ["📊 **Estatísticas — Base de Frota**\n"]
-        # Suporte aos dois formatos de campo (stats nested ou flat)
-        vehicles = data.get("vehicles", data.get("total_vehicles"))
-        empresas = data.get("empresas", data.get("total_empresas"))
-        registrations = data.get("registrations", data.get("total_registrations"))
-        marcas = data.get("marcas", data.get("total_marcas"))
-        modelos = data.get("modelos", data.get("total_modelos"))
+    def _fmt_stats(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Estatisticas FleetIntel\n\n{data}"
+        payload = data if isinstance(data, dict) else {}
+        stats = payload.get("stats", payload)
+        lines = ["Estatisticas - Base de Frota", ""]
+        vehicles = stats.get("vehicles", stats.get("total_vehicles"))
+        empresas = stats.get("empresas", stats.get("total_empresas"))
+        registrations = stats.get("registrations", stats.get("total_registrations"))
+        marcas = stats.get("marcas", stats.get("total_marcas"))
+        modelos = stats.get("modelos", stats.get("total_modelos"))
         if vehicles is not None:
-            lines.append(f"🚛 Veículos: **{int(vehicles):,}**".replace(",", "."))
+            lines.append(f"Veiculos: {int(vehicles):,}".replace(",", "."))
         if empresas is not None:
-            lines.append(f"🏢 Empresas: **{int(empresas):,}**".replace(",", "."))
+            lines.append(f"Empresas: {int(empresas):,}".replace(",", "."))
         if registrations is not None:
-            lines.append(f"📋 Emplacamentos: **{int(registrations):,}**".replace(",", "."))
+            lines.append(f"Emplacamentos: {int(registrations):,}".replace(",", "."))
         if marcas is not None:
-            lines.append(f"🔖 Marcas: **{marcas}**")
+            lines.append(f"Marcas: {marcas}")
         if modelos is not None:
-            lines.append(f"📐 Modelos: **{modelos}**")
-        if r.get("timestamp"):
-            ts = r["timestamp"][:10]
-            lines.append(f"\n_Atualizado: {ts}_")
-        return "\n".join(lines) if len(lines) > 1 else f"📊 {r}"
+            lines.append(f"Modelos: {modelos}")
+        if payload.get("timestamp"):
+            lines.append("")
+            lines.append(f"Atualizado: {payload['timestamp'][:10]}")
+        return "\n".join(lines) if len(lines) > 2 else f"FleetIntel\n\n{payload}"
 
-    def _fmt_market_share(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"📈 **Market Share**\n\n{r}"
-        # Resposta real: {"marcas": [{"marca": "VW", "total_emplacamentos": 27622, "market_share_pct": 26.14}]}
+    def _fmt_market_share(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Market Share\n\n{data}"
         items = (
-            r if isinstance(r, list) else r.get("marcas", r.get("market_share", r.get("data", [])))
+            data
+            if isinstance(data, list)
+            else data.get("marcas", data.get("market_share", data.get("data", [])))
         )
-        ano = r.get("ano", "") if isinstance(r, dict) else ""
-        uf = r.get("uf", "") if isinstance(r, dict) else ""
-        header = (
-            f"📈 **Market Share — Caminhões{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}**\n"
-        )
+        ano = data.get("ano", "") if isinstance(data, dict) else ""
+        uf = data.get("uf", "") if isinstance(data, dict) else ""
+        title = f"Market Share - Caminhoes{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}"
         if not items:
-            return f"{header}\n⚠️ Sem dados de market share para este período."
-        lines = [header]
-        for i, item in enumerate(items[:15], 1):
+            return f"{title}\n\nSem dados de market share para este periodo."
+        lines = [title, ""]
+        for index, item in enumerate(items[:15], 1):
             marca = item.get("marca", item.get("brand", "?"))
             total = item.get("total_emplacamentos", item.get("total", item.get("count", 0)))
             share = item.get("market_share_pct", item.get("share_pct", item.get("share", 0)))
-            lines.append(f"{i}. **{marca}**: {int(total):,} un. ({share:.1f}%)".replace(",", "."))
+            lines.append(f"{index}. {marca}: {int(total):,} un. ({share:.1f}%)".replace(",", "."))
         return "\n".join(lines)
 
-    def _fmt_top_empresas(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"🏆 **Top Empresas**\n\n{r}"
-        # Resposta real: {"empresas": [{"razao_social": "...", "total_registrations": 2426}], "ano": 2024}
-        items = r if isinstance(r, list) else r.get("empresas", r.get("data", []))
-        ano = r.get("ano", "") if isinstance(r, dict) else ""
-        uf = r.get("uf", "") if isinstance(r, dict) else ""
-        header = f"🏆 **Top Empresas — Emplacamentos{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}**\n"
+    def _fmt_top_empresas(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Top Empresas\n\n{data}"
+        items = data if isinstance(data, list) else data.get("empresas", data.get("data", []))
+        ano = data.get("ano", "") if isinstance(data, dict) else ""
+        uf = data.get("uf", "") if isinstance(data, dict) else ""
+        title = f"Top Empresas - Emplacamentos{f' {ano}' if ano else ''}{f' ({uf})' if uf else ''}"
         if not items:
-            return f"{header}\n⚠️ Sem dados de ranking para este período."
-        lines = [header]
-        for i, item in enumerate(items[:15], 1):
+            return f"{title}\n\nSem dados de ranking para este periodo."
+        lines = [title, ""]
+        for index, item in enumerate(items[:15], 1):
             nome = item.get("razao_social", item.get("nome", item.get("empresa", "?")))
             total = item.get("total_registrations", item.get("total", item.get("count", 0)))
-            lines.append(f"{i}. **{nome[:45]}**: {int(total):,} un.".replace(",", "."))
+            lines.append(f"{index}. {nome[:45]}: {int(total):,} un.".replace(",", "."))
         return "\n".join(lines)
 
-    def _fmt_count_empresa(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"🚛 **Emplacamentos da Empresa**\n\n{r}"
-        # Resposta real: {"total": N, "razao_social": "...", "ano": 2024}
-        count = r.get("total", r.get("count", r.get("total_registrations", "?")))
-        empresa = r.get("razao_social", r.get("empresa", r.get("nome", "empresa")))
-        year = r.get("ano", r.get("year", ""))
+    def _fmt_count_empresa(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Emplacamentos da Empresa\n\n{data}"
+        count = data.get("total", data.get("count", data.get("total_registrations", "?")))
+        empresa = data.get("razao_social", data.get("empresa", data.get("nome", "empresa")))
+        year = data.get("ano", data.get("year", ""))
         year_str = f" em {year}" if year else ""
-        return f"🚛 **{empresa}**{year_str}\n\n📋 Emplacamentos: **{count}**"
+        return f"{empresa}{year_str}\n\nEmplacamentos: {count}"
 
-    def _fmt_search_empresas(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"🏢 **Empresas encontradas**\n\n{r}"
-        items = r if isinstance(r, list) else r.get("empresas", r.get("data", []))
+    def _fmt_search_empresas(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Empresas encontradas\n\n{data}"
+        items = data if isinstance(data, list) else data.get("empresas", data.get("data", []))
         if not items:
-            return "⚠️ Nenhuma empresa encontrada."
-        lines = ["🏢 **Empresas encontradas**\n"]
+            return "Nenhuma empresa encontrada."
+        lines = ["Empresas encontradas", ""]
         for item in items[:5]:
             nome = item.get("razao_social", item.get("nome", "?"))
             cnpj = item.get("cnpj", "")
             seg = item.get("segmento_cliente", item.get("segmento", ""))
             uf = item.get("uf", "")
-            lines.append(f"• **{nome}**")
+            lines.append(f"- {nome}")
             if cnpj:
                 lines.append(f"  CNPJ: {cnpj}")
             if seg:
@@ -626,37 +463,38 @@ class FleetIntelSkill(SkillBase):
             if uf:
                 lines.append(f"  UF: {uf}")
             lines.append("")
-        return "\n".join(lines)
+        return "\n".join(lines).rstrip()
 
-    def _fmt_search_vehicles(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"🚛 **Veículos encontrados**\n\n{r}"
-        items = r if isinstance(r, list) else r.get("vehicles", r.get("data", []))
+    def _fmt_search_vehicles(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Veiculos encontrados\n\n{data}"
+        items = data if isinstance(data, list) else data.get("vehicles", data.get("data", []))
         if not items:
-            return "⚠️ Nenhum veículo encontrado."
-        lines = [f"🚛 **{len(items)} veículo(s) encontrado(s)**\n"]
+            return "Nenhum veiculo encontrado."
+        lines = [f"{len(items)} veiculo(s) encontrado(s)", ""]
         for item in items[:10]:
             marca = item.get("marca", item.get("marca_nome", "?"))
             modelo = item.get("modelo", item.get("modelo_nome", "?"))
             ano = item.get("ano_fabricacao", "?")
             placa = item.get("placa", "")
-            lines.append(f"• **{marca} {modelo}** ({ano}){f' — {placa}' if placa else ''}")
+            suffix = f" - {placa}" if placa else ""
+            lines.append(f"- {marca} {modelo} ({ano}){suffix}")
         return "\n".join(lines)
 
-    def _fmt_search_registrations(self, r: Any) -> str:
-        if isinstance(r, str):
-            return f"📋 **Emplacamentos**\n\n{r}"
-        items = r if isinstance(r, list) else r.get("registrations", r.get("data", []))
-        count = len(items) if isinstance(items, list) else r.get("count", "?")
+    def _fmt_search_registrations(self, data: Any) -> str:
+        if isinstance(data, str):
+            return f"Emplacamentos\n\n{data}"
+        items = data if isinstance(data, list) else data.get("registrations", data.get("data", []))
+        count = len(items) if isinstance(items, list) else data.get("count", "?")
         if not items:
-            return "⚠️ Nenhum emplacamento encontrado para os filtros informados."
-        lines = [f"📋 **{count} emplacamento(s) encontrado(s)**\n"]
+            return "Nenhum emplacamento encontrado para os filtros informados."
+        lines = [f"{count} emplacamento(s) encontrado(s)", ""]
         for item in (items if isinstance(items, list) else [])[:10]:
-            data = item.get("data_emplacamento", "?")
+            data_emplacamento = item.get("data_emplacamento", "?")
             empresa = item.get("razao_social", item.get("empresa", "?"))
             marca = item.get("marca", item.get("marca_nome", ""))
             uf = item.get("uf", item.get("uf_emplacamento", ""))
-            preco = item.get("preco", None)
-            preco_str = f" — R$ {preco:,.0f}".replace(",", ".") if preco else ""
-            lines.append(f"• {data} | {empresa[:30]} | {marca} | {uf}{preco_str}")
+            preco = item.get("preco")
+            preco_str = f" - R$ {preco:,.0f}".replace(",", ".") if preco else ""
+            lines.append(f"- {data_emplacamento} | {empresa[:30]} | {marca} | {uf}{preco_str}")
         return "\n".join(lines)

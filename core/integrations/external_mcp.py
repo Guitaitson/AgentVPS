@@ -12,33 +12,36 @@ _CNPJ_RE = re.compile(r"\b\d{14}\b")
 
 
 class RemoteMCPClient:
-    """Small client for stateless HTTP MCP servers protected by bearer token."""
+    """Small client for stateless HTTP MCP servers protected by Cloudflare Access."""
 
     def __init__(
         self,
         *,
         base_url: str,
-        token: str,
+        access_client_id: str,
+        access_client_secret: str,
         client_name: str,
         server_name: str,
         timeout_seconds: float = 25.0,
     ):
         self.base_url = base_url.strip()
-        self.token = token.strip()
+        self.access_client_id = access_client_id.strip()
+        self.access_client_secret = access_client_secret.strip()
         self.client_name = client_name
         self.server_name = server_name
         self.timeout_seconds = timeout_seconds
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.base_url and self.token)
+        return bool(self.base_url and self.access_client_id and self.access_client_secret)
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> Any:
         if not self.is_configured:
             raise RuntimeError(f"{self.server_name} MCP is not configured")
 
         headers = {
-            "Authorization": f"Bearer {self.token}",
+            "CF-Access-Client-Id": self.access_client_id,
+            "CF-Access-Client-Secret": self.access_client_secret,
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }

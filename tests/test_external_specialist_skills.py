@@ -29,7 +29,14 @@ async def test_brazilcnpj_skill_routes_socios(monkeypatch):
         calls.append((self.server_name, tool_name, arguments or {}))
         return {"socios": [{"nome": "Fulano"}]}
 
-    monkeypatch.setattr("core.skills._builtin.brazilcnpj.handler.BRAZILCNPJ_MCP_TOKEN", "token")
+    monkeypatch.setattr(
+        "core.skills._builtin.brazilcnpj.handler.BRAZILCNPJ_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.brazilcnpj.handler.BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
+    )
     monkeypatch.setattr(
         "core.skills._builtin.brazilcnpj.handler.RemoteMCPClient.call_tool", fake_call
     )
@@ -51,7 +58,12 @@ async def test_fleetintel_analyst_routes_priority_queries(monkeypatch):
         return {"items": [{"razao_social": "Empresa A", "cnpj": "12345678000199", "score": 98}]}
 
     monkeypatch.setattr(
-        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_MCP_TOKEN", "token"
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "client-secret",
     )
     monkeypatch.setattr(
         "core.skills._builtin.fleetintel_analyst.handler.RemoteMCPClient.call_tool", fake_call
@@ -95,10 +107,20 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
         return {}
 
     monkeypatch.setattr(
-        "core.skills._builtin.fleetintel_orchestrator.handler.FLEETINTEL_MCP_TOKEN", "token"
+        "core.skills._builtin.fleetintel_orchestrator.handler.FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "fleet-client-id",
     )
     monkeypatch.setattr(
-        "core.skills._builtin.fleetintel_orchestrator.handler.BRAZILCNPJ_MCP_TOKEN", "token"
+        "core.skills._builtin.fleetintel_orchestrator.handler.FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+        "fleet-client-secret",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.BRAZILCNPJ_CF_ACCESS_CLIENT_ID",
+        "cnpj-client-id",
+    )
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET",
+        "cnpj-client-secret",
     )
     monkeypatch.setattr(
         "core.skills._builtin.fleetintel_orchestrator.handler.RemoteMCPClient.call_tool",
