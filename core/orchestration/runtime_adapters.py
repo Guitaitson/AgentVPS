@@ -367,7 +367,6 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                 "exec",
                 "--skip-git-repo-check",
                 "--ephemeral",
-                "--json",
                 "--color",
                 "never",
                 "--sandbox",
@@ -473,7 +472,8 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
             "2. Nao execute comandos fora do bridge abaixo.\n"
             "3. Use apenas estes especialistas: " + ", ".join(allowed_specialists) + ".\n"
             "4. Se faltar dado, diga explicitamente em unresolved_items.\n"
-            "5. Nao exponha segredos ou caminhos sensiveis.\n\n"
+            "5. Nao exponha segredos ou caminhos sensiveis.\n"
+            "6. A mensagem final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
             f"Bridge permitido:\n{bridge_cmd}\n\n"
             "Envelope da tarefa:\n"
             f"{json.dumps(envelope, ensure_ascii=False, indent=2)}\n"
