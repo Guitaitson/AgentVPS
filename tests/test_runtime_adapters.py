@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from core.orchestration import (
@@ -10,6 +12,7 @@ from core.orchestration import (
     RuntimeExecutionResult,
     RuntimeProtocol,
     RuntimeRouter,
+    runtime_adapters,
 )
 
 
@@ -289,3 +292,63 @@ async def test_codex_operator_adapter_executes_codex_cli(monkeypatch, tmp_path):
     assert result.output["answer"] == "Resposta do Codex"
     assert "fleetintel_analyst" in recorded["prompt"]
     assert "--output-schema" in recorded["command"]
+
+
+@pytest.mark.asyncio
+async def test_codex_operator_adapter_kills_process_group_on_timeout(monkeypatch, tmp_path):
+    recorded = {}
+
+    class _HungProcess:
+        returncode = None
+        pid = 4242
+
+        async def communicate(self, _prompt_bytes):
+            await asyncio.sleep(1)
+            return b"", b""
+
+        def kill(self):
+            recorded["killed"] = True
+
+        async def wait(self):
+            recorded["waited"] = True
+            return 0
+
+    async def _fake_create_subprocess_exec(*command, **kwargs):
+        recorded["command"] = list(command)
+        recorded["kwargs"] = kwargs
+        return _HungProcess()
+
+    def _fake_killpg(pid, sig):
+        recorded["killpg"] = (pid, sig)
+
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.shutil.which", lambda _cmd: "/usr/bin/codex"
+    )
+    monkeypatch.setattr("core.orchestration.runtime_adapters.os.path.exists", lambda _path: True)
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.asyncio.create_subprocess_exec",
+        _fake_create_subprocess_exec,
+    )
+    monkeypatch.setattr(runtime_adapters.os, "killpg", _fake_killpg, raising=False)
+
+    adapter = CodexOperatorAdapter(
+        codex_command="codex",
+        workdir=str(tmp_path),
+        timeout_s=0,
+    )
+    result = await adapter.execute(
+        RuntimeExecutionRequest(
+            action="brazilcnpj",
+            args={"query": "Enriqueca o CNPJ 23.373.000/0001-32"},
+            user_id="u1",
+            preferred_protocol=RuntimeProtocol.CODEX_OPERATOR,
+        )
+    )
+
+    assert result.success is False
+    assert result.error == "Codex operator timeout"
+    if "killpg" in recorded:
+        assert recorded["killpg"][0] == 4242
+    else:
+        assert recorded["killed"] is True
+    assert recorded["waited"] is True

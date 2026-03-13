@@ -9,6 +9,7 @@ import json
 import os
 import shlex
 import shutil
+import signal
 import sys
 import tempfile
 import time
@@ -397,6 +398,7 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                 stderr=asyncio.subprocess.PIPE,
                 cwd=tmpdir,
                 env=env,
+                start_new_session=True,
             )
             try:
                 stdout, stderr = await asyncio.wait_for(
@@ -404,7 +406,11 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                     timeout=self.timeout_s,
                 )
             except asyncio.TimeoutError:
-                process.kill()
+                if process.returncode is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except Exception:
+                        process.kill()
                 await process.wait()
                 return RuntimeExecutionResult(
                     success=False,
