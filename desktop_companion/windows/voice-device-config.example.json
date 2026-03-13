@@ -3,9 +3,16 @@
   "importPath": "",
   "extensions": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
   "stagingDir": "C:\\Users\\Pc Gamer\\AppData\\Local\\AgentVPS\\voice-staging",
+  "preTriageDir": "C:\\Users\\Pc Gamer\\AppData\\Local\\AgentVPS\\voice-pretriage",
+  "recorderProfile": "factory-profile-current",
+  "reviewDurationMinutes": 30,
+  "minimumDurationSeconds": 20,
+  "minimumFileSizeKb": 128,
   "sshTarget": "user@your-vps-host",
   "sshKeyPath": "",
   "remoteStagingDir": "/tmp/agentvps-voice-inbox",
   "remoteInboxDir": "/opt/vps-agent/data/voice/inbox",
+  "remoteManifestDir": "/opt/vps-agent/data/voice/manifests",
+  "uploadBatchManifest": true,
   "pollSeconds": 15
 }

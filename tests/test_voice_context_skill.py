@@ -32,6 +32,37 @@ async def test_voice_context_sync_skill_runs_sync(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_voice_context_sync_skill_runs_inspect(monkeypatch):
+    class FakeService:
+        async def inspect_inbox(self, source="skill_inspect", max_files=None):
+            return {
+                "success": True,
+                "status": "inspected",
+                "processed_files": 2,
+                "already_processed_files": 1,
+                "discarded_low_quality": 0,
+                "review_required_files": 1,
+                "context_items": 4,
+                "auto_committed": 3,
+                "pending_review": 1,
+                "batch_recommendation": "review_before_send",
+                "calibration_advice": "Segregue os arquivos longos.",
+            }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.voice_context_sync.handler.VoiceContextService",
+        lambda: FakeService(),
+    )
+    skill = VoiceContextSyncSkill(config=SkillConfig(name="voice_context_sync", description="test"))
+
+    output = await skill.execute({"mode": "inspect", "max_files": 3})
+
+    assert "voice context inspect" in output
+    assert "already_processed_files: 1" in output
+    assert "batch_recommendation: review_before_send" in output
+
+
+@pytest.mark.asyncio
 async def test_voice_context_sync_skill_commits_item(monkeypatch):
     class FakeService:
         def commit_review_item(self, *, item_id, actor="x"):

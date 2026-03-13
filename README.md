@@ -165,6 +165,8 @@ O fluxo recomendado para manter GitHub, PRs e VPS sincronizados e auditaveis e:
 4. publicar uma release no GitHub
 5. deixar o workflow `.github/workflows/release-deploy.yml` fazer o deploy na VPS
 
+Regra operacional: `origin/main` e a unica branch de producao. Branch temporaria nunca e ambiente de deploy.
+
 Enquanto o deploy automatico por release nao for o caminho exclusivo, qualquer deploy manual deve terminar com a VPS alinhada em `main`, nao em branch temporaria.
 
 O deploy automatico por release nao reinicia o AgentVPS no meio de trabalho critico. O script `scripts/deploy_release.sh` adia a tentativa quando detecta:
@@ -175,6 +177,8 @@ O deploy automatico por release nao reinicia o AgentVPS no meio de trabalho crit
 - blockers manuais em `runtime/deploy-blockers`
 
 Para o acervo externo, a estrategia e diferente: skills/tools/agentes entram por catalog sync com proposal/approval, sem substituir automaticamente o core do AgentVPS.
+
+Para a politica completa de branch, PR, release e auditoria local, ver `docs/GIT_GOVERNANCE.md`.
 
 ---
 
@@ -265,7 +269,7 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 - Inbox operacional na VPS: `/opt/vps-agent/data/voice/inbox`
 - Processamento: transcricao local opcional com `faster-whisper` via extra `.[voice]`
 - Memoria derivada: `episodic`, `semantic`, `profile`, `goals` com auto-commit de baixo risco e proposals para itens sensiveis
-- Companion Windows: `desktop_companion/windows/voice_device_watcher.ps1` para detectar o gravador e enviar os arquivos via `scp`
+- Companion Windows: `desktop_companion/windows/voice_device_watcher.ps1` para detectar o gravador, gerar lote local de pre-triagem e enviar so os arquivos aprovados via `scp`
 
 ## Comandos Telegram
 
@@ -278,7 +282,7 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 | `/reject <id>` | Rejeitar proposal |
 | `/catalogsync <cmd>` | check/apply/pin/unpin/rollback/provenance do catalogo |
 | `/runtimes [list|enable|disable]` | Gerenciar runtime adapters externos |
-| `/contextsync [max_files]` | Processar audios pendentes na inbox de voz, inclusive em amostras curtas |
+| `/contextsync [inspect] [max_files]` | Inspecionar ou processar audios pendentes na inbox de voz |
 | `/contextstatus` | Ver status do pipeline de voz, inbox e revisoes |
 | `/updatestatus` | Status do updater e ultimo catalog sync |
 

@@ -348,7 +348,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - `/reject <id>` - Rejeita proposal autonoma
 - `/catalogsync <cmd>` - check/apply/pin/unpin/rollback/provenance do catalogo
 - `/runtimes [list|enable|disable]` - Gerencia runtimes externos
-- `/contextsync [max_files]` - Processa audios pendentes na inbox de voz
+- `/contextsync [inspect] [max_files]` - Inspeciona ou processa audios pendentes na inbox de voz
 - `/contextstatus` - Mostra status da captura de contexto por voz
 - `/contextdiscard <job_id>` - Descarta lote de voz ruim e remove memoria derivada
 - `/updatestatus` - Mostra status do updater automatico
@@ -747,25 +747,54 @@ async def cmd_runtimes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_contextsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /contextsync [max_files] - processa inbox de audios pendentes."""
+    """Handler para /contextsync [inspect] [max_files] - inspeciona ou processa a inbox."""
     try:
+        inspect_only = False
         max_files = None
         if context.args:
-            first_arg = context.args[0].strip()
-            if first_arg.isdigit():
-                max_files = max(1, int(first_arg))
-            else:
-                await update.message.reply_text("Uso: /contextsync [max_files]")
-                return
+            args = [arg.strip().lower() for arg in context.args if str(arg).strip()]
+            if args and args[0] in {"inspect", "dry-run", "dryrun"}:
+                inspect_only = True
+                args = args[1:]
+            if args:
+                first_arg = args[0]
+                if first_arg.isdigit():
+                    max_files = max(1, int(first_arg))
+                else:
+                    await update.message.reply_text("Uso: /contextsync [inspect] [max_files]")
+                    return
         from core.voice_context import VoiceContextService
 
-        result = await VoiceContextService().sync_inbox(
-            source=f"telegram:{update.effective_user.id}",
-            max_files=max_files,
-        )
+        service = VoiceContextService()
+        if inspect_only:
+            result = await service.inspect_inbox(
+                source=f"telegram_inspect:{update.effective_user.id}",
+                max_files=max_files,
+            )
+        else:
+            result = await service.sync_inbox(
+                source=f"telegram:{update.effective_user.id}",
+                max_files=max_files,
+            )
         if not result.get("success"):
             await update.message.reply_text(
                 f"Erro context sync: {result.get('error', 'unknown_error')}"
+            )
+            return
+        if inspect_only:
+            await update.message.reply_text(
+                "voice context inspect\n"
+                f"- status: {result.get('status', 'ok')}\n"
+                f"- requested_max_files: {max_files if max_files is not None else 'default'}\n"
+                f"- processed_files: {result.get('processed_files', 0)}\n"
+                f"- already_processed_files: {result.get('already_processed_files', 0)}\n"
+                f"- discarded_low_quality: {result.get('discarded_low_quality', 0)}\n"
+                f"- review_required_files: {result.get('review_required_files', 0)}\n"
+                f"- context_items: {result.get('context_items', 0)}\n"
+                f"- would_auto_commit: {result.get('auto_committed', 0)}\n"
+                f"- would_require_review: {result.get('pending_review', 0)}\n"
+                f"- batch_recommendation: {result.get('batch_recommendation', '-')}\n"
+                f"- calibration_advice: {result.get('calibration_advice', '-')}"
             )
             return
         await update.message.reply_text(
@@ -776,9 +805,11 @@ async def cmd_contextsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- duplicates_skipped: {result.get('duplicates_skipped', 0)}\n"
             f"- failed_files: {result.get('failed_files', 0)}\n"
             f"- discarded_low_quality: {result.get('discarded_low_quality', 0)}\n"
+            f"- review_required_files: {result.get('review_required_files', 0)}\n"
             f"- context_items: {result.get('context_items', 0)}\n"
             f"- auto_committed: {result.get('auto_committed', 0)}\n"
-            f"- pending_review: {result.get('pending_review', 0)}"
+            f"- pending_review: {result.get('pending_review', 0)}\n"
+            f"- batch_recommendation: {result.get('batch_recommendation', '-')}"
         )
     except Exception as e:
         logger.error("cmd_contextsync_error", error=str(e))
@@ -814,8 +845,10 @@ async def cmd_contextstatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- status: {last_job.get('status')}",
                     f"- processed_files: {stats.get('processed_files', 0)}",
                     f"- discarded_low_quality: {stats.get('discarded_low_quality', 0)}",
+                    f"- review_required_files: {stats.get('review_required_files', 0)}",
                     f"- auto_committed: {stats.get('auto_committed', 0)}",
                     f"- pending_review: {stats.get('pending_review', 0)}",
+                    f"- batch_recommendation: {stats.get('batch_recommendation', '-')}",
                 ]
             )
         await update.message.reply_text("\n".join(lines))

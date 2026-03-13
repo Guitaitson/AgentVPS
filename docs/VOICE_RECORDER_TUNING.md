@@ -57,8 +57,10 @@ Racional:
 1. fazer backup do `FACTORY.TXT` original
 2. aplicar o perfil recomendado
 3. testar um lote curto de 20-40 minutos
-4. revisar transcript e quality score
-5. iterar antes de voltar para gravacoes muito longas
+4. passar o lote pela pre-triagem local do companion Windows
+5. se necessario, rodar `/contextsync inspect` na VPS para avaliar sem gerar memoria
+6. revisar transcript, quality score e itens que iriam para review
+7. iterar antes de voltar para gravacoes muito longas
 
 ## Observacao importante
 
