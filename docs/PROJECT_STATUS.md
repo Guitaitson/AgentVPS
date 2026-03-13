@@ -1,6 +1,6 @@
 # Project Status - Operational Snapshot
 
-Last updated: 2026-03-12
+Last updated: 2026-03-13
 
 ## Canonical Read Order
 
@@ -35,7 +35,8 @@ Last updated: 2026-03-12
 - External specialist routing for `fleetintel_analyst`, `brazilcnpj` and `fleetintel_orchestrator`
 - Reusable remote MCP client for authenticated FleetIntel/BrazilCNPJ servers
 - Skills catalog source now supports direct GitHub repo discovery for LangChain-style `SKILL.md` packs
-- Default catalog source now ships with a real FleetIntel snapshot and optional live GitHub sync
+- Default catalog source now points to live FleetIntel GitHub discovery
+- External catalog updater now supports auto-apply with smoke and auto rollback for FleetIntel/BrazilCNPJ metadata updates
 
 Validation baseline at review time:
 - targeted: `python -m pytest -q tests/test_runtime_adapters.py tests/test_runtime_control.py tests/test_external_specialist_skills.py tests/test_react_codex_operator.py` -> 24 passed

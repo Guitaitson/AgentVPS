@@ -15,6 +15,7 @@ import redis
 import structlog
 
 from core.catalog import SkillsCatalogSyncEngine
+from core.updater.skills_smoke import ExternalSkillsSmokeRunner
 
 logger = structlog.get_logger(__name__)
 
@@ -42,16 +43,33 @@ class UpdaterJob(Protocol):
 
 
 class SkillsCatalogUpdateJob:
-    """Checks updates for external skills catalog sources."""
+    """Checks and optionally auto-applies updates for external skills catalog sources."""
 
     name = "skills_catalog"
 
-    def __init__(self, *, approval_required_for_apply: bool):
+    def __init__(
+        self,
+        *,
+        approval_required_for_apply: bool,
+        source_name: str,
+        auto_apply_enabled: bool,
+        smoke_enabled: bool,
+        auto_rollback_on_failure: bool,
+    ):
         self._approval_required_for_apply = bool(approval_required_for_apply)
+        self._source_name = str(source_name).strip()
+        self._auto_apply_enabled = bool(auto_apply_enabled)
+        self._smoke_enabled = bool(smoke_enabled)
+        self._auto_rollback_on_failure = bool(auto_rollback_on_failure)
         self._sync_engine = SkillsCatalogSyncEngine()
+        self._smoke_runner = ExternalSkillsSmokeRunner()
+
+    @property
+    def auto_apply_enabled(self) -> bool:
+        return self._auto_apply_enabled and not self._approval_required_for_apply
 
     async def check(self) -> UpdateCheckResult:
-        result = await self._sync_engine.sync(mode="check")
+        result = await self._sync_engine.sync(mode="check", source_name=self._source_name)
         if not result.get("success"):
             return UpdateCheckResult(
                 job_name=self.name,
@@ -66,18 +84,144 @@ class SkillsCatalogUpdateJob:
             trigger_name="catalog_update_available",
             changes_detected=changes,
             condition_data={
+                "source_name": self._source_name,
                 "changes_detected": changes,
                 "added": result.get("added", 0),
                 "updated": result.get("updated", 0),
                 "removed": result.get("removed", 0),
+                "changed_keys": result.get("changed_keys", []),
             },
             suggested_action={
                 "action": "skills_catalog_sync",
-                "args": {"mode": "apply"},
-                "description": "Aplicar atualizações detectadas no catálogo de skills",
+                "args": {"mode": "apply", "source": self._source_name},
+                "description": "Aplicar atualizacoes detectadas no catalogo de skills",
                 "requires_approval": self._approval_required_for_apply,
             },
         )
+
+    async def auto_apply(self, check: UpdateCheckResult) -> dict[str, Any]:
+        source_name = str((check.condition_data or {}).get("source_name") or self._source_name)
+        apply_result = await self._sync_engine.sync(mode="apply", source_name=source_name)
+        if not apply_result.get("success"):
+            summary = {
+                "job": self.name,
+                "status": "auto_apply_failed",
+                "source": source_name,
+                "error": str(apply_result.get("error", "unknown_error")),
+            }
+            await self._notify(summary)
+            return summary
+
+        changed_keys = [str(key) for key in apply_result.get("changed_keys", [])]
+        external_skill_names = [key.split(":", 1)[0] for key in changed_keys]
+        smoke_result: dict[str, Any] = {
+            "success": True,
+            "skipped": True,
+            "results": [],
+        }
+        if self._smoke_enabled:
+            smoke_result = await self._smoke_runner.run(external_skill_names)
+
+        summary: dict[str, Any] = {
+            "job": self.name,
+            "status": "auto_applied",
+            "source": source_name,
+            "changes": int(apply_result.get("changes_detected", 0)),
+            "added": int(apply_result.get("added", 0)),
+            "updated": int(apply_result.get("updated", 0)),
+            "removed": int(apply_result.get("removed", 0)),
+            "changed_keys": changed_keys[:20],
+            "smoke": smoke_result,
+        }
+
+        if smoke_result.get("success"):
+            await self._notify(summary)
+            return summary
+
+        summary["status"] = "smoke_failed"
+        if self._auto_rollback_on_failure:
+            summary["rollback"] = await self._rollback_changed(
+                changed_keys, source_name=source_name
+            )
+            summary["status"] = (
+                "auto_rollback_completed"
+                if summary["rollback"].get("success")
+                else "auto_rollback_failed"
+            )
+
+        await self._notify(summary)
+        return summary
+
+    async def _rollback_changed(
+        self, changed_keys: list[str], *, source_name: str
+    ) -> dict[str, Any]:
+        rolled_back: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+        for key in changed_keys:
+            skill_name, _, key_source = key.partition(":")
+            if key_source and key_source != source_name:
+                continue
+            result = await self._sync_engine.rollback(
+                skill_name=skill_name,
+                source_name=source_name,
+                actor="updater:auto_rollback",
+                reason="smoke failure after auto apply",
+            )
+            if result.get("success"):
+                rolled_back.append(
+                    {
+                        "skill_name": skill_name,
+                        "version": result.get("rolled_back_to_version"),
+                    }
+                )
+            else:
+                errors.append(
+                    {
+                        "skill_name": skill_name,
+                        "error": result.get("error", "unknown_error"),
+                    }
+                )
+
+        return {
+            "success": not errors,
+            "rolled_back": rolled_back,
+            "errors": errors,
+        }
+
+    async def _notify(self, summary: dict[str, Any]) -> None:
+        try:
+            from telegram_bot.bot import send_notification
+
+            lines = [
+                "Updater auto-apply",
+                f"- job: {summary.get('job')}",
+                f"- status: {summary.get('status')}",
+                f"- source: {summary.get('source')}",
+                f"- changes: {summary.get('changes', 0)}",
+            ]
+            smoke = summary.get("smoke")
+            if isinstance(smoke, dict):
+                lines.append(f"- smoke_success: {str(bool(smoke.get('success'))).lower()}")
+                for item in smoke.get("results", [])[:3]:
+                    lines.append(
+                        f"- smoke {item.get('external_skill')}: "
+                        f"{'ok' if item.get('success') else item.get('failure_reason')}"
+                    )
+            rollback = summary.get("rollback")
+            if isinstance(rollback, dict):
+                lines.append(f"- rollback_success: {str(bool(rollback.get('success'))).lower()}")
+                for item in rollback.get("rolled_back", [])[:5]:
+                    lines.append(
+                        f"- rolled_back {item.get('skill_name')} -> v{item.get('version')}"
+                    )
+                for item in rollback.get("errors", [])[:5]:
+                    lines.append(f"- rollback_error {item.get('skill_name')}: {item.get('error')}")
+            if summary.get("error"):
+                lines.append(f"- error: {summary.get('error')}")
+
+            await send_notification("\n".join(lines))
+        except Exception as exc:  # pragma: no cover - notification is best effort
+            logger.error("updater.skills_catalog_notify_failed", error=str(exc))
 
 
 class ManifestDigestUpdateJob:
@@ -258,7 +402,7 @@ class UpdaterAgent:
     async def check_and_propose(self, engine: Any) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
         checks = await self.run_checks()
-        for check in checks:
+        for job, check in zip(self._jobs, checks):
             trigger_name = check.trigger_name or f"{check.job_name}_update_available"
             if not check.success:
                 summaries.append(
@@ -277,6 +421,9 @@ class UpdaterAgent:
                         "changes": 0,
                     }
                 )
+                continue
+            if hasattr(job, "auto_apply") and getattr(job, "auto_apply_enabled", False):
+                summaries.append(await job.auto_apply(check))
                 continue
             if engine.has_open_proposal(trigger_name):
                 summaries.append(
