@@ -1,6 +1,6 @@
 # Project Status - Source of Truth
 
-Last updated: 2026-03-10
+Last updated: 2026-03-12
 
 ## Canonical Read Order
 
@@ -12,9 +12,9 @@ Last updated: 2026-03-10
 ## Branch and Sync Snapshot
 
 - Canonical branch on GitHub: `origin/main`
-- Current `origin/main` tip at review time: `4427a60` (post-merge PR #13)
-- Current worktree branch: `claude/pr3-fleetintel-integration`
-- Local worktree contains FleetIntel/BrazilCNPJ integration work in progress
+- Current `origin/main` tip at review time: `b4160d8` (post-merge PR #22)
+- Current worktree branch: `claude/pr11-codex-operator`
+- Local worktree contains Codex operator runtime integration in progress
 
 ## Master Plan Status (Strict 100% Gate)
 
@@ -26,6 +26,7 @@ Last updated: 2026-03-10
 - Versioned soul identity with proposal/approval flow and challenge mode
 - Runtime adapter layer (local + MCP + A2A + ACP + DeepAgents + OpenClaw)
 - Runtime adapter control plane (`/runtimes list|enable|disable`) with persisted overrides
+- Optional `codex_operator` runtime adapter for FleetIntel/BrazilCNPJ specialist delegation
 - Skills catalog sync engine + updater agent + autonomous trigger integration
 - Catalog operations: pin, unpin, rollback, provenance (DB + fallback file)
 - Real semantic memory integration with Qdrant in runtime path (save + recall)
@@ -36,7 +37,7 @@ Last updated: 2026-03-10
 - Default catalog source now ships with a real FleetIntel snapshot and optional live GitHub sync
 
 Validation at review time:
-- targeted: `python -m pytest -q tests/test_catalog_sync_engine.py tests/test_external_specialist_skills.py tests/test_skill_registry.py` -> 25 passed
+- targeted: `python -m pytest -q tests/test_runtime_adapters.py tests/test_runtime_control.py tests/test_external_specialist_skills.py tests/test_react_codex_operator.py` -> 24 passed
 - pending final full-suite run after docs finish
 
 ## Decision Gate for Next Features

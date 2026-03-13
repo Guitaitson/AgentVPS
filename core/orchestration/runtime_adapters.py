@@ -4,6 +4,14 @@ Runtime adapter layer for local and delegated agent execution.
 
 from __future__ import annotations
 
+import asyncio
+import json
+import os
+import shlex
+import shutil
+import signal
+import sys
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
@@ -15,6 +23,7 @@ import httpx
 import structlog
 
 from core.memory import MemoryPolicy
+from core.progress import emit_progress
 
 logger = structlog.get_logger(__name__)
 
@@ -28,6 +37,7 @@ class RuntimeProtocol(str, Enum):
     ACP = "acp"
     DEEPAGENTS = "deepagents"
     OPENCLAW = "openclaw"
+    CODEX_OPERATOR = "codex_operator"
 
 
 @dataclass(slots=True)
@@ -303,6 +313,237 @@ class OpenClawAdapter(AgentRuntimeAdapter):
             )
 
 
+class CodexOperatorAdapter(AgentRuntimeAdapter):
+    """Delegates complex specialist flows to a local Codex CLI operator."""
+
+    protocol = RuntimeProtocol.CODEX_OPERATOR
+
+    def __init__(
+        self,
+        *,
+        codex_command: str = "codex",
+        workdir: str,
+        python_executable: str | None = None,
+        model: str | None = None,
+        timeout_s: int = 120,
+    ):
+        self.codex_command = codex_command.strip() or "codex"
+        self.workdir = os.path.abspath(workdir)
+        self.python_executable = python_executable or sys.executable
+        self.model = model
+        self.timeout_s = timeout_s
+
+    async def execute(self, request: RuntimeExecutionRequest) -> RuntimeExecutionResult:
+        started = time.perf_counter()
+        if shutil.which(self.codex_command) is None:
+            return RuntimeExecutionResult(
+                success=False,
+                output=None,
+                runtime=self.protocol,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                error=f"Codex CLI not found: {self.codex_command}",
+            )
+
+        auth_path = os.path.expanduser("~/.codex/auth.json")
+        if not os.path.exists(auth_path):
+            return RuntimeExecutionResult(
+                success=False,
+                output=None,
+                runtime=self.protocol,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                error="Codex auth not configured",
+            )
+
+        await emit_progress("external_call", server="codex_operator", status="start")
+
+        with tempfile.TemporaryDirectory(prefix="agentvps-codex-") as tmpdir:
+            tmpdir = os.path.abspath(tmpdir)
+            schema_path = os.path.join(tmpdir, "output_schema.json")
+            output_path = os.path.join(tmpdir, "codex_output.json")
+            with open(schema_path, "w", encoding="utf-8") as schema_file:
+                json.dump(_codex_output_schema(), schema_file, ensure_ascii=True)
+
+            command = [
+                self.codex_command,
+                "exec",
+                "--skip-git-repo-check",
+                "--ephemeral",
+                "--color",
+                "never",
+                "--sandbox",
+                "workspace-write",
+                "-C",
+                tmpdir,
+                "--output-schema",
+                schema_path,
+                "-o",
+                output_path,
+            ]
+            if self.model:
+                command.extend(["-m", self.model])
+            command.append("-")
+
+            prompt = self._build_prompt(request)
+            env = os.environ.copy()
+            existing_pythonpath = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = (
+                f"{self.workdir}{os.pathsep}{existing_pythonpath}"
+                if existing_pythonpath
+                else self.workdir
+            )
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=tmpdir,
+                env=env,
+                start_new_session=True,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(prompt.encode("utf-8")),
+                    timeout=self.timeout_s,
+                )
+            except asyncio.TimeoutError:
+                if process.returncode is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except Exception:
+                        process.kill()
+                await process.wait()
+                return RuntimeExecutionResult(
+                    success=False,
+                    output=None,
+                    runtime=self.protocol,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    error="Codex operator timeout",
+                )
+
+            if process.returncode != 0:
+                error_text = (
+                    stderr.decode("utf-8", errors="ignore").strip()
+                    or stdout.decode("utf-8", errors="ignore").strip()
+                )
+                return RuntimeExecutionResult(
+                    success=False,
+                    output=None,
+                    runtime=self.protocol,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    error=f"Codex operator failed: {error_text[:500]}",
+                )
+
+            if not os.path.exists(output_path):
+                return RuntimeExecutionResult(
+                    success=False,
+                    output=None,
+                    runtime=self.protocol,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    error="Codex operator returned no output file",
+                )
+
+            with open(output_path, "r", encoding="utf-8") as output_file:
+                payload = json.load(output_file)
+
+        return RuntimeExecutionResult(
+            success=True,
+            output=payload,
+            runtime=self.protocol,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+        )
+
+    def _build_prompt(self, request: RuntimeExecutionRequest) -> str:
+        specialist_hint = request.action
+        allowed_specialists = _allowed_codex_specialists(specialist_hint)
+        primary_args_json = json.dumps(
+            {"query": request.args.get("query") or request.args.get("raw_input") or request.action},
+            ensure_ascii=False,
+        )
+        bridge_cmd = (
+            f"{shlex.quote(self.python_executable)} -m core.codex_operator_bridge run-skill "
+            f"--skill <skill> --args-json '<json>'"
+        )
+        primary_command = (
+            f"{shlex.quote(self.python_executable)} -m core.codex_operator_bridge run-skill "
+            f"--skill {shlex.quote(specialist_hint)} --args-json {shlex.quote(primary_args_json)}"
+        )
+        envelope = {
+            "task": request.args.get("query") or request.args.get("raw_input") or request.action,
+            "specialist_hint": specialist_hint,
+            "allowed_specialists": allowed_specialists,
+            "context": request.context or {},
+            "constraints": {
+                "no_file_edits": True,
+                "no_dangerous_skills": True,
+                "max_specialist_calls": 4,
+            },
+        }
+        return (
+            "Voce e o operador Codex do AgentVPS.\n"
+            "Objetivo: operar apenas especialistas allowlisted e devolver uma resposta estruturada.\n"
+            "Regras obrigatorias:\n"
+            "1. Nao edite arquivos.\n"
+            "2. Nao execute comandos fora do bridge abaixo.\n"
+            "3. Use apenas estes especialistas: " + ", ".join(allowed_specialists) + ".\n"
+            "4. Comece pelo especialista principal indicado em specialist_hint.\n"
+            "5. Se a primeira chamada ja devolver uma resposta util ou uma falha degradada, finalize imediatamente.\n"
+            "6. Nunca rode diagnosticos extras do ambiente, como ps, grep, rg, ls, cat ou comandos similares.\n"
+            "7. Se faltar dado, diga explicitamente em unresolved_items.\n"
+            "8. Nao exponha segredos ou caminhos sensiveis.\n"
+            "9. A mensagem final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
+            f"Bridge permitido:\n{bridge_cmd}\n\n"
+            f"Primeiro comando esperado:\n{primary_command}\n\n"
+            "Envelope da tarefa:\n"
+            f"{json.dumps(envelope, ensure_ascii=False, indent=2)}\n"
+        )
+
+
+def _allowed_codex_specialists(specialist_hint: str) -> list[str]:
+    if specialist_hint == "fleetintel_orchestrator":
+        return ["fleetintel_orchestrator", "fleetintel_analyst", "brazilcnpj"]
+    if specialist_hint == "fleetintel_analyst":
+        return ["fleetintel_analyst", "brazilcnpj"]
+    if specialist_hint == "brazilcnpj":
+        return ["brazilcnpj"]
+    return ["fleetintel_analyst", "brazilcnpj"]
+
+
+def _codex_output_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "summary",
+            "answer",
+            "confidence",
+            "facts",
+            "tool_trace",
+            "unresolved_items",
+            "requires_human_approval",
+        ],
+        "properties": {
+            "summary": {"type": "string"},
+            "answer": {"type": "string"},
+            "confidence": {"type": "number"},
+            "facts": {"type": "array", "items": {"type": "string"}},
+            "tool_trace": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["tool", "status"],
+                    "properties": {
+                        "tool": {"type": "string"},
+                        "status": {"type": "string"},
+                    },
+                },
+            },
+            "unresolved_items": {"type": "array", "items": {"type": "string"}},
+            "requires_human_approval": {"type": "boolean"},
+        },
+    }
+
+
 class RuntimeRouter:
     """
     Router for local vs delegated runtimes with least-privilege context.
@@ -327,6 +568,9 @@ class RuntimeRouter:
         )
         return await adapter.execute(prepared_request)
 
+    def has_protocol(self, protocol: RuntimeProtocol) -> bool:
+        return protocol in self._adapters
+
     def _prepare_request(self, request: RuntimeExecutionRequest) -> RuntimeExecutionRequest:
         allowed_keys = set(request.context_keys) if request.context_keys else None
         sanitized_context = self._memory_policy.sanitize_context(request.context, allowed_keys)
@@ -347,6 +591,7 @@ class RuntimeRouter:
             RuntimeProtocol.ACP,
             RuntimeProtocol.DEEPAGENTS,
             RuntimeProtocol.OPENCLAW,
+            RuntimeProtocol.CODEX_OPERATOR,
         ):
             if protocol in self._adapters:
                 return self._adapters[protocol]

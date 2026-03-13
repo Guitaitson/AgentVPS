@@ -1,6 +1,11 @@
 import pytest
 
-from core.integrations import RemoteMCPError, detect_external_skill, extract_company_count_query
+from core.integrations import (
+    RemoteMCPError,
+    detect_external_skill,
+    extract_company_count_query,
+    should_delegate_specialist_to_codex,
+)
 from core.skills._builtin.brazilcnpj.handler import BrazilCNPJSkill
 from core.skills._builtin.fleetintel.handler import FleetIntelSkill
 from core.skills._builtin.fleetintel_analyst.handler import FleetIntelAnalystSkill
@@ -36,6 +41,30 @@ def test_extract_company_count_query_for_company_year_volume():
     args = extract_company_count_query("Quantos caminhões o Grupo Vamos comprou em 2025?")
 
     assert args == {"razao_social": "Grupo Vamos", "ano": 2025}
+
+
+def test_should_delegate_specialist_to_codex_for_complex_specialist_requests():
+    assert (
+        should_delegate_specialist_to_codex(
+            "Use o FleetIntel para analisar o CNPJ 23.373.000/0001-32 e resumir sinais relevantes.",
+            "fleetintel_analyst",
+        )
+        is True
+    )
+    assert (
+        should_delegate_specialist_to_codex(
+            "Enriqueça o CNPJ 23.373.000/0001-32",
+            "brazilcnpj",
+        )
+        is False
+    )
+    assert (
+        should_delegate_specialist_to_codex(
+            "Use a skill fleetintel para consultar o CNPJ 23.373.000/0001-32",
+            "fleetintel_analyst",
+        )
+        is False
+    )
 
 
 @pytest.mark.asyncio

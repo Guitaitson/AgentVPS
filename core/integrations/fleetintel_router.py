@@ -105,6 +105,34 @@ def detect_external_skill(message: str) -> str | None:
     return None
 
 
+def should_delegate_specialist_to_codex(message: str, specialist_name: str) -> bool:
+    msg = _normalize_text(message)
+    if "skill fleetintel" in msg:
+        return False
+    if "codex" in msg:
+        return True
+    if specialist_name == "fleetintel_orchestrator":
+        return True
+    if specialist_name not in {"fleetintel_analyst", "brazilcnpj"}:
+        return False
+
+    complexity_markers = (
+        "resumir",
+        "resuma",
+        "analisar",
+        "analise",
+        "investigar",
+        "explique",
+        "por que",
+        "porque",
+        "o que mudou",
+        "sinais relevantes",
+    )
+    has_complexity = any(marker in msg for marker in complexity_markers)
+    has_multi_domain_hint = "cnpj" in msg and any(keyword in msg for keyword in FLEET_KEYWORDS)
+    return has_complexity and has_multi_domain_hint
+
+
 def _normalize_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value.lower().strip())
     return "".join(char for char in normalized if not unicodedata.combining(char))
