@@ -182,6 +182,34 @@ class FleetIntelAnalystSkill(SkillBase):
                 f"emplacamentos{periodo}.\n"
                 f"CNPJ: {empresa.get('cnpj', '-')}"
             )
+        if tool_name == "empresa_profile" and isinstance(result, dict):
+            if result.get("error"):
+                return "FleetIntel\n\nNao encontrei essa empresa na base atual do FleetIntel."
+            empresa = result.get("empresa") or {}
+            resumo = result.get("entity_summary", {}).get("resumo") or result.get("resumo") or {}
+            lines = ["FleetIntel", ""]
+            lines.append(
+                f"Empresa: {empresa.get('razao_social') or 'empresa'} | CNPJ {empresa.get('cnpj', '-')}"
+            )
+            if resumo:
+                lines.append(
+                    "Resumo historico: "
+                    f"{resumo.get('total_emplacamentos', 0)} emplacamentos, "
+                    f"R$ {float(resumo.get('valor_total', 0) or 0):,.2f}".replace(",", "X")
+                    .replace(".", ",")
+                    .replace("X", ".")
+                )
+                lines.append(
+                    "Janela observada: "
+                    f"{resumo.get('primeira_compra_historico', '-')} ate "
+                    f"{resumo.get('ultima_compra_historico', '-')}"
+                )
+                lines.append(
+                    "Diversidade: "
+                    f"{resumo.get('marcas_distintas', 0)} marcas, "
+                    f"{resumo.get('ufs_distintas', 0)} UFs"
+                )
+            return "\n".join(lines)
         if tool_name == "list_suggested_questions" and isinstance(result, dict):
             items = (
                 result.get("questions")
