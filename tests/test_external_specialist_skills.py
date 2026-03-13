@@ -32,6 +32,18 @@ def test_detect_external_skill_routes():
         detect_external_skill("Use a skill fleetintel para consultar o CNPJ 23.373.000/0001-32")
         == "fleetintel"
     )
+    assert detect_external_skill("Use o FleetIntel Orchestrator para cruzar frota e CNPJ") == (
+        "fleetintel_orchestrator"
+    )
+    assert (
+        detect_external_skill(
+            "Use BrazilCNPJ Enricher para validar este CNPJ (48.430.290/0001-30), "
+            "mostrar socios, grupo economico e me dizer sobre ela, depois use o "
+            "FleetIntel Orchestrator para falar da frota e o FleetIntel Analyst para "
+            "me dar insights sobre."
+        )
+        == "fleetintel_orchestrator"
+    )
     assert detect_external_skill("cruze sinais de compra com cnpj das contas") == (
         "fleetintel_orchestrator"
     )

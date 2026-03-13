@@ -84,11 +84,24 @@ COMPANY_VOLUME_NOUNS = [
 
 def detect_external_skill(message: str) -> str | None:
     msg = _normalize_text(message)
-    if "skill fleetintel" in msg or "use a skill fleetintel" in msg:
+    mentions_generic_fleet = "skill fleetintel" in msg or "use a skill fleetintel" in msg
+    mentions_analyst = "skill fleetintel_analyst" in msg or "fleetintel analyst" in msg
+    mentions_orchestrator = (
+        "skill fleetintel_orchestrator" in msg or "fleetintel orchestrator" in msg
+    )
+    mentions_brazilcnpj = "skill brazilcnpj" in msg or "brazilcnpj enricher" in msg
+
+    if mentions_orchestrator:
+        return "fleetintel_orchestrator"
+    if mentions_brazilcnpj and (mentions_analyst or mentions_generic_fleet):
+        return "fleetintel_orchestrator"
+    if mentions_analyst and mentions_brazilcnpj:
+        return "fleetintel_orchestrator"
+    if mentions_generic_fleet and not (mentions_analyst or mentions_brazilcnpj):
         return "fleetintel"
-    if "skill fleetintel_analyst" in msg or "fleetintel analyst" in msg:
+    if mentions_analyst:
         return "fleetintel_analyst"
-    if "skill brazilcnpj" in msg:
+    if mentions_brazilcnpj:
         return "brazilcnpj"
 
     has_fleet = any(keyword in msg for keyword in FLEET_KEYWORDS)
