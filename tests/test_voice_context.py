@@ -238,3 +238,88 @@ def test_voice_context_feedback_mentions_memory_targets_and_discard_reason():
     assert "memory_review: goals=1" in text
     assert "disposition: review_required; quality_discard:0.31" in text
     assert "/contextdiscard 9" in text
+
+
+@pytest.mark.asyncio
+async def test_voice_context_inspect_inbox_reports_review_without_committing(tmp_path):
+    inbox_dir = tmp_path / "inbox"
+    processing_dir = tmp_path / "processing"
+    archive_dir = tmp_path / "archive"
+    failed_dir = tmp_path / "failed"
+    transcripts_dir = tmp_path / "transcripts"
+    inbox_dir.mkdir()
+    (inbox_dir / "sample.mp3").write_bytes(b"fake-audio")
+
+    settings = SimpleNamespace(
+        file_extensions=".mp3,.wav",
+        inbox_dir=str(inbox_dir),
+        processing_dir=str(processing_dir),
+        archive_dir=str(archive_dir),
+        failed_dir=str(failed_dir),
+        transcripts_dir=str(transcripts_dir),
+        max_files_per_run=12,
+        auto_commit_max_duration_minutes=30,
+        quality_warn_score=0.65,
+        quality_min_score=0.35,
+        create_daily_summary=True,
+        auto_commit_threshold=0.75,
+    )
+
+    class FakeTranscriber:
+        def transcribe_file(self, file_path, language="pt"):  # noqa: ARG002
+            return TranscriptResult(
+                text=(
+                    "Hoje avancei no AgentVPS e documentei o fluxo de voz para reduzir ruido. "
+                    "Revisei o lote da manha, conferi os arquivos, organizei os blocos por contexto, "
+                    "separei trechos curtos, removi pausas longas e mantive um ritmo de fala mais claro. "
+                    "Tambem anotei que prefiro revisar os lotes antes de subir qualquer arquivo para a VPS. "
+                    "No periodo da tarde continuei o ajuste de calibracao, comparei os resultados do gravador "
+                    "e deixei um resumo operacional do dia para a memoria episodica."
+                ),
+                duration_seconds=12 * 60,
+                model="fake",
+            )
+
+    class FakeExtractor:
+        async def extract_structured_context(self, transcript, source_name=None):  # noqa: ARG002
+            return {
+                "summary": "Resumo util",
+                "episodes": [
+                    {
+                        "text": "Avancei no AgentVPS",
+                        "domain": "trabalho_criacao",
+                        "confidence": 0.91,
+                    }
+                ],
+                "facts": [],
+                "preferences": [
+                    {
+                        "key": "pref_review",
+                        "value": "Prefiro revisar lotes antes de subir",
+                        "evidence": "Eu prefiro revisar os lotes antes de subir.",
+                        "domain": "operacoes_dia_a_dia",
+                        "confidence": 0.84,
+                    }
+                ],
+                "commitments": [],
+            }
+
+    service = VoiceContextService(
+        settings=settings,
+        memory=SimpleNamespace(),
+        extractor=FakeExtractor(),
+        transcriber=FakeTranscriber(),
+    )
+
+    result = await service.inspect_inbox(max_files=5)
+
+    assert result["success"] is True
+    assert result["status"] == "inspected"
+    assert result["processed_files"] == 1
+    assert result["auto_committed"] == 2
+    assert result["pending_review"] == 1
+    assert result["review_required_files"] == 1
+    assert result["batch_recommendation"] == "review_before_send"
+    assert "Segregue os arquivos" in result["calibration_advice"]
+    assert result["files"][0]["recommended_action"] == "hold"
+    assert result["files"][0]["would_require_review"] == 1

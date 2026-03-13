@@ -117,6 +117,47 @@ class VoiceContextService:
     def has_pending_files(self) -> bool:
         return bool(self.list_pending_files())
 
+    async def inspect_inbox(
+        self,
+        *,
+        source: str = "manual_inspect",
+        max_files: int | None = None,
+    ) -> dict[str, Any]:
+        self.ensure_directories()
+        pending = self.list_pending_files()
+        limit = max_files or int(self.settings.max_files_per_run)
+        selected = pending[: max(1, limit)] if pending else []
+
+        if not selected:
+            return {
+                "success": True,
+                "status": "no_files",
+                "inspect_only": True,
+                "processed_files": 0,
+                "pending_review": self.count_pending_review(),
+                "inbox_files": 0,
+                "review_required_files": 0,
+                "already_processed_files": 0,
+                "batch_recommendation": "no_files",
+                "calibration_advice": "Nenhum audio pendente na inbox.",
+                "files": [],
+            }
+
+        stats = self._new_batch_stats()
+        stats["source"] = source
+        stats["inspect_only"] = True
+
+        for path in selected:
+            file_result = await self._inspect_one_file(source_path=path)
+            self._merge_file_result(stats, file_result)
+
+        stats["status"] = "inspected"
+        stats["batch_recommendation"] = self._recommend_batch_action(stats)
+        stats["calibration_advice"] = self._build_calibration_advice(stats)
+        stats["success"] = True
+        stats["inbox_files"] = len(pending)
+        return stats
+
     async def sync_inbox(
         self,
         *,
@@ -142,19 +183,8 @@ class VoiceContextService:
             }
 
         job_id = self._create_job(source=source, batch_date=datetime.utcnow().date().isoformat())
-        stats = {
-            "processed_files": 0,
-            "duplicates_skipped": 0,
-            "failed_files": 0,
-            "discarded_low_quality": 0,
-            "context_items": 0,
-            "auto_committed": 0,
-            "pending_review": 0,
-            "committed_targets": {},
-            "pending_targets": {},
-            "proposal_ids": [],
-            "files": [],
-        }
+        stats = self._new_batch_stats()
+        stats["source"] = source
 
         try:
             for path in selected:
@@ -163,26 +193,10 @@ class VoiceContextService:
                     source_path=path,
                     user_id=resolved_user_id,
                 )
-                stats["processed_files"] += 1
-                stats["duplicates_skipped"] += int(file_result.get("duplicate", False))
-                stats["failed_files"] += int(not file_result.get("success", False))
-                stats["discarded_low_quality"] += int(file_result.get("discarded_low_quality", 0))
-                stats["context_items"] += int(file_result.get("context_items", 0))
-                stats["auto_committed"] += int(file_result.get("auto_committed", 0))
-                stats["pending_review"] += int(file_result.get("pending_review", 0))
-                self._merge_counter(
-                    stats["committed_targets"],
-                    file_result.get("committed_targets") or {},
-                )
-                self._merge_counter(
-                    stats["pending_targets"],
-                    file_result.get("pending_targets") or {},
-                )
-                stats["proposal_ids"].extend(file_result.get("proposal_ids") or [])
-                report = file_result.get("report")
-                if report:
-                    stats["files"].append(report)
+                self._merge_file_result(stats, file_result)
 
+            stats["batch_recommendation"] = self._recommend_batch_action(stats)
+            stats["calibration_advice"] = self._build_calibration_advice(stats)
             self._finish_job(job_id, status="completed", stats=stats)
             status = self.get_status()
             feedback = self.build_job_feedback(job_id=job_id)
@@ -254,12 +268,15 @@ class VoiceContextService:
                     "context_items": 0,
                     "auto_committed": 0,
                     "pending_review": 0,
+                    "review_required_files": 1 if force_review else 0,
                     "report": self._build_file_report(
                         file_name=source_path.name,
                         transcript=transcript,
                         quality=quality,
                         status="discarded_quality",
                         reason=reason,
+                        recommended_action="discard",
+                        review_required=force_review,
                     ),
                 }
             extracted = await self.extractor.extract_structured_context(
@@ -294,6 +311,7 @@ class VoiceContextService:
             return {
                 "success": True,
                 **commit_stats,
+                "review_required_files": 1 if force_review or commit_stats.get("pending_review") else 0,
                 "report": self._build_file_report(
                     file_name=source_path.name,
                     transcript=transcript,
@@ -302,6 +320,15 @@ class VoiceContextService:
                     reason=self._file_status_reason(force_review=force_review, quality=quality),
                     committed_targets=commit_stats.get("committed_targets"),
                     pending_targets=commit_stats.get("pending_targets"),
+                    item_counts=self._count_items_by_type(items),
+                    recommended_action=self._recommend_file_action(
+                        quality=quality,
+                        force_review=force_review,
+                        pending_review=int(commit_stats.get("pending_review", 0)),
+                    ),
+                    review_required=force_review or bool(commit_stats.get("pending_review")),
+                    would_auto_commit=int(commit_stats.get("auto_committed", 0)),
+                    would_require_review=int(commit_stats.get("pending_review", 0)),
                 ),
             }
         except Exception as exc:
@@ -316,6 +343,82 @@ class VoiceContextService:
             )
             logger.error("voice_context.file_failed", file=str(source_path), error=str(exc))
             return {"success": False, "context_items": 0, "auto_committed": 0, "pending_review": 0}
+
+    async def _inspect_one_file(self, *, source_path: Path) -> dict[str, Any]:
+        sha256 = self._compute_sha256(source_path)
+        duplicate = self._safe_sha_already_processed(sha256)
+        transcript = self.transcriber.transcribe_file(source_path)
+        quality = self.evaluate_transcript_quality(transcript)
+        force_review = (
+            float(transcript.duration_seconds)
+            >= float(self.settings.auto_commit_max_duration_minutes) * 60.0
+        ) or quality.score < float(self.settings.quality_warn_score)
+
+        if quality.score < float(self.settings.quality_min_score):
+            return {
+                "success": True,
+                "duplicate_detected": int(duplicate),
+                "discarded_low_quality": 1,
+                "review_required_files": 1 if force_review else 0,
+                "report": self._build_file_report(
+                    file_name=source_path.name,
+                    transcript=transcript,
+                    quality=quality,
+                    status="inspected",
+                    reason="; ".join(quality.reasons) or "low transcript quality",
+                    recommended_action="discard",
+                    review_required=force_review,
+                    duplicate_detected=duplicate,
+                    quality_metrics=quality.metrics,
+                ),
+            }
+
+        extracted = await self.extractor.extract_structured_context(
+            transcript.text,
+            source_name=source_path.name,
+        )
+        items = self._build_context_items(
+            extraction=extracted,
+            job_id=0,
+            file_id=0,
+            batch_date=datetime.utcnow().date().isoformat(),
+            transcript_duration_seconds=float(transcript.duration_seconds),
+            force_review=force_review,
+            quality=quality,
+        )
+        decision_summary = self._summarize_item_decisions(items)
+        pending_review = int(decision_summary["would_require_review"])
+
+        return {
+            "success": True,
+            "duplicate_detected": int(duplicate),
+            "discarded_low_quality": 0,
+            "context_items": len(items),
+            "auto_committed": int(decision_summary["would_auto_commit"]),
+            "pending_review": pending_review,
+            "review_required_files": 1 if force_review or pending_review else 0,
+            "report": self._build_file_report(
+                file_name=source_path.name,
+                transcript=transcript,
+                quality=quality,
+                status="inspected",
+                reason=self._file_status_reason(force_review=force_review, quality=quality),
+                item_counts=self._count_items_by_type(items),
+                committed_targets=decision_summary["committed_targets"],
+                pending_targets=decision_summary["pending_targets"],
+                recommended_action=self._recommend_file_action(
+                    quality=quality,
+                    force_review=force_review,
+                    pending_review=pending_review,
+                    duplicate=duplicate,
+                ),
+                review_required=force_review or bool(pending_review),
+                would_auto_commit=int(decision_summary["would_auto_commit"]),
+                would_require_review=pending_review,
+                duplicate_detected=duplicate,
+                quality_metrics=quality.metrics,
+            ),
+        }
 
     def _build_context_items(
         self,
@@ -484,6 +587,51 @@ class VoiceContextService:
             "pending_targets": pending_targets,
             "proposal_ids": proposal_ids,
         }
+
+    @staticmethod
+    def _new_batch_stats() -> dict[str, Any]:
+        return {
+            "processed_files": 0,
+            "duplicates_skipped": 0,
+            "duplicate_detected": 0,
+            "already_processed_files": 0,
+            "failed_files": 0,
+            "discarded_low_quality": 0,
+            "review_required_files": 0,
+            "context_items": 0,
+            "auto_committed": 0,
+            "pending_review": 0,
+            "committed_targets": {},
+            "pending_targets": {},
+            "proposal_ids": [],
+            "files": [],
+        }
+
+    def _merge_file_result(self, stats: dict[str, Any], file_result: dict[str, Any]) -> None:
+        stats["processed_files"] += 1
+        stats["duplicates_skipped"] += int(file_result.get("duplicate", False))
+        stats["duplicate_detected"] += int(file_result.get("duplicate_detected", 0))
+        stats["already_processed_files"] += int(file_result.get("duplicate", False)) + int(
+            file_result.get("duplicate_detected", 0)
+        )
+        stats["failed_files"] += int(not file_result.get("success", False))
+        stats["discarded_low_quality"] += int(file_result.get("discarded_low_quality", 0))
+        stats["review_required_files"] += int(file_result.get("review_required_files", 0))
+        stats["context_items"] += int(file_result.get("context_items", 0))
+        stats["auto_committed"] += int(file_result.get("auto_committed", 0))
+        stats["pending_review"] += int(file_result.get("pending_review", 0))
+        self._merge_counter(
+            stats["committed_targets"],
+            file_result.get("committed_targets") or {},
+        )
+        self._merge_counter(
+            stats["pending_targets"],
+            file_result.get("pending_targets") or {},
+        )
+        stats["proposal_ids"].extend(file_result.get("proposal_ids") or [])
+        report = file_result.get("report")
+        if report:
+            stats["files"].append(report)
 
     def _insert_context_item(
         self,
@@ -1028,6 +1176,13 @@ class VoiceContextService:
         finally:
             conn.close()
 
+    def _safe_sha_already_processed(self, sha256: str) -> bool:
+        try:
+            return self._sha_already_processed(sha256)
+        except Exception as exc:
+            logger.warning("voice_context.duplicate_check_skipped", error=str(exc))
+            return False
+
     def _write_transcript(self, *, sha256: str, transcript: TranscriptResult) -> Path:
         path = Path(self.settings.transcripts_dir) / f"{sha256}.txt"
         lines = [
@@ -1050,6 +1205,80 @@ class VoiceContextService:
     def _merge_counter(target: dict[str, int], values: dict[str, int]) -> None:
         for key, value in values.items():
             target[str(key)] = target.get(str(key), 0) + int(value)
+
+    def _summarize_item_decisions(self, items: list[dict[str, Any]]) -> dict[str, Any]:
+        summary = {
+            "would_auto_commit": 0,
+            "would_require_review": 0,
+            "committed_targets": {},
+            "pending_targets": {},
+        }
+        for item in items:
+            decision = self.assess_item_decision(item)
+            target = str(item.get("memory_target") or "unknown")
+            if decision.auto_commit:
+                summary["would_auto_commit"] += 1
+                summary["committed_targets"][target] = (
+                    summary["committed_targets"].get(target, 0) + 1
+                )
+            else:
+                summary["would_require_review"] += 1
+                summary["pending_targets"][target] = summary["pending_targets"].get(target, 0) + 1
+        return summary
+
+    @staticmethod
+    def _count_items_by_type(items: list[dict[str, Any]]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in items:
+            key = str(item.get("item_type") or "unknown")
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    def _recommend_file_action(
+        self,
+        *,
+        quality: TranscriptQualityReport,
+        force_review: bool,
+        pending_review: int,
+        duplicate: bool = False,
+    ) -> str:
+        if duplicate:
+            return "skip_duplicate"
+        if quality.score < float(self.settings.quality_min_score):
+            return "discard"
+        if force_review or pending_review:
+            return "hold"
+        return "approve"
+
+    def _recommend_batch_action(self, stats: dict[str, Any]) -> str:
+        processed = int(stats.get("processed_files", 0))
+        if processed == 0:
+            return "no_files"
+        if int(stats.get("discarded_low_quality", 0)) > 0:
+            return "test_conservative_profile"
+        if int(stats.get("review_required_files", 0)) >= max(1, processed // 2 + processed % 2):
+            return "review_before_send"
+        if int(stats.get("already_processed_files", 0)) == processed:
+            return "already_processed"
+        return "approve_current_profile"
+
+    def _build_calibration_advice(self, stats: dict[str, Any]) -> str:
+        recommendation = str(stats.get("batch_recommendation") or "review_before_send")
+        if recommendation == "no_files":
+            return "Nenhum audio pendente para avaliar."
+        if recommendation == "test_conservative_profile":
+            return (
+                "Ha arquivo(s) abaixo do quality_min_score. Use o perfil conservador do gravador "
+                "ou reduza a agressividade do setup atual antes de subir o lote inteiro."
+            )
+        if recommendation == "review_before_send":
+            return (
+                "O lote esta util, mas parte relevante exigiria review. Segregue os arquivos longos "
+                "ou ruidosos antes de enviar tudo para a inbox da VPS."
+            )
+        if recommendation == "already_processed":
+            return "Os arquivos inspecionados ja apareceram em lotes anteriores. Evite reenviar duplicatas."
+        return "O perfil atual parece estavel para este lote. Envie apenas os arquivos aprovados."
 
     def evaluate_transcript_quality(self, transcript: TranscriptResult) -> TranscriptQualityReport:
         body = (transcript.text or "").strip()
@@ -1115,6 +1344,13 @@ class VoiceContextService:
         reason: str | None = None,
         committed_targets: dict[str, int] | None = None,
         pending_targets: dict[str, int] | None = None,
+        item_counts: dict[str, int] | None = None,
+        recommended_action: str | None = None,
+        review_required: bool = False,
+        would_auto_commit: int = 0,
+        would_require_review: int = 0,
+        duplicate_detected: bool = False,
+        quality_metrics: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return {
             "file_name": file_name,
@@ -1126,6 +1362,13 @@ class VoiceContextService:
             "reason": reason,
             "committed_targets": dict(committed_targets or {}),
             "pending_targets": dict(pending_targets or {}),
+            "item_counts": dict(item_counts or {}),
+            "recommended_action": recommended_action or "hold",
+            "review_required": bool(review_required),
+            "would_auto_commit": int(would_auto_commit),
+            "would_require_review": int(would_require_review),
+            "duplicate_detected": bool(duplicate_detected),
+            "quality_metrics": dict(quality_metrics or quality.metrics or {}),
         }
 
     def _file_status_reason(

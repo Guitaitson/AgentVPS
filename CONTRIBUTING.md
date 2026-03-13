@@ -9,6 +9,7 @@ Antes de iniciar qualquer contribuição, **você DEVE** ler:
 | Documento | Por Que Ler | Tempo |
 |----------|------------|-------|
 | [`README.md`](README.md) | Visão geral do projeto | 5 min |
+| [`docs/GIT_GOVERNANCE.md`](docs/GIT_GOVERNANCE.md) | Branch, PR, release e deploy | 10 min |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Arquitetura e fluxos | 15 min |
 | [`docs/adr/README.md`](docs/adr/README.md) | Decisões arquiteturais | 10 min |
 | [`.kilocode/rules/memory-bank/brief.md`](.kilocode/rules/memory-bank/brief.md) | Estado atual e próximos passos | 5 min |
@@ -81,12 +82,35 @@ ruff check . --fix  # Auto-corrigir erros
 
 Para **cada contribuição**, verifique:
 
+- [ ] **Branch** criada a partir de `main` atual
+- [ ] **PR** aberta para `main` antes de pensar em deploy
+- [ ] **Release** só sera publicada depois do merge em `main`
 - [ ] **Documentei** a mudança em `docs/adr/` (se for decisão arquitetural)
 - [ ] **Atualizei** `deployment-tracker.md` com o progresso
 - [ ] **Atualizei** `brief.md` se mudou o estado atual
 - [ ] **Rodei** `pytest -v` e todos os testes passaram
 - [ ] **Rodei** `ruff check .` e não há erros
+- [ ] **Rodei** `python scripts/audit_git_governance.py`
 - [ ] **Commit** tem descrição clara seguindo [Conventional Commits](#-convenções-de-commit)
+
+## Governança Git e GitHub
+
+Fluxo oficial:
+
+1. sincronizar com `origin/main`
+2. criar branch curta de trabalho
+3. implementar e validar localmente
+4. abrir PR para `main`
+5. mergear apenas com CI verde
+6. publicar GitHub Release com tag semântica
+7. deixar o workflow de release fazer o deploy na VPS
+
+Regras:
+
+- `main` e a unica branch de producao
+- nunca deployar branch temporaria como estado final da VPS
+- nunca publicar release de commit que ainda nao entrou em `main`
+- limpar branches locais `gone` ou `ahead` depois do merge
 
 ## 🏗️ Estrutura do Projeto
 
@@ -215,13 +239,16 @@ test(health): Adiciona teste para PostgreSQL
 4. **SEMPRE testar** após cada alteração
    - `pytest -v` e `ruff check .`
 
-5. **Uma tarefa por vez**
+5. **SEMPRE auditar o estado Git/GitHub** antes de push importante e antes de release
+   - `python scripts/audit_git_governance.py`
+
+6. **Uma tarefa por vez**
    - Completar subtarefa atual antes de começar outra
 
-6. **NÃO inventar soluções complexas**
+7. **NÃO inventar soluções complexas**
    - Se a instrução diz "copiar e colar", copiar e colar
 
-7. **Moltbot NÃO faz parte deste projeto**
+8. **Moltbot NÃO faz parte deste projeto**
    - Remover qualquer referência
 
 ## 📖 Recursos para IA/Agentes

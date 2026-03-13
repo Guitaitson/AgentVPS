@@ -3,6 +3,7 @@
 ## Documentos Ativos
 
 - [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- [GIT_GOVERNANCE.md](GIT_GOVERNANCE.md)
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [DEPLOYMENT.md](DEPLOYMENT.md)
 - [MCP_SERVER.md](MCP_SERVER.md)
@@ -18,9 +19,10 @@
 ## Ordem de Consulta (estado atual)
 
 1. `origin/main` no GitHub
-2. `docs/PROJECT_STATUS.md`
-3. Worktree local (WIP nao commitado)
-4. `archive/` apenas para contexto historico
+2. `docs/GIT_GOVERNANCE.md`
+3. `docs/PROJECT_STATUS.md`
+4. Worktree local (WIP nao commitado)
+5. `archive/` apenas para contexto historico
 
 ## Historico
 

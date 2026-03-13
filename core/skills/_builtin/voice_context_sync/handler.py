@@ -37,6 +37,29 @@ class VoiceContextSyncSkill(SkillBase):
                 f"- pending_review: {result.get('pending_review', 0)}"
             )
 
+        if mode == "inspect":
+            max_files = args.get("max_files")
+            result = await service.inspect_inbox(
+                source=str(args.get("source", "skill_inspect")),
+                max_files=int(max_files) if max_files is not None else None,
+            )
+            if not result.get("success"):
+                return f"ERROR: voice context inspect failed: {result.get('error', 'unknown')}"
+            return (
+                "voice context inspect\n"
+                f"- status: {result.get('status', 'ok')}\n"
+                f"- requested_max_files: {max_files if max_files is not None else 'default'}\n"
+                f"- processed_files: {result.get('processed_files', 0)}\n"
+                f"- already_processed_files: {result.get('already_processed_files', 0)}\n"
+                f"- discarded_low_quality: {result.get('discarded_low_quality', 0)}\n"
+                f"- review_required_files: {result.get('review_required_files', 0)}\n"
+                f"- context_items: {result.get('context_items', 0)}\n"
+                f"- would_auto_commit: {result.get('auto_committed', 0)}\n"
+                f"- would_require_review: {result.get('pending_review', 0)}\n"
+                f"- batch_recommendation: {result.get('batch_recommendation', '-')}\n"
+                f"- calibration_advice: {result.get('calibration_advice', '-')}"
+            )
+
         if mode == "status":
             result = service.get_status()
             last_job = result.get("last_job") or {}
@@ -88,4 +111,7 @@ class VoiceContextSyncSkill(SkillBase):
                 f"proposals={result.get('rejected_proposals', 0)})"
             )
 
-        return "ERROR: invalid mode. Use sync, status, commit_review_item, reject_review_item or discard_job."
+        return (
+            "ERROR: invalid mode. Use sync, inspect, status, commit_review_item, "
+            "reject_review_item or discard_job."
+        )

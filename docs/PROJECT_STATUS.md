@@ -1,20 +1,21 @@
-# Project Status - Source of Truth
+# Project Status - Operational Snapshot
 
 Last updated: 2026-03-12
 
 ## Canonical Read Order
 
 1. `origin/main` (GitHub)
-2. This file (`docs/PROJECT_STATUS.md`)
-3. Local worktree WIP (not committed yet)
-4. `archive/` (historical context only, non-normative)
+2. `docs/GIT_GOVERNANCE.md`
+3. This file (`docs/PROJECT_STATUS.md`)
+4. Local worktree WIP (not committed yet)
+5. `archive/` (historical context only, non-normative)
 
-## Branch and Sync Snapshot
+## Branch and Sync Policy
 
 - Canonical branch on GitHub: `origin/main`
-- Current `origin/main` tip at review time: `b4160d8` (post-merge PR #22)
-- Current worktree branch: `claude/pr11-codex-operator`
-- Local worktree contains Codex operator runtime integration in progress
+- This file must not track ephemeral local branch names or transient commit hashes.
+- Use `git rev-parse origin/main` and `python scripts/audit_git_governance.py` for live branch and release state.
+- Production deploy authority comes from published GitHub Release, not from branch pushes.
 
 ## Master Plan Status (Strict 100% Gate)
 
@@ -36,7 +37,7 @@ Last updated: 2026-03-12
 - Skills catalog source now supports direct GitHub repo discovery for LangChain-style `SKILL.md` packs
 - Default catalog source now ships with a real FleetIntel snapshot and optional live GitHub sync
 
-Validation at review time:
+Validation baseline at review time:
 - targeted: `python -m pytest -q tests/test_runtime_adapters.py tests/test_runtime_control.py tests/test_external_specialist_skills.py tests/test_react_codex_operator.py` -> 24 passed
 - pending final full-suite run after docs finish
 
