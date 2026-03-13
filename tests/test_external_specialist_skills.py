@@ -77,6 +77,15 @@ def test_should_delegate_specialist_to_codex_for_complex_specialist_requests():
         )
         is False
     )
+    assert (
+        should_delegate_specialist_to_codex(
+            "Use BrazilCNPJ Enricher para validar este CNPJ (48.430.290/0001-30), "
+            "depois use o FleetIntel Orchestrator para falar da frota e o FleetIntel "
+            "Analyst para me dar insights.",
+            "fleetintel_orchestrator",
+        )
+        is False
+    )
 
 
 @pytest.mark.asyncio

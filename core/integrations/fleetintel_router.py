@@ -120,7 +120,16 @@ def detect_external_skill(message: str) -> str | None:
 
 def should_delegate_specialist_to_codex(message: str, specialist_name: str) -> bool:
     msg = _normalize_text(message)
-    if "skill fleetintel" in msg:
+    explicit_specialist_markers = (
+        "skill fleetintel",
+        "skill fleetintel_analyst",
+        "fleetintel analyst",
+        "skill fleetintel_orchestrator",
+        "fleetintel orchestrator",
+        "skill brazilcnpj",
+        "brazilcnpj enricher",
+    )
+    if any(marker in msg for marker in explicit_specialist_markers):
         return False
     if "codex" in msg:
         return True
