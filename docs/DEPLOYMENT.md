@@ -112,7 +112,9 @@ ORCH_ENABLE_CODEX_OPERATOR=false
 ORCH_CODEX_COMMAND=codex
 ORCH_CODEX_WORKDIR=/opt/vps-agent
 ORCH_CODEX_MODEL=
-ORCH_CODEX_TIMEOUT_SECONDS=120
+ORCH_CODEX_TIMEOUT_SECONDS=360
+ORCH_CODEX_HEARTBEAT_SECONDS=15
+ORCH_CODEX_ABNORMAL_AFTER_SECONDS=45
 MCP_HOST=127.0.0.1
 MCP_PORT=8765
 MCP_API_KEY=troque-por-uma-chave-forte
@@ -319,7 +321,7 @@ Comandos uteis no Telegram:
 - `/catalogsync rollback <skill> [source] [target_version]` - rollback para versao anterior
 - `/catalogsync provenance <skill> [source] [limit]` - historico de versoes e origem
 - `/runtimes [list|enable|disable]` - gerencia runtimes externos
-- `/contextsync` - processa audios pendentes da inbox de voz
+- `/contextsync [max_files]` - processa audios pendentes da inbox de voz, inclusive em amostras curtas
 - `/contextstatus` - mostra ultimo job, inbox e revisoes pendentes
 - `/updatestatus` - status do updater autonomo e ultimo sync
 - `/proposals` e `/proposal <id>` - inspeciona proposals de update

@@ -17,12 +17,17 @@ class VoiceContextSyncSkill(SkillBase):
         service = VoiceContextService()
 
         if mode == "sync":
-            result = await service.sync_inbox(source=str(args.get("source", "skill")))
+            max_files = args.get("max_files")
+            result = await service.sync_inbox(
+                source=str(args.get("source", "skill")),
+                max_files=int(max_files) if max_files is not None else None,
+            )
             if not result.get("success"):
                 return f"ERROR: voice context sync failed: {result.get('error', 'unknown')}"
             return (
                 "voice context sync\n"
                 f"- status: {result.get('status', 'ok')}\n"
+                f"- requested_max_files: {max_files if max_files is not None else 'default'}\n"
                 f"- processed_files: {result.get('processed_files', 0)}\n"
                 f"- duplicates_skipped: {result.get('duplicates_skipped', 0)}\n"
                 f"- failed_files: {result.get('failed_files', 0)}\n"

@@ -113,6 +113,8 @@ def get_runtime_router() -> RuntimeRouter:
                 workdir=orch.codex_workdir or ".",
                 model=orch.codex_model,
                 timeout_s=orch.codex_timeout_seconds,
+                heartbeat_s=orch.codex_heartbeat_seconds,
+                abnormal_after_s=orch.codex_abnormal_after_seconds,
             )
         )
 

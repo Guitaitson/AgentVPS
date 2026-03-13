@@ -7,7 +7,7 @@ from core.skills.base import SkillConfig
 @pytest.mark.asyncio
 async def test_voice_context_sync_skill_runs_sync(monkeypatch):
     class FakeService:
-        async def sync_inbox(self, source="skill"):
+        async def sync_inbox(self, source="skill", max_files=None):
             return {
                 "success": True,
                 "status": "ok",
@@ -73,7 +73,7 @@ async def test_voice_context_sync_skill_discards_job(monkeypatch):
 @pytest.mark.asyncio
 async def test_voice_context_sync_skill_reports_low_quality_count(monkeypatch):
     class FakeService:
-        async def sync_inbox(self, source="skill"):
+        async def sync_inbox(self, source="skill", max_files=None):
             return {
                 "success": True,
                 "status": "ok",
@@ -95,3 +95,34 @@ async def test_voice_context_sync_skill_reports_low_quality_count(monkeypatch):
     output = await skill.execute({"mode": "sync"})
 
     assert "discarded_low_quality: 1" in output
+
+
+@pytest.mark.asyncio
+async def test_voice_context_sync_skill_passes_max_files(monkeypatch):
+    calls = []
+
+    class FakeService:
+        async def sync_inbox(self, source="skill", max_files=None):
+            calls.append({"source": source, "max_files": max_files})
+            return {
+                "success": True,
+                "status": "ok",
+                "processed_files": 2,
+                "duplicates_skipped": 0,
+                "failed_files": 0,
+                "discarded_low_quality": 0,
+                "context_items": 2,
+                "auto_committed": 1,
+                "pending_review": 1,
+            }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.voice_context_sync.handler.VoiceContextService",
+        lambda: FakeService(),
+    )
+    skill = VoiceContextSyncSkill(config=SkillConfig(name="voice_context_sync", description="test"))
+
+    output = await skill.execute({"mode": "sync", "max_files": 3})
+
+    assert calls == [{"source": "skill", "max_files": 3}]
+    assert "requested_max_files: 3" in output

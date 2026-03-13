@@ -148,6 +148,9 @@ class TelegramProgressSession:
             logger.debug("progress_edit_failed", error=str(exc))
 
     def _resolve_label(self, event: str, payload: dict[str, object]) -> str:
+        custom_label = str(payload.get("label") or "").strip()
+        if custom_label:
+            return custom_label
         if event == "external_call":
             server = str(payload.get("server") or "").lower()
             return self.SERVER_LABELS.get(server, "Executando integracao externa...")
@@ -345,7 +348,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - `/reject <id>` - Rejeita proposal autonoma
 - `/catalogsync <cmd>` - check/apply/pin/unpin/rollback/provenance do catalogo
 - `/runtimes [list|enable|disable]` - Gerencia runtimes externos
-- `/contextsync` - Processa audios pendentes na inbox de voz
+- `/contextsync [max_files]` - Processa audios pendentes na inbox de voz
 - `/contextstatus` - Mostra status da captura de contexto por voz
 - `/contextdiscard <job_id>` - Descarta lote de voz ruim e remove memoria derivada
 - `/updatestatus` - Mostra status do updater automatico
@@ -744,12 +747,21 @@ async def cmd_runtimes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @authorized_only
 async def cmd_contextsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler para /contextsync - processa inbox de audios pendentes."""
+    """Handler para /contextsync [max_files] - processa inbox de audios pendentes."""
     try:
+        max_files = None
+        if context.args:
+            first_arg = context.args[0].strip()
+            if first_arg.isdigit():
+                max_files = max(1, int(first_arg))
+            else:
+                await update.message.reply_text("Uso: /contextsync [max_files]")
+                return
         from core.voice_context import VoiceContextService
 
         result = await VoiceContextService().sync_inbox(
-            source=f"telegram:{update.effective_user.id}"
+            source=f"telegram:{update.effective_user.id}",
+            max_files=max_files,
         )
         if not result.get("success"):
             await update.message.reply_text(
@@ -759,6 +771,7 @@ async def cmd_contextsync(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "voice context sync\n"
             f"- status: {result.get('status', 'ok')}\n"
+            f"- requested_max_files: {max_files if max_files is not None else 'default'}\n"
             f"- processed_files: {result.get('processed_files', 0)}\n"
             f"- duplicates_skipped: {result.get('duplicates_skipped', 0)}\n"
             f"- failed_files: {result.get('failed_files', 0)}\n"
