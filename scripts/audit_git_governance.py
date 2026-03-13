@@ -66,11 +66,18 @@ def audit_worktree(report: AuditReport) -> None:
 
     branch_line = lines[0]
     report.add("info", branch_line)
-    dirty_lines = lines[1:]
-    if dirty_lines:
-        report.add("fail", f"Worktree is dirty ({len(dirty_lines)} tracked change(s)).")
+    tracked_lines = [line for line in lines[1:] if not line.startswith("?? ")]
+    untracked_lines = [line for line in lines[1:] if line.startswith("?? ")]
+
+    if tracked_lines:
+        report.add("fail", f"Worktree has {len(tracked_lines)} tracked change(s).")
     else:
-        report.add("info", "Worktree is clean.")
+        report.add("info", "No tracked worktree changes.")
+
+    if untracked_lines:
+        report.add("warning", f"Worktree has {len(untracked_lines)} untracked file(s).")
+    else:
+        report.add("info", "No untracked files detected.")
 
 
 def audit_current_branch(report: AuditReport) -> None:
