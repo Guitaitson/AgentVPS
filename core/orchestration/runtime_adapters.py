@@ -325,13 +325,17 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
         workdir: str,
         python_executable: str | None = None,
         model: str | None = None,
-        timeout_s: int = 120,
+        timeout_s: int = 360,
+        heartbeat_s: int = 15,
+        abnormal_after_s: int = 45,
     ):
         self.codex_command = codex_command.strip() or "codex"
         self.workdir = os.path.abspath(workdir)
         self.python_executable = python_executable or sys.executable
         self.model = model
         self.timeout_s = timeout_s
+        self.heartbeat_s = max(5, int(heartbeat_s))
+        self.abnormal_after_s = max(self.heartbeat_s, int(abnormal_after_s))
 
     async def execute(self, request: RuntimeExecutionRequest) -> RuntimeExecutionResult:
         started = time.perf_counter()
@@ -354,7 +358,12 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                 error="Codex auth not configured",
             )
 
-        await emit_progress("external_call", server="codex_operator", status="start")
+        await emit_progress(
+            "external_call",
+            server="codex_operator",
+            status="start",
+            label="Delegando ao operador Codex. Status: normal.",
+        )
 
         with tempfile.TemporaryDirectory(prefix="agentvps-codex-") as tmpdir:
             tmpdir = os.path.abspath(tmpdir)
@@ -400,18 +409,27 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                 env=env,
                 start_new_session=True,
             )
+            heartbeat_task = asyncio.create_task(self._heartbeat_loop(started))
             try:
                 stdout, stderr = await asyncio.wait_for(
                     process.communicate(prompt.encode("utf-8")),
                     timeout=self.timeout_s,
                 )
             except asyncio.TimeoutError:
+                heartbeat_task.cancel()
+                await self._cancel_heartbeat_task(heartbeat_task)
                 if process.returncode is None:
                     try:
                         os.killpg(process.pid, signal.SIGKILL)
                     except Exception:
                         process.kill()
                 await process.wait()
+                await emit_progress(
+                    "external_call",
+                    server="codex_operator",
+                    status="timeout",
+                    label="Operador Codex excedeu o tempo limite. Status: anormal, ativando fallback.",
+                )
                 return RuntimeExecutionResult(
                     success=False,
                     output=None,
@@ -419,11 +437,35 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     error="Codex operator timeout",
                 )
+            finally:
+                heartbeat_task.cancel()
+                await self._cancel_heartbeat_task(heartbeat_task)
+
+            payload = self._load_codex_output(output_path)
+            if payload is not None:
+                await emit_progress(
+                    "external_call",
+                    server="codex_operator",
+                    status="done",
+                    label="Operador Codex concluiu. Consolidando resposta...",
+                )
+                return RuntimeExecutionResult(
+                    success=True,
+                    output=payload,
+                    runtime=self.protocol,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                )
 
             if process.returncode != 0:
                 error_text = (
                     stderr.decode("utf-8", errors="ignore").strip()
                     or stdout.decode("utf-8", errors="ignore").strip()
+                )
+                await emit_progress(
+                    "external_call",
+                    server="codex_operator",
+                    status="failed",
+                    label="Operador Codex retornou erro. Status: anormal, ativando fallback.",
                 )
                 return RuntimeExecutionResult(
                     success=False,
@@ -434,6 +476,12 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                 )
 
             if not os.path.exists(output_path):
+                await emit_progress(
+                    "external_call",
+                    server="codex_operator",
+                    status="failed",
+                    label="Operador Codex nao produziu saida estruturada. Status: anormal, ativando fallback.",
+                )
                 return RuntimeExecutionResult(
                     success=False,
                     output=None,
@@ -441,16 +489,66 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     error="Codex operator returned no output file",
                 )
-
-            with open(output_path, "r", encoding="utf-8") as output_file:
-                payload = json.load(output_file)
-
         return RuntimeExecutionResult(
-            success=True,
-            output=payload,
+            success=False,
+            output=None,
             runtime=self.protocol,
             latency_ms=int((time.perf_counter() - started) * 1000),
+            error="Codex operator returned invalid structured output",
         )
+
+    async def _heartbeat_loop(self, started: float) -> None:
+        while True:
+            await asyncio.sleep(self.heartbeat_s)
+            elapsed = int(time.perf_counter() - started)
+            if elapsed >= self.abnormal_after_s:
+                label = (
+                    f"Operador Codex em execucao ha {elapsed}s. "
+                    "Status: anormal, mantendo observacao e pronto para fallback."
+                )
+            else:
+                label = f"Operador Codex em execucao ha {elapsed}s. Status: normal."
+            await emit_progress(
+                "external_call",
+                server="codex_operator",
+                status="heartbeat",
+                elapsed_seconds=elapsed,
+                label=label,
+            )
+
+    @staticmethod
+    async def _cancel_heartbeat_task(task: asyncio.Task) -> None:
+        try:
+            await task
+        except asyncio.CancelledError:
+            return
+
+    @staticmethod
+    def _load_codex_output(output_path: str) -> dict[str, Any] | None:
+        if not os.path.exists(output_path):
+            return None
+        with open(output_path, "r", encoding="utf-8") as output_file:
+            raw = output_file.read().strip()
+        if not raw:
+            return None
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        required = {
+            "summary",
+            "answer",
+            "confidence",
+            "facts",
+            "tool_trace",
+            "unresolved_items",
+            "requires_human_approval",
+        }
+        if not required.issubset(payload.keys()):
+            return None
+        return payload
 
     def _build_prompt(self, request: RuntimeExecutionRequest) -> str:
         specialist_hint = request.action

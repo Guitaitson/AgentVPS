@@ -244,7 +244,9 @@ ORCH_ENABLE_CODEX_OPERATOR=false
 ORCH_CODEX_COMMAND=codex
 ORCH_CODEX_WORKDIR=/opt/vps-agent
 ORCH_CODEX_MODEL=
-ORCH_CODEX_TIMEOUT_SECONDS=120
+ORCH_CODEX_TIMEOUT_SECONDS=360
+ORCH_CODEX_HEARTBEAT_SECONDS=15
+ORCH_CODEX_ABNORMAL_AFTER_SECONDS=45
 ```
 
 Migracao de auth externa FleetIntel/BrazilCNPJ:
@@ -276,7 +278,7 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 | `/reject <id>` | Rejeitar proposal |
 | `/catalogsync <cmd>` | check/apply/pin/unpin/rollback/provenance do catalogo |
 | `/runtimes [list|enable|disable]` | Gerenciar runtime adapters externos |
-| `/contextsync` | Processar audios pendentes na inbox de voz |
+| `/contextsync [max_files]` | Processar audios pendentes na inbox de voz, inclusive em amostras curtas |
 | `/contextstatus` | Ver status do pipeline de voz, inbox e revisoes |
 | `/updatestatus` | Status do updater e ultimo catalog sync |
 

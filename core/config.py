@@ -174,8 +174,16 @@ class OrchestrationSettings(BaseSettings):
         description="Modelo opcional passado ao Codex CLI",
     )
     codex_timeout_seconds: int = Field(
-        default=120,
-        description="Timeout em segundos para execucoes do operador Codex",
+        default=360,
+        description="Timeout duro em segundos para execucoes do operador Codex",
+    )
+    codex_heartbeat_seconds: int = Field(
+        default=15,
+        description="Intervalo entre heartbeats de status do operador Codex",
+    )
+    codex_abnormal_after_seconds: int = Field(
+        default=45,
+        description="A partir desse tempo sem resposta final o status do operador Codex vira anormal",
     )
 
     timeout_seconds: int = Field(default=30, description="Timeout para delegaÃ§Ãµes externas")

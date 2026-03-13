@@ -304,7 +304,7 @@ Schema: `configs/init-db.sql` + `configs/migration-autonomous.sql`
 | Extractor | `core/voice_context/extraction.py` | Extracao estruturada (`summary`, `episodes`, `facts`, `preferences`, `commitments`) |
 | Transcriber | `core/voice_context/transcription.py` | Transcricao local com `faster-whisper` + `ffmpeg`/`ffprobe` quando disponiveis |
 | Skill Operacional | `core/skills/_builtin/voice_context_sync/` | `sync`, `status`, `commit_review_item`, `reject_review_item` |
-| Telegram | `telegram_bot/bot.py` | `/contextsync` e `/contextstatus` |
+| Telegram | `telegram_bot/bot.py` | `/contextsync [max_files]` e `/contextstatus` |
 | Scheduler | `core/autonomous/engine.py` (`voice_context_batch`) | Lote diario automatico e limpeza de transcripts |
 | Tabelas | `voice_ingestion_jobs`, `voice_audio_files`, `voice_context_items` | Estado operacional, arquivos, itens extraidos e ligacao logica com proposals |
 

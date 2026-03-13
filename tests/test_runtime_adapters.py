@@ -295,6 +295,56 @@ async def test_codex_operator_adapter_executes_codex_cli(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_codex_operator_adapter_accepts_valid_output_even_with_nonzero_exit(
+    monkeypatch, tmp_path
+):
+    class _FakeProcess:
+        returncode = 1
+
+        async def communicate(self, _prompt_bytes):
+            output_path = recorded["command"][recorded["command"].index("-o") + 1]
+            with open(output_path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    '{"summary":"ok","answer":"Resposta do Codex","confidence":0.82,'
+                    '"facts":["f1"],"tool_trace":[{"tool":"fleetintel_analyst","status":"ok"}],'
+                    '"unresolved_items":[],"requires_human_approval":false}'
+                )
+            return b"", b"warning"
+
+        async def wait(self):
+            return 1
+
+    recorded = {}
+
+    async def _fake_create_subprocess_exec(*command, **kwargs):
+        recorded["command"] = list(command)
+        recorded["kwargs"] = kwargs
+        return _FakeProcess()
+
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.shutil.which", lambda _cmd: "/usr/bin/codex"
+    )
+    monkeypatch.setattr("core.orchestration.runtime_adapters.os.path.exists", lambda _path: True)
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.asyncio.create_subprocess_exec",
+        _fake_create_subprocess_exec,
+    )
+
+    adapter = CodexOperatorAdapter(codex_command="codex", workdir=str(tmp_path), timeout_s=10)
+    result = await adapter.execute(
+        RuntimeExecutionRequest(
+            action="fleetintel_analyst",
+            args={"query": "Analise o CNPJ 23.373.000/0001-32"},
+            user_id="u1",
+            preferred_protocol=RuntimeProtocol.CODEX_OPERATOR,
+        )
+    )
+
+    assert result.success is True
+    assert result.output["answer"] == "Resposta do Codex"
+
+
+@pytest.mark.asyncio
 async def test_codex_operator_adapter_kills_process_group_on_timeout(monkeypatch, tmp_path):
     recorded = {}
 
