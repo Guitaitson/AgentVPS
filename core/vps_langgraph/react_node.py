@@ -14,7 +14,8 @@ import json
 
 import structlog
 
-from ..integrations import detect_external_skill
+from ..integrations import detect_external_skill, should_delegate_specialist_to_codex
+from ..orchestration import RuntimeExecutionRequest, RuntimeProtocol, get_runtime_router
 from ..progress import emit_progress
 from ..skills.registry import get_skill_registry
 from .state import AgentState
@@ -22,6 +23,29 @@ from .state import AgentState
 logger = structlog.get_logger()
 
 MAX_REACT_STEPS = 5  # Máximo de iterações tool→observation→thought
+
+
+def _render_codex_operator_response(payload: dict) -> str:
+    lines = ["Operador Codex", ""]
+    answer = str(payload.get("answer") or payload.get("summary") or "").strip()
+    if answer:
+        lines.append(answer)
+    facts = payload.get("facts") or []
+    if facts:
+        lines.append("")
+        lines.append("Pontos principais:")
+        for fact in facts[:4]:
+            lines.append(f"- {fact}")
+    unresolved = payload.get("unresolved_items") or []
+    if unresolved:
+        lines.append("")
+        lines.append("Pendencias:")
+        for item in unresolved[:3]:
+            lines.append(f"- {item}")
+    if payload.get("requires_human_approval"):
+        lines.append("")
+        lines.append("Esta resposta pede aprovacao humana antes de qualquer acao sensivel.")
+    return "\n".join(lines).strip()
 
 
 def build_react_system_prompt() -> str:
@@ -95,6 +119,43 @@ async def node_react(state: AgentState) -> AgentState:
         if specialist:
             logger.info("react_external_shortcut", skill=specialist_name)
             try:
+                if should_delegate_specialist_to_codex(user_message, specialist_name):
+                    router = get_runtime_router()
+                    if router.has_protocol(RuntimeProtocol.CODEX_OPERATOR):
+                        codex_result = await router.dispatch(
+                            RuntimeExecutionRequest(
+                                action=specialist_name,
+                                args={
+                                    "query": user_message,
+                                    "specialist_name": specialist_name,
+                                },
+                                user_id=state.get("user_id", ""),
+                                context={
+                                    "conversation_history": conversation_history[-6:],
+                                    "user_message": user_message,
+                                    "specialist_name": specialist_name,
+                                },
+                                context_keys=[
+                                    "conversation_history",
+                                    "user_message",
+                                    "specialist_name",
+                                ],
+                                preferred_protocol=RuntimeProtocol.CODEX_OPERATOR,
+                            )
+                        )
+                        if codex_result.success and isinstance(codex_result.output, dict):
+                            return {
+                                **state,
+                                "intent": "task",
+                                "action_required": False,
+                                "response": _render_codex_operator_response(codex_result.output),
+                                "plan": None,
+                            }
+                        logger.warning(
+                            "react_codex_operator_failed",
+                            skill=specialist_name,
+                            error=codex_result.error,
+                        )
                 if specialist_name.startswith("fleetintel"):
                     await emit_progress("external_call", server="fleetintel", status="start")
                 elif specialist_name == "brazilcnpj":

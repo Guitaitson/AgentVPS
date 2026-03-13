@@ -169,9 +169,16 @@ Modelo adotado (híbrido):
 
 | Componente | Localizacao | Descricao |
 |---|---|---|
-| Runtime Control | `core/orchestration/runtime_control.py` | Overrides de enable/disable por protocolo (MCP/A2A/ACP/DeepAgents/OpenClaw) |
+| Runtime Control | `core/orchestration/runtime_control.py` | Overrides de enable/disable por protocolo (MCP/A2A/ACP/DeepAgents/OpenClaw/Codex Operator) |
 | Router Factory | `core/orchestration/router_factory.py` | Construcao do runtime router usando defaults + overrides persistidos |
 | Comando Telegram | `telegram_bot/bot.py` (`/runtimes`) | `list`, `enable`, `disable` dos runtimes externos |
+
+Runtime opcional `codex_operator`:
+- adapter: `core/orchestration/runtime_adapters.py`
+- bridge allowlisted: `core/codex_operator_bridge.py`
+- uso inicial: operar `fleetintel_analyst`, `fleetintel_orchestrator` e `brazilcnpj` em consultas mais ambiguas ou multi-etapas
+- isolamento: execucao do Codex em diretório temporário com `PYTHONPATH` apontando para o projeto; o runtime nao recebe workspace amplo do repositório
+- soberania: memória, approvals, resposta final e policy continuam no AgentVPS
 
 ### 6. LLM Layer
 

@@ -108,6 +108,11 @@ FLEETINTEL_CF_ACCESS_CLIENT_SECRET=seu-client-secret-cloudflare-aqui
 BRAZILCNPJ_MCP_URL=https://agent-cnpj.gtaitson.space/mcp
 BRAZILCNPJ_CF_ACCESS_CLIENT_ID=seu-client-id-cloudflare-aqui
 BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET=seu-client-secret-cloudflare-aqui
+ORCH_ENABLE_CODEX_OPERATOR=false
+ORCH_CODEX_COMMAND=codex
+ORCH_CODEX_WORKDIR=/opt/vps-agent
+ORCH_CODEX_MODEL=
+ORCH_CODEX_TIMEOUT_SECONDS=120
 MCP_HOST=127.0.0.1
 MCP_PORT=8765
 MCP_API_KEY=troque-por-uma-chave-forte
@@ -218,6 +223,27 @@ O fluxo faz:
 
 Protecoes atuais:
 - se houver processamento de voz em andamento, o deploy nao reinicia os servicos
+
+### Runtime opcional: Codex Operator
+
+Se voce quiser habilitar o operador Codex no AgentVPS:
+
+```bash
+npm install -g @openai/codex
+mkdir -p /root/.codex
+```
+
+Depois, garanta que o usuario real do servico (`root`, na VPS atual) tenha `config.toml` e `auth.json` validos em `/root/.codex/`.
+
+Checklist:
+- `codex --help` funciona no host
+- `ORCH_ENABLE_CODEX_OPERATOR=true`
+- `ORCH_CODEX_COMMAND=codex`
+- `ORCH_CODEX_WORKDIR=/opt/vps-agent`
+- opcionalmente `ORCH_CODEX_MODEL=<modelo>`
+- `/runtimes list` mostra `codex_operator`
+
+O runtime usa `core.codex_operator_bridge` para limitar o Codex a especialistas allowlisted e roda em diretório temporário isolado.
 - nesse caso, o script agenda nova tentativa automatica alguns minutos depois
 - isso evita quebrar transcricao/ingestao longa por causa de release publicada
 

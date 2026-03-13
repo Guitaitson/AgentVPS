@@ -13,6 +13,7 @@ from core.skills.registry import get_skill_registry
 from .runtime_adapters import (
     A2AAdapter,
     ACPAdapter,
+    CodexOperatorAdapter,
     DeepAgentsAdapter,
     LocalSkillsAdapter,
     MCPAdapter,
@@ -103,6 +104,15 @@ def get_runtime_router() -> RuntimeRouter:
                 endpoint=orch.openclaw_endpoint,
                 api_key=orch.openclaw_api_key,
                 timeout_s=orch.timeout_seconds,
+            )
+        )
+    if control.is_enabled("codex_operator", fallback_default=orch.enable_codex_operator):
+        adapters.append(
+            CodexOperatorAdapter(
+                codex_command=orch.codex_command,
+                workdir=orch.codex_workdir or ".",
+                model=orch.codex_model,
+                timeout_s=orch.codex_timeout_seconds,
             )
         )
 

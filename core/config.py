@@ -157,6 +157,27 @@ class OrchestrationSettings(BaseSettings):
     openclaw_endpoint: Optional[str] = Field(default=None, description="Endpoint OpenClaw")
     openclaw_api_key: Optional[str] = Field(default=None, description="API key OpenClaw")
 
+    enable_codex_operator: bool = Field(
+        default=False,
+        description="Habilita delegacao para operador Codex local",
+    )
+    codex_command: str = Field(
+        default="codex",
+        description="Comando do Codex CLI disponivel no host do servico",
+    )
+    codex_workdir: Optional[str] = Field(
+        default=None,
+        description="Diretorio de trabalho usado pelo operador Codex",
+    )
+    codex_model: Optional[str] = Field(
+        default=None,
+        description="Modelo opcional passado ao Codex CLI",
+    )
+    codex_timeout_seconds: int = Field(
+        default=120,
+        description="Timeout em segundos para execucoes do operador Codex",
+    )
+
     timeout_seconds: int = Field(default=30, description="Timeout para delegaÃ§Ãµes externas")
 
 

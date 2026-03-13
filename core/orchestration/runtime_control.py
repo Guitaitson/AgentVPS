@@ -51,6 +51,7 @@ class RuntimeControl:
             "acp": settings.acp_endpoint,
             "deepagents": settings.deepagents_endpoint,
             "openclaw": settings.openclaw_endpoint,
+            "codex_operator": settings.codex_workdir,
             "local_skills": None,
         }
 
@@ -62,6 +63,7 @@ class RuntimeControl:
             "acp": bool(self._settings.enable_acp),
             "deepagents": bool(self._settings.enable_deepagents),
             "openclaw": bool(self._settings.enable_openclaw),
+            "codex_operator": bool(self._settings.enable_codex_operator),
         }
 
     def _init_redis_client(self):
@@ -103,7 +105,15 @@ class RuntimeControl:
         endpoints = self._endpoint_map(self._settings)
 
         states: list[RuntimeState] = []
-        for protocol in ("local_skills", "mcp", "a2a", "acp", "deepagents", "openclaw"):
+        for protocol in (
+            "local_skills",
+            "mcp",
+            "a2a",
+            "acp",
+            "deepagents",
+            "openclaw",
+            "codex_operator",
+        ):
             default_enabled = defaults.get(protocol, False)
             if protocol in overrides:
                 enabled = bool(overrides[protocol])
@@ -142,7 +152,7 @@ class RuntimeControl:
                 "protocol": protocol,
             }
 
-        known = {"mcp", "a2a", "acp", "deepagents", "openclaw"}
+        known = {"mcp", "a2a", "acp", "deepagents", "openclaw", "codex_operator"}
         if protocol not in known:
             return {"success": False, "error": "unknown protocol", "protocol": protocol}
 

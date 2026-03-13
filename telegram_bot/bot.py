@@ -63,6 +63,7 @@ class TelegramProgressSession:
     SERVER_LABELS = {
         "fleetintel": "Consultando FleetIntel...",
         "brazilcnpj": "Consultando BrazilCNPJ...",
+        "codex_operator": "Delegando ao operador Codex...",
     }
 
     def __init__(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

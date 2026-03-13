@@ -22,6 +22,7 @@ def test_runtime_control_lists_defaults(monkeypatch):
     monkeypatch.setenv("ORCH_ENABLE_ACP", "false")
     monkeypatch.setenv("ORCH_ENABLE_DEEPAGENTS", "false")
     monkeypatch.setenv("ORCH_ENABLE_OPENCLAW", "false")
+    monkeypatch.setenv("ORCH_ENABLE_CODEX_OPERATOR", "true")
 
     control = RuntimeControl()
     _disable_redis(control)
@@ -31,6 +32,7 @@ def test_runtime_control_lists_defaults(monkeypatch):
     assert states["local_skills"].enabled is True
     assert states["mcp"].enabled is True
     assert states["a2a"].enabled is False
+    assert states["codex_operator"].enabled is True
 
 
 def test_runtime_control_enable_disable_override(monkeypatch):
