@@ -445,11 +445,16 @@ Para habilitar as skills externas em producao:
 - definir `FLEETINTEL_MCP_URL`, `FLEETINTEL_CF_ACCESS_CLIENT_ID` e `FLEETINTEL_CF_ACCESS_CLIENT_SECRET`
 - definir `BRAZILCNPJ_MCP_URL`, `BRAZILCNPJ_CF_ACCESS_CLIENT_ID` e `BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET`
 - opcionalmente ajustar `TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS` e `TELEGRAM_TYPING_INTERVAL_SECONDS` para o feedback visual do bot
-- manter `configs/skills-catalog-sources.json` com a fonte `fleetintel_skillpack_snapshot` habilitada
-- executar `/catalogsync check` e depois `/catalogsync apply`
+- manter `configs/skills-catalog-sources.json` com a fonte `fleetintel_skillpack_repo` habilitada
+- definir `CATALOG_GITHUB_TOKEN` para leitura do repo privado
+- definir `CATALOG_APPROVAL_REQUIRED_FOR_APPLY=false`
+- definir `CATALOG_AUTO_APPLY_EXTERNAL_SKILLS=true`
+- definir `CATALOG_AUTO_APPLY_SMOKE_ENABLED=true`
+- definir `CATALOG_AUTO_ROLLBACK_ON_FAILURE=true`
+- usar `/updatestatus` para acompanhar o ultimo auto-apply, smoke e rollback
 
-O catalogo padrao usa um snapshot real versionado do repo `https://github.com/Guitaitson/fleetintel-mcp`.
-Para sync vivo via GitHub API em repositorio privado, habilite a fonte `fleetintel_skillpack_repo` e configure `CATALOG_GITHUB_TOKEN`.
+O catalogo padrao agora usa a fonte viva `fleetintel_skillpack_repo` para acompanhar o repo `https://github.com/Guitaitson/fleetintel-mcp`.
+O snapshot local continua versionado como fallback operacional/manual, mas nao e mais a fonte primaria de update.
 
 Migracao de auth externa:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`

@@ -1,8 +1,8 @@
 """
-ConfiguraÃ§Ãµes Centralizadas - Pydantic Settings v2
+ConfiguraÃƒÂ§ÃƒÂµes Centralizadas - Pydantic Settings v2
 
-Este mÃ³dulo centraliza todas as configuraÃ§Ãµes do projeto usando Pydantic Settings.
-Substitui os mÃºltiplos os.getenv() dispersos pelo cÃ³digo.
+Este mÃƒÂ³dulo centraliza todas as configuraÃƒÂ§ÃƒÂµes do projeto usando Pydantic Settings.
+Substitui os mÃƒÂºltiplos os.getenv() dispersos pelo cÃƒÂ³digo.
 """
 
 from functools import lru_cache
@@ -15,7 +15,7 @@ from core.env import ENV_FILE_CANDIDATES
 
 
 class PostgresSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do PostgreSQL."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do PostgreSQL."""
 
     model_config = SettingsConfigDict(
         env_prefix="POSTGRES_",
@@ -27,17 +27,17 @@ class PostgresSettings(BaseSettings):
     host: str = Field(default="127.0.0.1", description="Host do PostgreSQL")
     port: int = Field(default=5432, description="Porta do PostgreSQL")
     db: str = Field(default="vps_agent", description="Nome do banco de dados")
-    user: Optional[str] = Field(default=None, description="UsuÃ¡rio do PostgreSQL")
+    user: Optional[str] = Field(default=None, description="UsuÃƒÂ¡rio do PostgreSQL")
     password: Optional[str] = Field(default=None, description="Senha do PostgreSQL")
 
     @property
     def dsn(self) -> str:
-        """Retorna string de conexÃ£o DSN."""
+        """Retorna string de conexÃƒÂ£o DSN."""
         return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
 
 
 class RedisSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do Redis."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do Redis."""
 
     model_config = SettingsConfigDict(
         env_prefix="REDIS_",
@@ -52,7 +52,7 @@ class RedisSettings(BaseSettings):
 
 
 class TelegramSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do Telegram Bot."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do Telegram Bot."""
 
     model_config = SettingsConfigDict(
         env_prefix="TELEGRAM_",
@@ -63,17 +63,17 @@ class TelegramSettings(BaseSettings):
 
     bot_token: Optional[str] = Field(default=None, description="Token do bot")
     allowed_users: str = Field(
-        default="", description="IDs de usuÃ¡rios autorizados separados por vÃ­rgula"
+        default="", description="IDs de usuÃƒÂ¡rios autorizados separados por vÃƒÂ­rgula"
     )
 
     @property
     def allowed_user_ids(self) -> list[int]:
-        """Retorna lista de IDs de usuÃ¡rios autorizados."""
+        """Retorna lista de IDs de usuÃƒÂ¡rios autorizados."""
         return [int(uid.strip()) for uid in self.allowed_users.split(",") if uid.strip()]
 
 
 class OpenRouterSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do OpenRouter (LLM)."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do OpenRouter (LLM)."""
 
     model_config = SettingsConfigDict(
         env_prefix="OPENROUTER_",
@@ -83,14 +83,14 @@ class OpenRouterSettings(BaseSettings):
     )
 
     api_key: Optional[str] = Field(default=None, description="Chave API do OpenRouter")
-    model: str = Field(default="minimax/minimax-m2.5", description="Modelo LLM padrÃ£o")
-    max_tokens: int = Field(default=8192, description="MÃ¡ximo de tokens na resposta")
+    model: str = Field(default="minimax/minimax-m2.5", description="Modelo LLM padrÃƒÂ£o")
+    max_tokens: int = Field(default=8192, description="MÃƒÂ¡ximo de tokens na resposta")
     temperature: float = Field(default=0.7, description="Temperatura do LLM")
     timeout: int = Field(default=60, description="Timeout em segundos")
 
 
 class QdrantSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do Qdrant (MemÃ³ria SemÃ¢ntica)."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do Qdrant (MemÃƒÂ³ria SemÃƒÂ¢ntica)."""
 
     model_config = SettingsConfigDict(
         env_prefix="QDRANT_",
@@ -115,7 +115,7 @@ class QdrantSettings(BaseSettings):
 
 
 class GatewaySettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do Gateway API."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do Gateway API."""
 
     model_config = SettingsConfigDict(
         env_prefix="GATEWAY_",
@@ -131,7 +131,7 @@ class GatewaySettings(BaseSettings):
 
 
 class OrchestrationSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes de roteamento para runtimes externos."""
+    """ConfiguraÃƒÂ§ÃƒÂµes de roteamento para runtimes externos."""
 
     model_config = SettingsConfigDict(
         env_prefix="ORCH_",
@@ -140,14 +140,14 @@ class OrchestrationSettings(BaseSettings):
         extra="ignore",
     )
 
-    enable_mcp: bool = Field(default=False, description="Habilita delegaÃ§Ã£o MCP")
+    enable_mcp: bool = Field(default=False, description="Habilita delegaÃƒÂ§ÃƒÂ£o MCP")
     mcp_base_url: str = Field(default="http://127.0.0.1:8765", description="URL base MCP")
     mcp_api_key: Optional[str] = Field(default=None, description="API key MCP (opcional)")
 
-    enable_a2a: bool = Field(default=False, description="Habilita delegaÃ§Ã£o A2A")
+    enable_a2a: bool = Field(default=False, description="Habilita delegaÃƒÂ§ÃƒÂ£o A2A")
     a2a_endpoint: Optional[str] = Field(default=None, description="Endpoint A2A")
 
-    enable_acp: bool = Field(default=False, description="Habilita delegaÃ§Ã£o ACP")
+    enable_acp: bool = Field(default=False, description="Habilita delegaÃƒÂ§ÃƒÂ£o ACP")
     acp_endpoint: Optional[str] = Field(default=None, description="Endpoint ACP")
 
     enable_deepagents: bool = Field(default=False, description="Habilita delegacao DeepAgents")
@@ -186,11 +186,11 @@ class OrchestrationSettings(BaseSettings):
         description="A partir desse tempo sem resposta final o status do operador Codex vira anormal",
     )
 
-    timeout_seconds: int = Field(default=30, description="Timeout para delegaÃ§Ãµes externas")
+    timeout_seconds: int = Field(default=30, description="Timeout para delegaÃƒÂ§ÃƒÂµes externas")
 
 
 class IdentitySettings(BaseSettings):
-    """ConfiguraÃ§Ãµes da alma/identidade do agente."""
+    """ConfiguraÃƒÂ§ÃƒÂµes da alma/identidade do agente."""
 
     model_config = SettingsConfigDict(
         env_prefix="SOUL_",
@@ -202,12 +202,12 @@ class IdentitySettings(BaseSettings):
     owner_name: str = Field(default="Guilherme", description="Nome do criador/owner")
     challenge_mode_enabled: bool = Field(
         default=True,
-        description="Quando ativo, o agente deve contestar decisÃµes frÃ¡geis antes de planos complexos",
+        description="Quando ativo, o agente deve contestar decisÃƒÂµes frÃƒÂ¡geis antes de planos complexos",
     )
 
 
 class CatalogSettings(BaseSettings):
-    """ConfiguraÃ§Ãµes do sync do catÃ¡logo de skills externos."""
+    """ConfiguraÃƒÂ§ÃƒÂµes do sync do catÃƒÂ¡logo de skills externos."""
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",
@@ -216,14 +216,14 @@ class CatalogSettings(BaseSettings):
         extra="ignore",
     )
 
-    enabled: bool = Field(default=True, description="Habilita catÃ¡logo de skills externo")
+    enabled: bool = Field(default=True, description="Habilita catÃƒÂ¡logo de skills externo")
     sources_file: str = Field(
         default="configs/skills-catalog-sources.json",
-        description="Arquivo JSON com fontes do catÃ¡logo",
+        description="Arquivo JSON com fontes do catÃƒÂ¡logo",
     )
     fallback_cache_file: str = Field(
         default="configs/skills-catalog-cache.json",
-        description="Cache local quando DB estÃ¡ indisponÃ­vel",
+        description="Cache local quando DB estÃƒÂ¡ indisponÃƒÂ­vel",
     )
     history_file: str = Field(
         default="configs/skills-catalog-history.json",
@@ -235,12 +235,29 @@ class CatalogSettings(BaseSettings):
     )
     check_interval_seconds: int = Field(
         default=6 * 60 * 60,
-        description="Intervalo para check automÃ¡tico no loop autÃ´nomo",
+        description="Intervalo para check automÃƒÂ¡tico no loop autÃƒÂ´nomo",
     )
     http_timeout_seconds: int = Field(default=20, description="Timeout HTTP das fontes remotas")
     approval_required_for_apply: bool = Field(
         default=True,
-        description="Se true, apply automÃ¡tico via trigger gera proposal com aprovaÃ§Ã£o humana",
+        description="Se true, apply automÃƒÂ¡tico via trigger gera proposal com aprovaÃƒÂ§ÃƒÂ£o humana",
+    )
+
+    live_source_name: str = Field(
+        default="fleetintel_skillpack_repo",
+        description="Nome da fonte viva do catalogo externo usada para auto-update",
+    )
+    auto_apply_external_skills: bool = Field(
+        default=False,
+        description="Aplica automaticamente diffs do catalogo externo sem proposal humana",
+    )
+    auto_apply_smoke_enabled: bool = Field(
+        default=True,
+        description="Roda smoke das skills externas apos apply automatico",
+    )
+    auto_rollback_on_failure: bool = Field(
+        default=True,
+        description="Faz rollback automatico quando o smoke falha apos auto-apply",
     )
 
 
@@ -334,8 +351,8 @@ class VoiceContextSettings(BaseSettings):
 
 class AppSettings(BaseSettings):
     """
-    ConfiguraÃ§Ãµes principais da aplicaÃ§Ã£o.
-    Agrega todas as configuraÃ§Ãµes em um sÃ³ lugar.
+    ConfiguraÃƒÂ§ÃƒÂµes principais da aplicaÃƒÂ§ÃƒÂ£o.
+    Agrega todas as configuraÃƒÂ§ÃƒÂµes em um sÃƒÂ³ lugar.
     """
 
     model_config = SettingsConfigDict(
@@ -344,7 +361,7 @@ class AppSettings(BaseSettings):
         extra="ignore",
     )
 
-    # Sub-configuraÃ§Ãµes
+    # Sub-configuraÃƒÂ§ÃƒÂµes
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
     telegram: TelegramSettings = Field(default_factory=TelegramSettings)
@@ -356,22 +373,22 @@ class AppSettings(BaseSettings):
     catalog: CatalogSettings = Field(default_factory=CatalogSettings)
     voice_context: VoiceContextSettings = Field(default_factory=VoiceContextSettings)
 
-    # ConfiguraÃ§Ãµes gerais
+    # ConfiguraÃƒÂ§ÃƒÂµes gerais
     env: str = Field(default="production", description="Ambiente (production/development)")
     debug: bool = Field(default=False, description="Modo debug")
-    log_level: str = Field(default="INFO", description="NÃ­vel de logging")
+    log_level: str = Field(default="INFO", description="NÃƒÂ­vel de logging")
 
 
 @lru_cache()
 def get_settings() -> AppSettings:
     """
-    Retorna instÃ¢ncia Ãºnica das configuraÃ§Ãµes (singleton cacheado).
+    Retorna instÃƒÂ¢ncia ÃƒÂºnica das configuraÃƒÂ§ÃƒÂµes (singleton cacheado).
     Uso: from core.config import get_settings
     """
     return AppSettings()
 
 
-# Alias para uso rÃ¡pido
+# Alias para uso rÃƒÂ¡pido
 settings = get_settings()
 
 

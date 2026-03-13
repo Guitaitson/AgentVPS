@@ -108,7 +108,7 @@ Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (
 Roteamento externo:
 - `detect_external_skill()` decide entre `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator`
 - `RemoteMCPClient` encapsula autenticacao + initialize + tools/call para MCP remoto
-- `configs/skills-catalog-sources.json` usa snapshot local real do `Guitaitson/fleetintel-mcp` e pode alternar para sync vivo via GitHub token
+- `configs/skills-catalog-sources.json` usa `fleetintel_skillpack_repo` como fonte primaria viva e mantem o snapshot versionado como fallback manual
 
 ### 4. Hook System
 
@@ -154,16 +154,16 @@ Tipos de memória suportados: `episodic`, `semantic`, `procedural`, `profile`, `
 | Componente | Localização | Descrição |
 |---|---|---|
 | Sync Engine | `core/catalog/sync_engine.py` | Normaliza fontes externas e calcula diff (`check`/`apply`) |
-| Updater Agent | `core/updater/agent.py` | Orquestra jobs de atualização e abertura de proposals |
+| Updater Agent | `core/updater/agent.py` | Orquestra jobs de atualização, auto-apply com smoke e auto rollback para skills externas |
 | Skill Operacional | `core/skills/_builtin/skills_catalog_sync/` | Trigger manual/on-demand para check/apply/pin/unpin/rollback/provenance |
-| Trigger Autônomo | `core/autonomous/engine.py` (`catalog_sync_check`) | Check periódico estilo cron + proposal para apply |
+| Trigger Autônomo | `core/autonomous/engine.py` (`catalog_sync_check`) | Check periódico estilo cron + auto-apply do catálogo vivo quando permitido |
 | Tabelas | `skills_catalog`, `skills_catalog_history`, `skills_catalog_sync_runs` | Estado versionado, provenance e historico de sincronizacoes |
 
 Modelo adotado (híbrido):
 - `engine`: lógica de atualização e diff.
-- `updater agent`: coordena checks e proposals por domínio.
+- `updater agent`: coordena checks e, para skills externas do FleetIntel, pode promover automaticamente após smoke.
 - `skill`: execução explícita pelo operador/agente.
-- `trigger`: automação periódica para detecção de updates sem aplicar silenciosamente.
+- `trigger`: automação periódica para detecção de updates; mappings/policies/runbooks continuam em proposal workflow.
 
 ### 5.4 Runtime Control (Phase 1)
 

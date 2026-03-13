@@ -1,6 +1,6 @@
 import pytest
 
-from core.updater import UpdateCheckResult, UpdaterAgent
+from core.updater import SkillsCatalogUpdateJob, UpdateCheckResult, UpdaterAgent
 
 
 class _StaticJob:
@@ -10,6 +10,18 @@ class _StaticJob:
 
     async def check(self) -> UpdateCheckResult:
         return self._result
+
+
+class _AutoApplyJob(_StaticJob):
+    auto_apply_enabled = True
+
+    def __init__(self, result: UpdateCheckResult, summary: dict, name: str = "skills_catalog"):
+        super().__init__(result, name=name)
+        self._summary = summary
+
+    async def auto_apply(self, check: UpdateCheckResult) -> dict:
+        assert check is self._result
+        return self._summary
 
 
 class _FakeEngine:
@@ -55,6 +67,24 @@ async def test_updater_agent_creates_proposal_when_changes_detected():
 
 
 @pytest.mark.asyncio
+async def test_updater_agent_auto_applies_when_job_is_eligible():
+    result = UpdateCheckResult(
+        job_name="skills_catalog",
+        trigger_name="catalog_update_available",
+        success=True,
+        changes_detected=2,
+    )
+    job = _AutoApplyJob(result, {"job": "skills_catalog", "status": "auto_applied"})
+    agent = UpdaterAgent(jobs=[job])
+    engine = _FakeEngine(has_open=False)
+
+    summary = await agent.check_and_propose(engine)
+
+    assert summary == [{"job": "skills_catalog", "status": "auto_applied"}]
+    assert engine.created == []
+
+
+@pytest.mark.asyncio
 async def test_updater_agent_skips_when_proposal_already_open():
     result = UpdateCheckResult(
         job_name="skills_catalog",
@@ -86,3 +116,152 @@ async def test_updater_agent_reports_failed_check():
     assert summary[0]["status"] == "check_failed"
     assert summary[0]["error"] == "network_error"
     assert engine.created == []
+
+
+@pytest.mark.asyncio
+async def test_skills_catalog_job_check_targets_live_source(monkeypatch):
+    captured = {}
+
+    async def fake_sync(self, *, mode="check", source_name=None):
+        captured["mode"] = mode
+        captured["source_name"] = source_name
+        return {
+            "success": True,
+            "changes_detected": 1,
+            "added": 1,
+            "updated": 0,
+            "removed": 0,
+            "changed_keys": ["fleetintel-orchestrator:fleetintel_skillpack_repo"],
+        }
+
+    monkeypatch.setattr("core.updater.agent.SkillsCatalogSyncEngine.sync", fake_sync)
+
+    job = SkillsCatalogUpdateJob(
+        approval_required_for_apply=False,
+        source_name="fleetintel_skillpack_repo",
+        auto_apply_enabled=True,
+        smoke_enabled=True,
+        auto_rollback_on_failure=True,
+    )
+
+    result = await job.check()
+
+    assert captured == {"mode": "check", "source_name": "fleetintel_skillpack_repo"}
+    assert result.condition_data["source_name"] == "fleetintel_skillpack_repo"
+    assert result.suggested_action["args"] == {
+        "mode": "apply",
+        "source": "fleetintel_skillpack_repo",
+    }
+
+
+@pytest.mark.asyncio
+async def test_skills_catalog_job_auto_apply_smoke_success(monkeypatch):
+    async def fake_sync(self, *, mode="check", source_name=None):
+        assert mode == "apply"
+        return {
+            "success": True,
+            "changes_detected": 2,
+            "added": 0,
+            "updated": 2,
+            "removed": 0,
+            "changed_keys": [
+                "fleetintel-orchestrator:fleetintel_skillpack_repo",
+                "brazilcnpj-enricher:fleetintel_skillpack_repo",
+            ],
+        }
+
+    async def fake_smoke(self, external_skill_names):
+        assert sorted(external_skill_names) == ["brazilcnpj-enricher", "fleetintel-orchestrator"]
+        return {"success": True, "skipped": False, "results": []}
+
+    async def fake_notify(self, summary):
+        summary["notified"] = True
+
+    monkeypatch.setattr("core.updater.agent.SkillsCatalogSyncEngine.sync", fake_sync)
+    monkeypatch.setattr("core.updater.agent.ExternalSkillsSmokeRunner.run", fake_smoke)
+    monkeypatch.setattr("core.updater.agent.SkillsCatalogUpdateJob._notify", fake_notify)
+
+    job = SkillsCatalogUpdateJob(
+        approval_required_for_apply=False,
+        source_name="fleetintel_skillpack_repo",
+        auto_apply_enabled=True,
+        smoke_enabled=True,
+        auto_rollback_on_failure=True,
+    )
+    check = UpdateCheckResult(
+        job_name="skills_catalog",
+        success=True,
+        changes_detected=2,
+        condition_data={"source_name": "fleetintel_skillpack_repo"},
+    )
+
+    summary = await job.auto_apply(check)
+
+    assert summary["status"] == "auto_applied"
+    assert summary["smoke"]["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_skills_catalog_job_auto_apply_rolls_back_when_smoke_fails(monkeypatch):
+    async def fake_sync(self, *, mode="check", source_name=None):
+        assert mode == "apply"
+        return {
+            "success": True,
+            "changes_detected": 1,
+            "added": 0,
+            "updated": 1,
+            "removed": 0,
+            "changed_keys": ["fleetintel-orchestrator:fleetintel_skillpack_repo"],
+        }
+
+    async def fake_smoke(self, external_skill_names):
+        return {
+            "success": False,
+            "skipped": False,
+            "results": [
+                {
+                    "external_skill": "fleetintel-orchestrator",
+                    "success": False,
+                    "failure_reason": "missing_marker:Operacao FleetIntel: status=",
+                }
+            ],
+        }
+
+    async def fake_rollback(
+        self, *, skill_name, source_name=None, actor=None, reason=None, target_version=None
+    ):
+        assert skill_name == "fleetintel-orchestrator"
+        assert source_name == "fleetintel_skillpack_repo"
+        return {
+            "success": True,
+            "skill_name": skill_name,
+            "rolled_back_to_version": "1.2.3",
+        }
+
+    async def fake_notify(self, summary):
+        summary["notified"] = True
+
+    monkeypatch.setattr("core.updater.agent.SkillsCatalogSyncEngine.sync", fake_sync)
+    monkeypatch.setattr("core.updater.agent.ExternalSkillsSmokeRunner.run", fake_smoke)
+    monkeypatch.setattr("core.updater.agent.SkillsCatalogSyncEngine.rollback", fake_rollback)
+    monkeypatch.setattr("core.updater.agent.SkillsCatalogUpdateJob._notify", fake_notify)
+
+    job = SkillsCatalogUpdateJob(
+        approval_required_for_apply=False,
+        source_name="fleetintel_skillpack_repo",
+        auto_apply_enabled=True,
+        smoke_enabled=True,
+        auto_rollback_on_failure=True,
+    )
+    check = UpdateCheckResult(
+        job_name="skills_catalog",
+        success=True,
+        changes_detected=1,
+        condition_data={"source_name": "fleetintel_skillpack_repo"},
+    )
+
+    summary = await job.auto_apply(check)
+
+    assert summary["status"] == "auto_rollback_completed"
+    assert summary["rollback"]["success"] is True
+    assert summary["rollback"]["rolled_back"][0]["version"] == "1.2.3"

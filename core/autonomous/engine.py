@@ -914,7 +914,11 @@ def get_autonomous_loop() -> AutonomousLoop:
         updater_agent = UpdaterAgent(
             jobs=[
                 SkillsCatalogUpdateJob(
-                    approval_required_for_apply=bool(catalog_cfg.approval_required_for_apply)
+                    approval_required_for_apply=bool(catalog_cfg.approval_required_for_apply),
+                    source_name=str(catalog_cfg.live_source_name),
+                    auto_apply_enabled=bool(catalog_cfg.auto_apply_external_skills),
+                    smoke_enabled=bool(catalog_cfg.auto_apply_smoke_enabled),
+                    auto_rollback_on_failure=bool(catalog_cfg.auto_rollback_on_failure),
                 ),
                 ProtocolMappingsUpdateJob(),
                 PolicyBundleUpdateJob(),

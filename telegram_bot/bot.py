@@ -923,13 +923,29 @@ async def cmd_updatestatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- job {item.get('job', '?')}: {item.get('status', '?')} "
                     f"(changes={item.get('changes', 0)})"
                 )
+                if item.get("source"):
+                    lines.append(f"  source={item.get('source')}")
+                smoke = item.get("smoke")
+                if isinstance(smoke, dict):
+                    lines.append(
+                        f"  smoke_success={str(bool(smoke.get('success'))).lower()} "
+                        f"skipped={str(bool(smoke.get('skipped'))).lower()}"
+                    )
+                rollback = item.get("rollback")
+                if isinstance(rollback, dict):
+                    lines.append(
+                        f"  rollback_success={str(bool(rollback.get('success'))).lower()} "
+                        f"rolled_back={len(rollback.get('rolled_back', []))}"
+                    )
 
         lines.extend(
             [
                 "",
                 "Update policy:",
                 "- AgentVPS core usa release + deploy gate automatico",
-                "- skills/tools/agentes externos do acervo entram por catalog sync e approval workflow",
+                "- acervo externo FleetIntel usa live GitHub + catalog sync",
+                "- quando habilitado, skills externas entram por auto-apply com smoke e auto rollback",
+                "- mappings/policies/runbooks continuam em proposal workflow",
                 "- jobs longos podem criar blockers em runtime/deploy-blockers para adiar deploys",
             ]
         )

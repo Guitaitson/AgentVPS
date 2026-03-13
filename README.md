@@ -176,7 +176,8 @@ O deploy automatico por release nao reinicia o AgentVPS no meio de trabalho crit
 - tarefas agendadas rodando
 - blockers manuais em `runtime/deploy-blockers`
 
-Para o acervo externo, a estrategia e diferente: skills/tools/agentes entram por catalog sync com proposal/approval, sem substituir automaticamente o core do AgentVPS.
+Para o acervo externo, a estrategia e diferente: o core do AgentVPS continua em release separada, enquanto o catalogo vivo do FleetIntel pode fazer auto-apply com smoke e auto rollback sem substituir o core.
+O caminho padrao do acervo externo agora e `fleetintel_skillpack_repo` com `CATALOG_GITHUB_TOKEN`; o snapshot local permanece apenas como fallback manual.
 
 Para a politica completa de branch, PR, release e auditoria local, ver `docs/GIT_GOVERNANCE.md`.
 
