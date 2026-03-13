@@ -517,7 +517,6 @@ def _codex_output_schema() -> dict[str, Any]:
                     "properties": {
                         "tool": {"type": "string"},
                         "status": {"type": "string"},
-                        "notes": {"type": "string"},
                     },
                 },
             },
