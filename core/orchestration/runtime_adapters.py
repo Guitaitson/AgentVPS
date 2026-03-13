@@ -449,9 +449,17 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
     def _build_prompt(self, request: RuntimeExecutionRequest) -> str:
         specialist_hint = request.action
         allowed_specialists = _allowed_codex_specialists(specialist_hint)
+        primary_args_json = json.dumps(
+            {"query": request.args.get("query") or request.args.get("raw_input") or request.action},
+            ensure_ascii=False,
+        )
         bridge_cmd = (
             f"{shlex.quote(self.python_executable)} -m core.codex_operator_bridge run-skill "
             f"--skill <skill> --args-json '<json>'"
+        )
+        primary_command = (
+            f"{shlex.quote(self.python_executable)} -m core.codex_operator_bridge run-skill "
+            f"--skill {shlex.quote(specialist_hint)} --args-json {shlex.quote(primary_args_json)}"
         )
         envelope = {
             "task": request.args.get("query") or request.args.get("raw_input") or request.action,
@@ -471,10 +479,14 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
             "1. Nao edite arquivos.\n"
             "2. Nao execute comandos fora do bridge abaixo.\n"
             "3. Use apenas estes especialistas: " + ", ".join(allowed_specialists) + ".\n"
-            "4. Se faltar dado, diga explicitamente em unresolved_items.\n"
-            "5. Nao exponha segredos ou caminhos sensiveis.\n"
-            "6. A mensagem final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
+            "4. Comece pelo especialista principal indicado em specialist_hint.\n"
+            "5. Se a primeira chamada ja devolver uma resposta util ou uma falha degradada, finalize imediatamente.\n"
+            "6. Nunca rode diagnosticos extras do ambiente, como ps, grep, rg, ls, cat ou comandos similares.\n"
+            "7. Se faltar dado, diga explicitamente em unresolved_items.\n"
+            "8. Nao exponha segredos ou caminhos sensiveis.\n"
+            "9. A mensagem final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
             f"Bridge permitido:\n{bridge_cmd}\n\n"
+            f"Primeiro comando esperado:\n{primary_command}\n\n"
             "Envelope da tarefa:\n"
             f"{json.dumps(envelope, ensure_ascii=False, indent=2)}\n"
         )
