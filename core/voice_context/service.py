@@ -311,7 +311,9 @@ class VoiceContextService:
             return {
                 "success": True,
                 **commit_stats,
-                "review_required_files": 1 if force_review or commit_stats.get("pending_review") else 0,
+                "review_required_files": 1
+                if force_review or commit_stats.get("pending_review")
+                else 0,
                 "report": self._build_file_report(
                     file_name=source_path.name,
                     transcript=transcript,
