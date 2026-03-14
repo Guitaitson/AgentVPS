@@ -109,6 +109,7 @@ Roteamento externo:
 - `detect_external_skill()` decide entre `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator`
 - `RemoteMCPClient` encapsula autenticacao + initialize + tools/call para MCP remoto
 - `configs/skills-catalog-sources.json` usa `fleetintel_skillpack_repo` como fonte primaria viva e mantem o snapshot versionado como fallback manual
+- O catalogo externo agora preserva `instructions_markdown` do `SKILL.md`; quando o contrato indica que a resposta pertence ao especialista, o `react_node` prioriza `codex_operator` para sintetizar a resposta final em vez de renderizar payload MCP localmente
 
 ### 4. Hook System
 

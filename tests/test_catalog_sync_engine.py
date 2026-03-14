@@ -224,6 +224,9 @@ async def test_catalog_sync_parses_langchain_skills_github_repo_source(tmp_path,
                     "  mcp_servers: fleetintel-mcp,brazilcnpj-mcp\n"
                     "---\n"
                     "# FleetIntel Orchestrator\n"
+                    "\n"
+                    "## Response Contract\n"
+                    "Return executive summary.\n"
                 )
             )
         if "brazilcnpj-enricher/SKILL.md" in url:
@@ -249,3 +252,9 @@ async def test_catalog_sync_parses_langchain_skills_github_repo_source(tmp_path,
     assert result["success"] is True
     assert result["skills_discovered"] == 2
     assert result["added"] == 2
+
+    discovered = await engine._discover_all_sources(engine.load_sources())
+    fleet_skill = next(
+        item for item in discovered.values() if item["skill_name"] == "fleetintel-orchestrator"
+    )
+    assert "Response Contract" in fleet_skill["payload"]["instructions_markdown"]

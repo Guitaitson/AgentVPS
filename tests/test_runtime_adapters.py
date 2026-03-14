@@ -265,6 +265,22 @@ async def test_codex_operator_adapter_executes_codex_cli(monkeypatch, tmp_path):
     )
     monkeypatch.setattr("core.orchestration.runtime_adapters.os.path.exists", lambda _path: True)
     monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.get_external_skill_contract",
+        lambda _name: type(
+            "Contract",
+            (),
+            {
+                "external_name": "fleetintel-analyst",
+                "version": "abc123",
+                "execution_mode": "specialist_response",
+                "response_owner": "specialist",
+                "raw_output_policy": "on_user_request",
+                "description": "Contract test",
+                "instructions_markdown": "## Response Contract\nSummarize, do not dump raw JSON.",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
         "core.orchestration.runtime_adapters.asyncio.create_subprocess_exec",
         _fake_create_subprocess_exec,
     )
@@ -291,6 +307,8 @@ async def test_codex_operator_adapter_executes_codex_cli(monkeypatch, tmp_path):
     assert result.runtime == RuntimeProtocol.CODEX_OPERATOR
     assert result.output["answer"] == "Resposta do Codex"
     assert "fleetintel_analyst" in recorded["prompt"]
+    assert "Response Contract" in recorded["prompt"]
+    assert "do not dump raw JSON" in recorded["prompt"]
     assert "--output-schema" in recorded["command"]
 
 

@@ -37,10 +37,11 @@ Last updated: 2026-03-13
 - Skills catalog source now supports direct GitHub repo discovery for LangChain-style `SKILL.md` packs
 - Default catalog source now points to live FleetIntel GitHub discovery
 - External catalog updater now supports auto-apply with smoke and auto rollback for FleetIntel/BrazilCNPJ metadata updates
+- External FleetIntel contracts now persist `instructions_markdown`, and `react_node` can route `fleetintel-orchestrator` / `fleetintel-analyst` through `codex_operator` when the synced contract says the specialist owns the final response
 
 Validation baseline at review time:
 - targeted: `python -m pytest -q tests/test_runtime_adapters.py tests/test_runtime_control.py tests/test_external_specialist_skills.py tests/test_react_codex_operator.py` -> 24 passed
-- pending final full-suite run after docs finish
+- full suite: `python -m pytest -q` -> 266 passed, 2 skipped
 
 ## Decision Gate for Next Features
 
