@@ -46,6 +46,7 @@ async def test_voice_context_sync_skill_runs_inspect(monkeypatch):
                 "auto_committed": 3,
                 "pending_review": 1,
                 "batch_recommendation": "review_before_send",
+                "green_gate": {"passed": False},
                 "calibration_advice": "Segregue os arquivos longos.",
             }
 
@@ -60,6 +61,7 @@ async def test_voice_context_sync_skill_runs_inspect(monkeypatch):
     assert "voice context inspect" in output
     assert "already_processed_files: 1" in output
     assert "batch_recommendation: review_before_send" in output
+    assert "green_gate: False" in output
 
 
 @pytest.mark.asyncio

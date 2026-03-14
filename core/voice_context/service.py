@@ -117,16 +117,45 @@ class VoiceContextService:
     def has_pending_files(self) -> bool:
         return bool(self.list_pending_files())
 
+    def _resolve_pending_selection(
+        self,
+        *,
+        file_names: list[str] | None = None,
+        max_files: int | None = None,
+    ) -> tuple[list[Path], list[str], list[str]]:
+        pending = self.list_pending_files()
+        if not file_names:
+            limit = max_files or int(self.settings.max_files_per_run)
+            selected = pending[: max(1, limit)] if pending else []
+            return selected, [], []
+
+        pending_by_name = {path.name: path for path in pending}
+        normalized_names: list[str] = []
+        for name in file_names:
+            normalized = str(name or "").strip()
+            if normalized and normalized not in normalized_names:
+                normalized_names.append(normalized)
+
+        selected = [pending_by_name[name] for name in normalized_names if name in pending_by_name]
+        if max_files is not None:
+            selected = selected[: max(1, int(max_files))]
+        matched_names = [path.name for path in selected]
+        missing_names = [name for name in normalized_names if name not in matched_names]
+        return selected, matched_names, missing_names
+
     async def inspect_inbox(
         self,
         *,
         source: str = "manual_inspect",
         max_files: int | None = None,
+        file_names: list[str] | None = None,
     ) -> dict[str, Any]:
         self.ensure_directories()
         pending = self.list_pending_files()
-        limit = max_files or int(self.settings.max_files_per_run)
-        selected = pending[: max(1, limit)] if pending else []
+        selected, matched_names, missing_names = self._resolve_pending_selection(
+            file_names=file_names,
+            max_files=max_files,
+        )
 
         if not selected:
             return {
@@ -135,17 +164,23 @@ class VoiceContextService:
                 "inspect_only": True,
                 "processed_files": 0,
                 "pending_review": self.count_pending_review(),
-                "inbox_files": 0,
+                "inbox_files": len(pending),
                 "review_required_files": 0,
                 "already_processed_files": 0,
                 "batch_recommendation": "no_files",
                 "calibration_advice": "Nenhum audio pendente na inbox.",
+                "requested_files": list(file_names or []),
+                "matched_files": [],
+                "missing_requested_files": missing_names,
                 "files": [],
             }
 
         stats = self._new_batch_stats()
         stats["source"] = source
         stats["inspect_only"] = True
+        stats["requested_files"] = list(file_names or [])
+        stats["matched_files"] = matched_names
+        stats["missing_requested_files"] = missing_names
 
         for path in selected:
             file_result = await self._inspect_one_file(source_path=path)
@@ -154,6 +189,8 @@ class VoiceContextService:
         stats["status"] = "inspected"
         stats["batch_recommendation"] = self._recommend_batch_action(stats)
         stats["calibration_advice"] = self._build_calibration_advice(stats)
+        stats["calibration_hints"] = self._build_calibration_hints(stats)
+        stats["green_gate"] = self.evaluate_green_gate(stats)
         stats["success"] = True
         stats["inbox_files"] = len(pending)
         return stats
@@ -164,14 +201,17 @@ class VoiceContextService:
         user_id: str | None = None,
         source: str = "manual",
         max_files: int | None = None,
+        file_names: list[str] | None = None,
     ) -> dict[str, Any]:
         self.ensure_directories()
         self.cleanup_expired_transcripts()
 
         resolved_user_id = self.resolve_user_id(user_id)
         pending = self.list_pending_files()
-        limit = max_files or int(self.settings.max_files_per_run)
-        selected = pending[: max(1, limit)] if pending else []
+        selected, matched_names, missing_names = self._resolve_pending_selection(
+            file_names=file_names,
+            max_files=max_files,
+        )
 
         if not selected:
             return {
@@ -179,12 +219,18 @@ class VoiceContextService:
                 "status": "no_files",
                 "processed_files": 0,
                 "pending_review": self.count_pending_review(),
-                "inbox_files": 0,
+                "inbox_files": len(pending),
+                "requested_files": list(file_names or []),
+                "matched_files": [],
+                "missing_requested_files": missing_names,
             }
 
         job_id = self._create_job(source=source, batch_date=datetime.utcnow().date().isoformat())
         stats = self._new_batch_stats()
         stats["source"] = source
+        stats["requested_files"] = list(file_names or [])
+        stats["matched_files"] = matched_names
+        stats["missing_requested_files"] = missing_names
 
         try:
             for path in selected:
@@ -197,6 +243,8 @@ class VoiceContextService:
 
             stats["batch_recommendation"] = self._recommend_batch_action(stats)
             stats["calibration_advice"] = self._build_calibration_advice(stats)
+            stats["calibration_hints"] = self._build_calibration_hints(stats)
+            stats["green_gate"] = self.evaluate_green_gate(stats)
             self._finish_job(job_id, status="completed", stats=stats)
             status = self.get_status()
             feedback = self.build_job_feedback(job_id=job_id)
@@ -1281,6 +1329,60 @@ class VoiceContextService:
         if recommendation == "already_processed":
             return "Os arquivos inspecionados ja apareceram em lotes anteriores. Evite reenviar duplicatas."
         return "O perfil atual parece estavel para este lote. Envie apenas os arquivos aprovados."
+
+    def _build_calibration_hints(self, stats: dict[str, Any]) -> list[str]:
+        reasons: dict[str, int] = {}
+        files = stats.get("files") or []
+        for report in files:
+            for reason in report.get("quality_reasons") or []:
+                key = str(reason).strip().lower()
+                if key:
+                    reasons[key] = reasons.get(key, 0) + 1
+
+        hints: list[str] = []
+        if reasons.get("muitos trechos curtos e fragmentados", 0) > 0:
+            hints.append("Reduza VOR de 3 para 2 antes de subir o proximo lote completo.")
+        if reasons.get("pouca fala util detectada", 0) > 0:
+            hints.append(
+                "Se a fala estiver sendo cortada cedo, reduza VOR ou grave trechos menos interrompidos."
+            )
+        if reasons.get("baixa estabilidade lexical na transcricao", 0) > 0:
+            hints.append("Reduza DENOISE de 20 para 15 antes de mexer no bitrate.")
+        if reasons.get("linhas muito curtas, possivel segmentacao ruidosa", 0) > 0:
+            hints.append("Se o volume estiver oscilando, reduza AGC de 20 para 18.")
+        if reasons.get("audio longo com vocabulario pouco consistente", 0) > 0:
+            hints.append("Segregue arquivos longos e mantenha SECTION em 60 minutos.")
+        if not hints and stats.get("batch_recommendation") == "approve_current_profile":
+            hints.append("Mantenha o perfil atual como baseline para o proximo lote organico.")
+        return hints
+
+    def evaluate_green_gate(self, stats: dict[str, Any]) -> dict[str, Any]:
+        recommendation = str(stats.get("batch_recommendation") or "")
+        files = stats.get("files") or []
+        discard_reports = [
+            report.get("file_name")
+            for report in files
+            if report.get("recommended_action") == "discard"
+        ]
+        failed_reasons: list[str] = []
+        if not files:
+            failed_reasons.append("no_files_selected")
+        if discard_reports:
+            failed_reasons.append("discarded_files_present")
+        if recommendation == "test_conservative_profile":
+            failed_reasons.append("conservative_profile_required")
+        if recommendation == "review_before_send":
+            failed_reasons.append("review_dominates_batch")
+        if recommendation == "already_processed":
+            failed_reasons.append("already_processed_batch")
+
+        return {
+            "passed": len(failed_reasons) == 0,
+            "failed_reasons": failed_reasons,
+            "discarded_files": discard_reports,
+            "batch_recommendation": recommendation or "review_before_send",
+            "calibration_hints": self._build_calibration_hints(stats),
+        }
 
     def evaluate_transcript_quality(self, transcript: TranscriptResult) -> TranscriptQualityReport:
         body = (transcript.text or "").strip()
