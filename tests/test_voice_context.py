@@ -321,5 +321,118 @@ async def test_voice_context_inspect_inbox_reports_review_without_committing(tmp
     assert result["review_required_files"] == 1
     assert result["batch_recommendation"] == "review_before_send"
     assert "Segregue os arquivos" in result["calibration_advice"]
+    assert result["green_gate"]["passed"] is False
+    assert "review_dominates_batch" in result["green_gate"]["failed_reasons"]
     assert result["files"][0]["recommended_action"] == "hold"
     assert result["files"][0]["would_require_review"] == 1
+
+
+@pytest.mark.asyncio
+async def test_voice_context_inspect_inbox_filters_explicit_batch_file_names(tmp_path):
+    inbox_dir = tmp_path / "inbox"
+    processing_dir = tmp_path / "processing"
+    archive_dir = tmp_path / "archive"
+    failed_dir = tmp_path / "failed"
+    transcripts_dir = tmp_path / "transcripts"
+    inbox_dir.mkdir()
+    (inbox_dir / "older.mp3").write_bytes(b"old")
+    (inbox_dir / "batch.mp3").write_bytes(b"batch")
+
+    settings = SimpleNamespace(
+        file_extensions=".mp3,.wav",
+        inbox_dir=str(inbox_dir),
+        processing_dir=str(processing_dir),
+        archive_dir=str(archive_dir),
+        failed_dir=str(failed_dir),
+        transcripts_dir=str(transcripts_dir),
+        max_files_per_run=12,
+        auto_commit_max_duration_minutes=30,
+        quality_warn_score=0.65,
+        quality_min_score=0.35,
+        create_daily_summary=True,
+        auto_commit_threshold=0.75,
+    )
+
+    class FakeTranscriber:
+        def transcribe_file(self, file_path, language="pt"):  # noqa: ARG002
+            name = getattr(file_path, "name", str(file_path))
+            return TranscriptResult(
+                text=(
+                    f"Arquivo {name} com resumo do dia no AgentVPS e detalhes claros do que foi feito. "
+                    "Organizei o lote de voz, revisei a captacao, mantive o raciocinio continuo, "
+                    "e deixei contexto suficiente para memoria episodica sem ruido excessivo. "
+                )
+                * 8,
+                duration_seconds=12 * 60,
+                model="fake",
+            )
+
+    class FakeExtractor:
+        async def extract_structured_context(self, transcript, source_name=None):  # noqa: ARG002
+            return {
+                "summary": f"Resumo util de {source_name}",
+                "episodes": [
+                    {
+                        "text": "Organizei o lote de voz",
+                        "domain": "trabalho_criacao",
+                        "confidence": 0.93,
+                    }
+                ],
+                "facts": [],
+                "preferences": [],
+                "commitments": [],
+            }
+
+    service = VoiceContextService(
+        settings=settings,
+        memory=SimpleNamespace(),
+        extractor=FakeExtractor(),
+        transcriber=FakeTranscriber(),
+    )
+
+    result = await service.inspect_inbox(file_names=["batch.mp3"])
+
+    assert result["processed_files"] == 1
+    assert result["matched_files"] == ["batch.mp3"]
+    assert result["missing_requested_files"] == []
+    assert result["files"][0]["file_name"] == "batch.mp3"
+    assert result["green_gate"]["passed"] is True
+
+
+@pytest.mark.asyncio
+async def test_voice_context_inspect_inbox_reports_missing_requested_files(tmp_path, monkeypatch):
+    inbox_dir = tmp_path / "inbox"
+    processing_dir = tmp_path / "processing"
+    archive_dir = tmp_path / "archive"
+    failed_dir = tmp_path / "failed"
+    transcripts_dir = tmp_path / "transcripts"
+    inbox_dir.mkdir()
+
+    settings = SimpleNamespace(
+        file_extensions=".mp3,.wav",
+        inbox_dir=str(inbox_dir),
+        processing_dir=str(processing_dir),
+        archive_dir=str(archive_dir),
+        failed_dir=str(failed_dir),
+        transcripts_dir=str(transcripts_dir),
+        max_files_per_run=12,
+        auto_commit_max_duration_minutes=30,
+        quality_warn_score=0.65,
+        quality_min_score=0.35,
+        create_daily_summary=True,
+        auto_commit_threshold=0.75,
+    )
+
+    service = VoiceContextService(
+        settings=settings,
+        memory=SimpleNamespace(),
+        extractor=SimpleNamespace(),
+        transcriber=SimpleNamespace(),
+    )
+    monkeypatch.setattr(service, "count_pending_review", lambda: 0)
+
+    result = await service.inspect_inbox(file_names=["missing.mp3"])
+
+    assert result["status"] == "no_files"
+    assert result["requested_files"] == ["missing.mp3"]
+    assert result["missing_requested_files"] == ["missing.mp3"]

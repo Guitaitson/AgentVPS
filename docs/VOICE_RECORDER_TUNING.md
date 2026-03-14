@@ -62,6 +62,25 @@ Racional:
 6. revisar transcript, quality score e itens que iriam para review
 7. iterar antes de voltar para gravacoes muito longas
 
+## Ciclo end-to-end recomendado
+
+Para um lote organico do dia:
+
+1. conectar o gravador e rodar `voice_device_watcher.ps1 -RunOnce -BatchAction send -RemoteAction inspect`
+2. abrir o lote local gerado em `preTriageDir`
+3. revisar `batch_review.json` e `remote_inspect.json`
+4. se `green_gate.passed=true`, repetir com `-RemoteAction sync_if_green` para efetivar memoria no mesmo ciclo
+5. se `green_gate.failed_reasons` incluir `review_dominates_batch`, segregar os arquivos mais longos antes de novo envio
+6. se `green_gate.failed_reasons` incluir `conservative_profile_required`, reduzir a agressividade do perfil atual ou voltar para o perfil conservador
+
+## Heuristicas praticas de microajuste
+
+- `muitos trechos curtos e fragmentados`: reduzir `VOR` primeiro
+- `pouca fala util detectada`: revisar `VOR` e padrao de pausas longas
+- `baixa estabilidade lexical na transcricao`: reduzir `DENOISE` antes de mexer em bitrate
+- `linhas muito curtas, possivel segmentacao ruidosa`: reduzir `AGC` se o volume estiver oscilando
+- `audio longo com vocabulario pouco consistente`: manter `SECTION:(060)` e segregar arquivos longos no gate local
+
 ## Observacao importante
 
 O proprio arquivo do gravador avisa que, no Windows 11, salvar via Notepad e o caminho mais confiavel para a configuracao surtir efeito. Isso deve ser respeitado se o dispositivo ignorar edicoes programaticas.

@@ -4,6 +4,8 @@
   "extensions": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
   "stagingDir": "C:\\Users\\Pc Gamer\\AppData\\Local\\AgentVPS\\voice-staging",
   "preTriageDir": "C:\\Users\\Pc Gamer\\AppData\\Local\\AgentVPS\\voice-pretriage",
+  "batchStorageMode": "auto",
+  "stagingReserveMb": 512,
   "recorderProfile": "factory-profile-current",
   "reviewDurationMinutes": 30,
   "minimumDurationSeconds": 20,
@@ -13,6 +15,9 @@
   "remoteStagingDir": "/tmp/agentvps-voice-inbox",
   "remoteInboxDir": "/opt/vps-agent/data/voice/inbox",
   "remoteManifestDir": "/opt/vps-agent/data/voice/manifests",
+  "remoteProjectDir": "/opt/vps-agent",
+  "remotePythonPath": "/opt/vps-agent/core/venv/bin/python3",
+  "remoteBatchRunnerPath": "/opt/vps-agent/scripts/voice_context_batch.py",
   "uploadBatchManifest": true,
   "pollSeconds": 15
 }

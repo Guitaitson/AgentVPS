@@ -50,6 +50,7 @@ class VoiceContextSyncSkill(SkillBase):
                 f"- status: {result.get('status', 'ok')}\n"
                 f"- requested_max_files: {max_files if max_files is not None else 'default'}\n"
                 f"- processed_files: {result.get('processed_files', 0)}\n"
+                f"- matched_files: {len(result.get('matched_files', []))}\n"
                 f"- already_processed_files: {result.get('already_processed_files', 0)}\n"
                 f"- discarded_low_quality: {result.get('discarded_low_quality', 0)}\n"
                 f"- review_required_files: {result.get('review_required_files', 0)}\n"
@@ -57,6 +58,7 @@ class VoiceContextSyncSkill(SkillBase):
                 f"- would_auto_commit: {result.get('auto_committed', 0)}\n"
                 f"- would_require_review: {result.get('pending_review', 0)}\n"
                 f"- batch_recommendation: {result.get('batch_recommendation', '-')}\n"
+                f"- green_gate: {result.get('green_gate', {}).get('passed', False)}\n"
                 f"- calibration_advice: {result.get('calibration_advice', '-')}"
             )
 
