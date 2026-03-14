@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 import structlog
 
+from core.catalog.external_skill_contracts import get_external_skill_contract
 from core.memory import MemoryPolicy
 from core.progress import emit_progress
 
@@ -553,6 +554,7 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
     def _build_prompt(self, request: RuntimeExecutionRequest) -> str:
         specialist_hint = request.action
         allowed_specialists = _allowed_codex_specialists(specialist_hint)
+        contract = get_external_skill_contract(specialist_hint)
         primary_args_json = json.dumps(
             {"query": request.args.get("query") or request.args.get("raw_input") or request.action},
             ensure_ascii=False,
@@ -576,6 +578,23 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
                 "max_specialist_calls": 4,
             },
         }
+        contract_section = ""
+        if contract is not None:
+            contract_section = (
+                "\nContrato da skill externa sincronizada:\n"
+                f"- external_name: {contract.external_name}\n"
+                f"- version: {contract.version or '-'}\n"
+                f"- execution_mode: {contract.execution_mode}\n"
+                f"- response_owner: {contract.response_owner}\n"
+                f"- raw_output_policy: {contract.raw_output_policy}\n"
+            )
+            if contract.description:
+                contract_section += f"- description: {contract.description}\n"
+            if contract.instructions_markdown:
+                contract_section += (
+                    "\nInstrucoes publicadas da skill externa (fonte de verdade de dominio):\n"
+                    f"{contract.instructions_markdown[:12000]}\n"
+                )
         return (
             "Voce e o operador Codex do AgentVPS.\n"
             "Objetivo: operar apenas especialistas allowlisted e devolver uma resposta estruturada.\n"
@@ -588,11 +607,14 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
             "6. Nunca rode diagnosticos extras do ambiente, como ps, grep, rg, ls, cat ou comandos similares.\n"
             "7. Se faltar dado, diga explicitamente em unresolved_items.\n"
             "8. Nao exponha segredos ou caminhos sensiveis.\n"
-            "9. A mensagem final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
+            "9. Se houver contrato de resposta da skill externa, siga-o e trate output de tool como working data, nao como resposta final.\n"
+            "10. So devolva JSON bruto se o usuario tiver pedido explicitamente raw/json/payload/bloco tecnico.\n"
+            "11. A mensagem final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
             f"Bridge permitido:\n{bridge_cmd}\n\n"
             f"Primeiro comando esperado:\n{primary_command}\n\n"
             "Envelope da tarefa:\n"
             f"{json.dumps(envelope, ensure_ascii=False, indent=2)}\n"
+            f"{contract_section}"
         )
 
 

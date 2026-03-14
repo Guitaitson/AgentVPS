@@ -606,10 +606,12 @@ class SkillsCatalogSyncEngine:
             return None
         if not isinstance(payload, dict):
             return None
+        body = content[match.end() :].strip()
         if "description" not in payload:
-            body = content[match.end() :].strip()
             if body:
                 payload["description"] = body.splitlines()[0][:300]
+        if body:
+            payload["_skill_body"] = body
         return payload
 
     @staticmethod
@@ -686,6 +688,7 @@ class SkillsCatalogSyncEngine:
             "security_level": security_level,
             "triggers": triggers,
             "parameters_schema": parameters_schema,
+            "instructions_markdown": str(raw_skill.get("_skill_body", "")).strip(),
             "metadata": self._build_metadata(raw_skill),
         }
         schema_hash = hashlib.sha256(

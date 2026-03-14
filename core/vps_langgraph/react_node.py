@@ -14,6 +14,7 @@ import json
 
 import structlog
 
+from ..catalog.external_skill_contracts import get_external_skill_contract
 from ..integrations import detect_external_skill, should_delegate_specialist_to_codex
 from ..orchestration import RuntimeExecutionRequest, RuntimeProtocol, get_runtime_router
 from ..progress import emit_progress
@@ -119,9 +120,27 @@ async def node_react(state: AgentState) -> AgentState:
         if specialist:
             logger.info("react_external_shortcut", skill=specialist_name)
             try:
-                if should_delegate_specialist_to_codex(user_message, specialist_name):
-                    router = get_runtime_router()
-                    if router.has_protocol(RuntimeProtocol.CODEX_OPERATOR):
+                router = get_runtime_router()
+                contract = get_external_skill_contract(specialist_name)
+                use_codex = False
+                if router.has_protocol(RuntimeProtocol.CODEX_OPERATOR):
+                    if contract and contract.response_owner == "specialist":
+                        use_codex = True
+                    elif should_delegate_specialist_to_codex(user_message, specialist_name):
+                        use_codex = True
+                if use_codex:
+                    if specialist_name.startswith("fleetintel"):
+                        await emit_progress("external_call", server="fleetintel", status="start")
+                    elif specialist_name == "brazilcnpj":
+                        await emit_progress("external_call", server="brazilcnpj", status="start")
+                    if contract is not None:
+                        await emit_progress(
+                            "routing",
+                            server="codex_operator",
+                            specialist=specialist_name,
+                            response_owner=contract.response_owner,
+                            execution_mode=contract.execution_mode,
+                        )
                         codex_result = await router.dispatch(
                             RuntimeExecutionRequest(
                                 action=specialist_name,
@@ -134,11 +153,22 @@ async def node_react(state: AgentState) -> AgentState:
                                     "conversation_history": conversation_history[-6:],
                                     "user_message": user_message,
                                     "specialist_name": specialist_name,
+                                    "external_skill_contract": {
+                                        "external_name": contract.external_name,
+                                        "version": contract.version,
+                                        "execution_mode": contract.execution_mode,
+                                        "response_owner": contract.response_owner,
+                                        "raw_output_policy": contract.raw_output_policy,
+                                        "description": contract.description,
+                                    }
+                                    if contract
+                                    else None,
                                 },
                                 context_keys=[
                                     "conversation_history",
                                     "user_message",
                                     "specialist_name",
+                                    "external_skill_contract",
                                 ],
                                 preferred_protocol=RuntimeProtocol.CODEX_OPERATOR,
                             )

@@ -15,7 +15,7 @@ class _FakeRegistry:
         return []
 
     def get(self, name):
-        return object() if name == "fleetintel_analyst" else None
+        return object() if name in {"fleetintel_analyst", "fleetintel_orchestrator"} else None
 
     async def execute_skill(self, name, args):
         self.executed.append((name, args))
@@ -71,4 +71,49 @@ async def test_node_react_prefers_codex_operator_for_complex_specialist_queries(
 
     assert "Operador Codex" in result["response"]
     assert "Resposta sintetizada pelo Codex." in result["response"]
+    assert registry.executed == []
+
+
+@pytest.mark.asyncio
+async def test_node_react_prefers_codex_operator_when_external_contract_owns_response(monkeypatch):
+    registry = _FakeRegistry()
+
+    monkeypatch.setattr("core.vps_langgraph.react_node.get_skill_registry", lambda: registry)
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.detect_external_skill",
+        lambda _message: "fleetintel_orchestrator",
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.should_delegate_specialist_to_codex",
+        lambda _message, _skill: False,
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_external_skill_contract",
+        lambda _skill: type(
+            "Contract",
+            (),
+            {
+                "external_name": "fleetintel-orchestrator",
+                "version": "abc123",
+                "execution_mode": "specialist_response",
+                "response_owner": "specialist",
+                "raw_output_policy": "on_user_request",
+                "description": "x",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_runtime_router",
+        lambda: _FakeRouter(),
+    )
+
+    state = {
+        "user_id": "u-1",
+        "user_message": "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me responder.",
+        "conversation_history": [],
+    }
+
+    result = await node_react(state)
+
+    assert "Operador Codex" in result["response"]
     assert registry.executed == []
