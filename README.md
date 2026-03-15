@@ -1,5 +1,7 @@
 # AgentVPS
 
+Contributor quick start: see [AGENTS.md](AGENTS.md) for repository guidelines and [CONTRIBUTING.md](CONTRIBUTING.md) for delivery workflow and governance.
+
 [![CI/CD](https://github.com/Guitaitson/AgentVPS/actions/workflows/ci.yml/badge.svg)](https://github.com/Guitaitson/AgentVPS/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
