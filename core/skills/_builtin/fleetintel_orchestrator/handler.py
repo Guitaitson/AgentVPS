@@ -384,14 +384,11 @@ class FleetIntelOrchestratorSkill(SkillBase):
             supporting_data = fleet_result.get("supporting_data") or {}
             account_layers = supporting_data.get("account_layers") or {}
             exact_entity = account_layers.get("exact_entity") or {}
-            empresa = (
-                fleet_result.get("empresa")
-                or exact_entity.get("empresa")
-                or {}
-            )
+            empresa = fleet_result.get("empresa") or exact_entity.get("empresa") or {}
             if not empresa and (fleet_result.get("company_name") or fleet_result.get("headline")):
                 empresa = {
-                    "razao_social": fleet_result.get("company_name") or fleet_result.get("headline"),
+                    "razao_social": fleet_result.get("company_name")
+                    or fleet_result.get("headline"),
                     "cnpj": fleet_result.get("cnpj"),
                 }
             resumo = (
@@ -401,9 +398,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 or {}
             )
             group_summary = (
-                fleet_result.get("group_summary")
-                or account_layers.get("effective_group")
-                or {}
+                fleet_result.get("group_summary") or account_layers.get("effective_group") or {}
             )
             lines = ["Leitura de frota:"]
             lines.append(
@@ -537,7 +532,9 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 continue
             supporting_data = item.get("supporting_data") or {}
             group_layers = supporting_data.get("group_layers") or {}
-            effective_group = item.get("effective_group") or group_layers.get("effective_group") or {}
+            effective_group = (
+                item.get("effective_group") or group_layers.get("effective_group") or {}
+            )
             groups = effective_group.get("groups") or []
             first_group = groups[0] if groups and isinstance(groups[0], dict) else {}
             group_name = (
@@ -547,13 +544,12 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 or item.get("headline")
             )
             members = (
-                item.get("members")
-                or item.get("group_members")
-                or first_group.get("members")
-                or []
+                item.get("members") or item.get("group_members") or first_group.get("members") or []
             )
-            total = item.get("member_count") or effective_group.get("count") or (
-                len(members) if isinstance(members, list) else None
+            total = (
+                item.get("member_count")
+                or effective_group.get("count")
+                or (len(members) if isinstance(members, list) else None)
             )
             if group_name:
                 found = True
