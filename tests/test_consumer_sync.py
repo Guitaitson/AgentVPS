@@ -25,7 +25,7 @@ class _MockResponse:
 def _reset_settings_and_manager(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "CONSUMER_SYNC_URL",
-        "https://request-access.gtaitson.space/api/consumer-sync/v1/sync",
+        "https://consumer-sync.gtaitson.space/api/consumer-sync/v1/sync",
     )
     monkeypatch.setenv("CONSUMER_SLUG", "agentvps")
     monkeypatch.setenv("CONSUMER_BOOTSTRAP_SECRET", "bootstrap-secret")
@@ -80,7 +80,15 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
                 },
                 "client_adaptation": {
                     "compatibility_status": "compatible",
+                    "compatibility_reason_codes": ["declared_capabilities_match"],
+                    "criteria": {"supports_contract_v1": True},
+                    "criteria_results": {"supports_contract_v1": True},
                     "response_contract_version_to_use": "client_brief_v1",
+                    "recognized_client_behavior_version": "contract_driven_v1",
+                    "recognized_response_contract_version": "client_brief_v1",
+                    "recognized_preferred_client_tools": {
+                        "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
+                    },
                     "preferred_client_tools": {
                         "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
                         "brazilcnpj": ["health_check", "get_company_registry_brief"],
@@ -89,8 +97,21 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
                         "fleetintel": ["get_operations_status"],
                         "brazilcnpj": ["health_check"],
                     },
+                    "tool_surface": "client_brief_v1",
+                    "client_capabilities_seen": {
+                        "supported_contract_versions": ["v1"],
+                        "supported_response_contract_versions": ["client_brief_v1"],
+                        "supported_tool_families": ["client_brief_v1", "raw_tools"],
+                        "client_behavior_version": "contract_driven_v1",
+                    },
                     "required_actions": ["nenhuma"],
                     "deprecation_notices": ["raw tools deprecated"],
+                },
+                "rollout_status": {
+                    "status": "canary_passable",
+                    "reason": "validation accepted",
+                    "validation_requirements": ["validation-report=passed"],
+                    "latest_validation_summary": {"validation_status": "passed"},
                 },
             }
         ),
@@ -119,6 +140,17 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
     assert second.last_sync_status == "up_to_date"
     assert seen_payloads[0]["current_release_id"] == "stale-release"
     assert seen_payloads[0]["current_bundle_hash"] == "stale-hash"
+    assert seen_payloads[0]["client_capabilities"]["supported_contract_versions"] == ["v1"]
+    assert seen_payloads[0]["client_capabilities"]["supported_response_contract_versions"] == [
+        "client_brief_v1"
+    ]
+    assert seen_payloads[0]["client_capabilities"]["supported_tool_families"] == [
+        "client_brief_v1",
+        "raw_tools",
+    ]
+    assert seen_payloads[0]["client_capabilities"]["client_behavior_version"] == (
+        "contract_driven_v1"
+    )
     assert seen_payloads[1]["current_release_id"] == "rel-2"
     assert seen_payloads[1]["current_bundle_hash"] == "hash-2"
 
@@ -129,6 +161,7 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
     assert payload["current_bundle"]["values"]["FLEETINTEL_CF_ACCESS_CLIENT_ID"] == "fleet-id"
     assert payload["contract"]["contract_version"] == "v1"
     assert payload["client_adaptation"]["compatibility_status"] == "compatible"
+    assert payload["rollout_status"]["status"] == "canary_passable"
 
     fleet_connection = await manager.resolve_service_connection("fleetintel")
     assert fleet_connection.base_url == "https://agent-fleet.gtaitson.space/mcp"
@@ -136,6 +169,8 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
     assert second.contract.contract_version == "v1"
     assert second.contract.server_release.version == "0.1.0"
     assert second.client_adaptation.response_contract_version_to_use == "client_brief_v1"
+    assert second.client_adaptation.recognized_client_behavior_version == "contract_driven_v1"
+    assert second.rollout_status.status == "canary_passable"
     assert manager.preferred_tools_for("fleetintel", second) == [
         "get_client_readiness_status",
         "get_market_changes_brief",
@@ -210,6 +245,7 @@ async def test_consumer_sync_disables_preferred_tools_when_not_compatible(monkey
                 },
                 "client_adaptation": {
                     "compatibility_status": "upgrade_recommended",
+                    "compatibility_reason_codes": ["missing_capabilities"],
                     "preferred_client_tools": {
                         "fleetintel": ["get_client_readiness_status"],
                     },
@@ -217,6 +253,10 @@ async def test_consumer_sync_disables_preferred_tools_when_not_compatible(monkey
                         "fleetintel": ["get_operations_status"],
                     },
                     "required_actions": ["Use preferred_client_tools before promotion."],
+                },
+                "rollout_status": {
+                    "status": "awaiting_client_upgrade",
+                    "reason": "client capabilities missing",
                 },
             }
         )
@@ -229,3 +269,4 @@ async def test_consumer_sync_disables_preferred_tools_when_not_compatible(monkey
     assert manager.preferred_tools_for("fleetintel", state) == ["get_client_readiness_status"]
     assert manager.should_use_preferred_tools("fleetintel", state) is False
     assert manager.fallback_tools_for("fleetintel", state) == ["get_operations_status"]
+    assert state.rollout_status.status == "awaiting_client_upgrade"

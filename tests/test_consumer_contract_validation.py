@@ -47,7 +47,12 @@ def _reset_settings_and_manager(monkeypatch, tmp_path):
     reset_consumer_sync_manager_for_tests()
 
 
-def _sync_payload(compatibility_status="compatible"):
+def _sync_payload(
+    compatibility_status="compatible",
+    *,
+    rollout_status="awaiting_validation_report",
+    required_actions=None,
+):
     return {
         "sync_status": "bundle_update_required",
         "release_id": "rel-42",
@@ -86,7 +91,20 @@ def _sync_payload(compatibility_status="compatible"):
         },
         "client_adaptation": {
             "compatibility_status": compatibility_status,
+            "compatibility_reason_codes": (
+                ["declared_capabilities_match"]
+                if compatibility_status == "compatible"
+                else ["missing_capabilities"]
+            ),
+            "criteria": {"supports_contract_v1": compatibility_status == "compatible"},
+            "criteria_results": {"supports_contract_v1": compatibility_status == "compatible"},
             "response_contract_version_to_use": "client_brief_v1",
+            "recognized_client_behavior_version": "contract_driven_v1",
+            "recognized_response_contract_version": "client_brief_v1",
+            "recognized_preferred_client_tools": {
+                "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
+                "brazilcnpj": ["health_check", "get_company_registry_brief"],
+            },
             "preferred_client_tools": {
                 "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
                 "brazilcnpj": ["health_check", "get_company_registry_brief"],
@@ -95,8 +113,21 @@ def _sync_payload(compatibility_status="compatible"):
                 "fleetintel": ["get_operations_status"],
                 "brazilcnpj": ["health_check"],
             },
-            "required_actions": ["Implementar preferred_client_tools"],
+            "tool_surface": "client_brief_v1",
+            "client_capabilities_seen": {
+                "supported_contract_versions": ["v1"],
+                "supported_response_contract_versions": ["client_brief_v1"],
+                "supported_tool_families": ["client_brief_v1", "raw_tools"],
+                "client_behavior_version": "contract_driven_v1",
+            },
+            "required_actions": required_actions or ["Implementar preferred_client_tools"],
             "deprecation_notices": ["raw tools deprecated"],
+        },
+        "rollout_status": {
+            "status": rollout_status,
+            "reason": "provider decision",
+            "validation_requirements": ["validation-report=passed"],
+            "latest_validation_summary": {"validation_status": "pending"},
         },
     }
 
@@ -128,8 +159,14 @@ async def test_run_release_validation_posts_passed_report_when_contract_is_compa
 
     async def fake_post(self, url, json=None, headers=None):
         if "consumer-sync" in url and "validation-report" not in url:
+            if not hasattr(fake_post, "sync_calls"):
+                fake_post.sync_calls = 0
+            fake_post.sync_calls += 1
+            rollout = (
+                "awaiting_validation_report" if fake_post.sync_calls == 1 else "canary_passable"
+            )
             return _MockResponse(
-                json_data=_sync_payload("compatible"),
+                json_data=_sync_payload("compatible", rollout_status=rollout, required_actions=[]),
                 headers={"server": "cloudflare", "cf-ray": "sync-ray"},
             )
         if "validation-report" in url:
@@ -157,6 +194,7 @@ async def test_run_release_validation_posts_passed_report_when_contract_is_compa
     assert result["sync"]["contract_version"] == "v1"
     assert result["sync"]["response_contract_version"] == "client_brief_v1"
     assert result["sync"]["client_adaptation"]["compatibility_status"] == "compatible"
+    assert result["sync"]["rollout_status"]["status"] == "canary_passable"
     assert result["sync"]["preferred_client_tools_used"]["fleetintel"] == [
         "get_client_readiness_status",
         "get_market_changes_brief",
@@ -184,7 +222,15 @@ async def test_run_release_validation_fails_and_skips_preferred_tools_when_not_c
 
     async def fake_post(self, url, json=None, headers=None):
         if "consumer-sync" in url and "validation-report" not in url:
-            return _MockResponse(json_data=_sync_payload("upgrade_recommended"))
+            return _MockResponse(
+                json_data=_sync_payload(
+                    "upgrade_recommended",
+                    rollout_status="awaiting_client_upgrade",
+                    required_actions=[
+                        "Implementar leitura de preferred_client_tools, response_contract_version e legacy_tool_policy do consumer sync."
+                    ],
+                )
+            )
         if "validation-report" in url:
             posted_reports.append(json)
             return _MockResponse(
@@ -202,7 +248,13 @@ async def test_run_release_validation_fails_and_skips_preferred_tools_when_not_c
     result = await run_release_validation()
 
     assert result["validation_status"] == "failed"
-    assert result["required_actions"] == ["Implementar preferred_client_tools"]
+    assert result["required_actions"] == [
+        "Implementar leitura de preferred_client_tools, response_contract_version e legacy_tool_policy do consumer sync."
+    ]
+    assert result["sync"]["rollout_status"]["status"] == "awaiting_client_upgrade"
+    assert result["sync"]["client_adaptation"]["compatibility_reason_codes"] == [
+        "missing_capabilities"
+    ]
     assert tool_calls == []
     skipped = [check for check in result["checks"] if check["status"] == "skipped"]
     assert len(skipped) == 4

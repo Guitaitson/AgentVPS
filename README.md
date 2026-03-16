@@ -244,7 +244,7 @@ TELEGRAM_TYPING_INTERVAL_SECONDS=4.0
 POSTGRES_PASSWORD=...         # Senha PostgreSQL
 OPENROUTER_API_KEY=...        # Chave OpenRouter
 OPENROUTER_MODEL=minimax/minimax-m2.5
-CONSUMER_SYNC_URL=https://request-access.gtaitson.space/api/consumer-sync/v1/sync
+CONSUMER_SYNC_URL=https://consumer-sync.gtaitson.space/api/consumer-sync/v1/sync
 CONSUMER_VALIDATION_REPORT_URL=https://consumer-sync.gtaitson.space/api/consumer-sync/v1/validation-report
 CONSUMER_SLUG=agentvps
 CONSUMER_BOOTSTRAP_SECRET=...
@@ -266,10 +266,11 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 - o bootstrap de acesso externo agora usa `CONSUMER_SYNC_URL`, `CONSUMER_SLUG` e `CONSUMER_BOOTSTRAP_SECRET`
 - o bundle retornado pelo consumer sync traz `FLEETINTEL_MCP_URL`, `BRAZILCNPJ_MCP_URL` e os headers `CF-Access-Client-Id` / `CF-Access-Client-Secret`
 - o estado atual do bundle e do contrato de adaptacao fica persistido em `data/consumer-sync/agentvps.json`
+- o request de consumer sync anuncia `client_capabilities` com `supported_contract_versions=["v1"]`, `supported_response_contract_versions=["client_brief_v1"]`, `supported_tool_families=["client_brief_v1","raw_tools"]` e `client_behavior_version=contract_driven_v1`
 - se `initialize` ou `tools/call` retornarem `403` do Cloudflare Access, o AgentVPS executa consumer sync uma vez e repete a chamada uma unica vez
 - nao ha compatibilidade reversa com bearer token legado nem com credenciais CF estaticas no AgentVPS
 - o contrato autoritativo de comportamento vem do consumer sync (`contract.*` e `client_adaptation.*`), incluindo `preferred_client_tools`, `legacy_tool_policy` e `response_contract_version`
-- a validacao canary da release publicada usa `CONSUMER_VALIDATION_REPORT_URL` para publicar `validation-report` com `client_behavior_version=contract_driven_v1`
+- a validacao canary da release publicada segue `sync -> checks -> validation-report -> sync`; so fecha quando o segundo sync retorna `rollout_status.status=canary_passable`
 - consultas FleetIntel/BrazilCNPJ usam retry curto para `502/503/504`, timeout e erro de conexao
 - em falha, o AgentVPS tenta preflight (`get_client_readiness_status` no FleetIntel, `health_check` no BrazilCNPJ) antes de responder ao usuario
 - quando o preflight ja indica degradacao, o AgentVPS responde rapido e nao entra no `codex_operator` nem no caminho lento do especialista

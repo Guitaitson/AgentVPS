@@ -213,8 +213,8 @@ class ConsumerSyncSettings(BaseSettings):
     )
 
     sync_url: str = Field(
-        default="https://request-access.gtaitson.space/api/consumer-sync/v1/sync",
-        description="Endpoint efetivo do consumer sync machine-pull",
+        default="https://consumer-sync.gtaitson.space/api/consumer-sync/v1/sync",
+        description="Endpoint canonico do consumer sync machine-pull",
     )
     validation_report_url: str = Field(
         default="https://consumer-sync.gtaitson.space/api/consumer-sync/v1/validation-report",
