@@ -75,11 +75,17 @@ async def test_run_external_workflow_combines_skill_outputs():
     assert registry.executed == [
         (
             "fleetintel_orchestrator",
-            {"raw_input": "cruze cnpj e frota e me de insights", "query": "cruze cnpj e frota e me de insights"},
+            {
+                "raw_input": "cruze cnpj e frota e me de insights",
+                "query": "cruze cnpj e frota e me de insights",
+            },
         ),
         (
             "fleetintel_analyst",
-            {"raw_input": "cruze cnpj e frota e me de insights", "query": "cruze cnpj e frota e me de insights"},
+            {
+                "raw_input": "cruze cnpj e frota e me de insights",
+                "query": "cruze cnpj e frota e me de insights",
+            },
         ),
     ]
 

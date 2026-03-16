@@ -72,7 +72,9 @@ def detect_external_workflow(message: str) -> ExternalWorkflowPlan | None:
     has_fleet = any(marker in msg for marker in _FLEET_MARKERS)
     has_cnpj_context = any(marker in msg for marker in _CNPJ_MARKERS)
     mentions_brazilcnpj = "brazilcnpj enricher" in msg or "skill brazilcnpj" in msg
-    mentions_orchestrator = "fleetintel orchestrator" in msg or "skill fleetintel_orchestrator" in msg
+    mentions_orchestrator = (
+        "fleetintel orchestrator" in msg or "skill fleetintel_orchestrator" in msg
+    )
     mentions_analyst = "fleetintel analyst" in msg or "skill fleetintel_analyst" in msg
     wants_insights = any(marker in msg for marker in _INSIGHT_MARKERS)
 
@@ -96,7 +98,9 @@ def detect_external_workflow(message: str) -> ExternalWorkflowPlan | None:
     except Exception:
         preferred = set()
 
-    provider_composite_tool = "get_account_360_brief" if "get_account_360_brief" in preferred else None
+    provider_composite_tool = (
+        "get_account_360_brief" if "get_account_360_brief" in preferred else None
+    )
     response_mode = "sectioned_answer" if wants_raw_specialist_output(msg) else "single_answer"
     kind = "account_360_plus_insights" if "fleetintel_analyst" in steps else "account_360"
     return ExternalWorkflowPlan(
@@ -201,7 +205,10 @@ def _compose_sections(
     if len(sections) == 1 and response_mode == "single_answer":
         return sections[0][1]
 
-    lines = ["Visao consolidada:" if response_mode == "single_answer" else "Resposta por etapa:", ""]
+    lines = [
+        "Visao consolidada:" if response_mode == "single_answer" else "Resposta por etapa:",
+        "",
+    ]
     for index, (label, body) in enumerate(sections):
         lines.append(f"{label}:")
         lines.append(body)

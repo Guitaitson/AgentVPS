@@ -332,6 +332,7 @@ async def test_node_react_fail_fast_when_specialist_health_is_degraded(monkeypat
 @pytest.mark.asyncio
 async def test_node_react_routes_combined_prompt_to_external_workflow(monkeypatch):
     registry = _FakeRegistry()
+
     async def _run_workflow(**_kwargs):
         return "Resposta consolidada do workflow externo."
 
