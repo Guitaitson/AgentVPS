@@ -102,7 +102,7 @@ OPENROUTER_MODEL=minimax/minimax-m2.5
 OPENROUTER_MAX_TOKENS=2048
 OPENROUTER_TIMEOUT=30
 OPENROUTER_TEMPERATURE=0.7
-CONSUMER_SYNC_URL=https://request-access.gtaitson.space/api/consumer-sync/v1/sync
+CONSUMER_SYNC_URL=https://consumer-sync.gtaitson.space/api/consumer-sync/v1/sync
 CONSUMER_VALIDATION_REPORT_URL=https://consumer-sync.gtaitson.space/api/consumer-sync/v1/validation-report
 CONSUMER_SLUG=agentvps
 CONSUMER_BOOTSTRAP_SECRET=bootstrap-secret-do-agentvps
@@ -446,6 +446,13 @@ sudo docker exec repo-openclaw-gateway-1 timeout 10 \
 Para habilitar as skills externas em producao:
 
 - definir `CONSUMER_SYNC_URL`, `CONSUMER_SLUG`, `CONSUMER_BOOTSTRAP_SECRET` e `CONSUMER_SYNC_STATE_FILE`
+- o consumer sync deve anunciar `client_capabilities` com:
+  - `supported_contract_versions=["v1"]`
+  - `supported_response_contract_versions=["client_brief_v1"]`
+  - `supported_tool_families=["client_brief_v1","raw_tools"]`
+  - `client_behavior_version=contract_driven_v1`
+- a validacao canary correta e: `sync -> validation-report -> sync`
+- so considerar a release canary-fechada quando o segundo sync retornar `rollout_status.status=canary_passable`
 - garantir permissao de escrita em `data/consumer-sync/` para persistir `current_release_id`, `current_bundle_hash` e `current_bundle`
 - opcionalmente ajustar `TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS` e `TELEGRAM_TYPING_INTERVAL_SECONDS` para o feedback visual do bot
 - manter `configs/skills-catalog-sources.json` com a fonte `fleetintel_skillpack_repo` habilitada

@@ -43,6 +43,10 @@ _SERVICE_KEY_MAP = {
         "BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET",
     ),
 }
+_SUPPORTED_CONTRACT_VERSIONS = ["v1"]
+_SUPPORTED_RESPONSE_CONTRACT_VERSIONS = ["client_brief_v1"]
+_SUPPORTED_TOOL_FAMILIES = ["client_brief_v1", "raw_tools"]
+_CLIENT_BEHAVIOR_VERSION = "contract_driven_v1"
 
 
 class ConsumerSyncError(RuntimeError):
@@ -63,6 +67,14 @@ class ServerReleaseInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class ClientCapabilities:
+    supported_contract_versions: list[str] = field(default_factory=list)
+    supported_response_contract_versions: list[str] = field(default_factory=list)
+    supported_tool_families: list[str] = field(default_factory=list)
+    client_behavior_version: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ConsumerSyncContract:
     contract_version: str | None = None
     response_contract_version: str | None = None
@@ -80,11 +92,27 @@ class ConsumerSyncContract:
 @dataclass(frozen=True, slots=True)
 class ClientAdaptation:
     compatibility_status: str | None = None
+    compatibility_reason_codes: list[str] = field(default_factory=list)
+    criteria: dict[str, Any] = field(default_factory=dict)
+    criteria_results: dict[str, Any] = field(default_factory=dict)
     response_contract_version_to_use: str | None = None
+    recognized_client_behavior_version: str | None = None
+    recognized_response_contract_version: str | None = None
+    recognized_preferred_client_tools: dict[str, list[str]] = field(default_factory=dict)
     preferred_client_tools: dict[str, list[str]] = field(default_factory=dict)
     fallback_tools: dict[str, list[str]] = field(default_factory=dict)
+    tool_surface: str | None = None
+    client_capabilities_seen: ClientCapabilities | None = None
     required_actions: list[str] = field(default_factory=list)
     deprecation_notices: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class RolloutStatus:
+    status: str | None = None
+    reason: str | None = None
+    validation_requirements: list[str] = field(default_factory=list)
+    latest_validation_summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +124,7 @@ class ConsumerSyncState:
     last_sync_at: str | None = None
     contract: ConsumerSyncContract | None = None
     client_adaptation: ClientAdaptation | None = None
+    rollout_status: RolloutStatus | None = None
 
 
 def _repo_root() -> Path:
@@ -162,6 +191,21 @@ def _normalize_string_list(payload: Any) -> list[str]:
     return [str(item).strip() for item in payload if str(item).strip()]
 
 
+def _parse_client_capabilities(payload: Any) -> ClientCapabilities | None:
+    if not isinstance(payload, dict):
+        return None
+    return ClientCapabilities(
+        supported_contract_versions=_normalize_string_list(
+            payload.get("supported_contract_versions")
+        ),
+        supported_response_contract_versions=_normalize_string_list(
+            payload.get("supported_response_contract_versions")
+        ),
+        supported_tool_families=_normalize_string_list(payload.get("supported_tool_families")),
+        client_behavior_version=str(payload.get("client_behavior_version") or "").strip() or None,
+    )
+
+
 def _parse_server_release(payload: Any) -> ServerReleaseInfo | None:
     if not isinstance(payload, dict):
         return None
@@ -210,14 +254,49 @@ def _parse_client_adaptation(payload: Any) -> ClientAdaptation | None:
         return None
     return ClientAdaptation(
         compatibility_status=str(payload.get("compatibility_status") or "").strip() or None,
+        compatibility_reason_codes=_normalize_string_list(
+            payload.get("compatibility_reason_codes")
+        ),
+        criteria=payload.get("criteria") if isinstance(payload.get("criteria"), dict) else {},
+        criteria_results=payload.get("criteria_results")
+        if isinstance(payload.get("criteria_results"), dict)
+        else {},
         response_contract_version_to_use=str(
             payload.get("response_contract_version_to_use") or ""
         ).strip()
         or None,
+        recognized_client_behavior_version=str(
+            payload.get("recognized_client_behavior_version") or ""
+        ).strip()
+        or None,
+        recognized_response_contract_version=str(
+            payload.get("recognized_response_contract_version") or ""
+        ).strip()
+        or None,
+        recognized_preferred_client_tools=_normalize_tool_mapping(
+            payload.get("recognized_preferred_client_tools")
+        ),
         preferred_client_tools=_normalize_tool_mapping(payload.get("preferred_client_tools")),
         fallback_tools=_normalize_tool_mapping(payload.get("fallback_tools")),
+        tool_surface=str(payload.get("tool_surface") or "").strip() or None,
+        client_capabilities_seen=_parse_client_capabilities(
+            payload.get("client_capabilities_seen")
+        ),
         required_actions=_normalize_string_list(payload.get("required_actions")),
         deprecation_notices=_normalize_string_list(payload.get("deprecation_notices")),
+    )
+
+
+def _parse_rollout_status(payload: Any) -> RolloutStatus | None:
+    if not isinstance(payload, dict):
+        return None
+    return RolloutStatus(
+        status=str(payload.get("status") or "").strip() or None,
+        reason=str(payload.get("reason") or "").strip() or None,
+        validation_requirements=_normalize_string_list(payload.get("validation_requirements")),
+        latest_validation_summary=payload.get("latest_validation_summary")
+        if isinstance(payload.get("latest_validation_summary"), dict)
+        else {},
     )
 
 
@@ -260,6 +339,7 @@ class ConsumerSyncManager:
             last_sync_at=payload.get("last_sync_at"),
             contract=_parse_contract(payload.get("contract")),
             client_adaptation=_parse_client_adaptation(payload.get("client_adaptation")),
+            rollout_status=_parse_rollout_status(payload.get("rollout_status")),
         )
 
     def save_state(self, state: ConsumerSyncState) -> None:
@@ -292,6 +372,12 @@ class ConsumerSyncManager:
             "agent_commit": _agent_commit(),
             "current_release_id": state.current_release_id or _STALE_RELEASE_ID,
             "current_bundle_hash": state.current_bundle_hash or _STALE_BUNDLE_HASH,
+            "client_capabilities": {
+                "supported_contract_versions": list(_SUPPORTED_CONTRACT_VERSIONS),
+                "supported_response_contract_versions": list(_SUPPORTED_RESPONSE_CONTRACT_VERSIONS),
+                "supported_tool_families": list(_SUPPORTED_TOOL_FAMILIES),
+                "client_behavior_version": _CLIENT_BEHAVIOR_VERSION,
+            },
         }
 
     async def sync(self, *, force_refresh: bool = False) -> ConsumerSyncState:
@@ -356,6 +442,7 @@ class ConsumerSyncManager:
                     last_sync_at=now,
                     contract=_parse_contract(result.get("contract")),
                     client_adaptation=_parse_client_adaptation(result.get("client_adaptation")),
+                    rollout_status=_parse_rollout_status(result.get("rollout_status")),
                 )
             elif sync_status == "up_to_date":
                 if state.current_bundle is None:
@@ -377,6 +464,8 @@ class ConsumerSyncManager:
                     contract=_parse_contract(result.get("contract")) or state.contract,
                     client_adaptation=_parse_client_adaptation(result.get("client_adaptation"))
                     or state.client_adaptation,
+                    rollout_status=_parse_rollout_status(result.get("rollout_status"))
+                    or state.rollout_status,
                 )
             elif sync_status in {"revoked", "disabled"}:
                 new_state = ConsumerSyncState(
@@ -394,6 +483,8 @@ class ConsumerSyncManager:
                     contract=_parse_contract(result.get("contract")) or state.contract,
                     client_adaptation=_parse_client_adaptation(result.get("client_adaptation"))
                     or state.client_adaptation,
+                    rollout_status=_parse_rollout_status(result.get("rollout_status"))
+                    or state.rollout_status,
                 )
             else:
                 raise ConsumerSyncError(
@@ -486,6 +577,17 @@ class ConsumerSyncManager:
         current_state = state or self.load_state()
         return self.compatibility_status(current_state) == "compatible" and bool(
             self.preferred_tools_for(service, current_state)
+        )
+
+    def client_behavior_version(self) -> str:
+        return _CLIENT_BEHAVIOR_VERSION
+
+    def client_capabilities(self) -> ClientCapabilities:
+        return ClientCapabilities(
+            supported_contract_versions=list(_SUPPORTED_CONTRACT_VERSIONS),
+            supported_response_contract_versions=list(_SUPPORTED_RESPONSE_CONTRACT_VERSIONS),
+            supported_tool_families=list(_SUPPORTED_TOOL_FAMILIES),
+            client_behavior_version=_CLIENT_BEHAVIOR_VERSION,
         )
 
 

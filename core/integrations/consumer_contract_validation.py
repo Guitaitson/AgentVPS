@@ -173,10 +173,25 @@ class ContractValidationRunner:
                     ),
                 ]
             )
+        final_state = state
+        report_result = None
+        if post_report:
+            report_result = await self._post_validation_report(
+                state=state,
+                validation_status=self._pre_report_status(
+                    state=state,
+                    compatibility_status=compatibility_status,
+                    checks=checks,
+                ),
+                checks=checks,
+            )
+            final_state = await self.manager.sync()
+
         validation_status = self._overall_status(
-            state=state,
+            state=final_state,
             compatibility_status=compatibility_status,
             checks=checks,
+            report_result=report_result,
         )
 
         result = {
@@ -184,39 +199,36 @@ class ContractValidationRunner:
             "agent_name": "AgentVPS",
             "agent_version": get_agent_version(),
             "agent_commit": get_agent_commit(),
-            "client_behavior_version": "contract_driven_v1",
+            "client_behavior_version": self.manager.client_behavior_version(),
             "sync": {
-                "sync_status": state.last_sync_status,
-                "release_id": state.current_release_id,
-                "bundle_hash": state.current_bundle_hash,
-                "contract_version": state.contract.contract_version if state.contract else None,
-                "response_contract_version": self._response_contract_version(state),
-                "server_release": asdict(state.contract.server_release)
-                if state.contract and state.contract.server_release
+                "sync_status": final_state.last_sync_status,
+                "release_id": final_state.current_release_id,
+                "bundle_hash": final_state.current_bundle_hash,
+                "contract_version": final_state.contract.contract_version
+                if final_state.contract
                 else None,
-                "client_adaptation": asdict(state.client_adaptation)
-                if state.client_adaptation
+                "response_contract_version": self._response_contract_version(final_state),
+                "server_release": asdict(final_state.contract.server_release)
+                if final_state.contract and final_state.contract.server_release
+                else None,
+                "client_adaptation": asdict(final_state.client_adaptation)
+                if final_state.client_adaptation
+                else None,
+                "rollout_status": asdict(final_state.rollout_status)
+                if final_state.rollout_status
                 else None,
                 "preferred_client_tools_used": preferred_tools_used,
             },
             "checks": [asdict(check) for check in checks],
             "validation_status": validation_status,
-            "required_actions": state.client_adaptation.required_actions
-            if state.client_adaptation
+            "required_actions": final_state.client_adaptation.required_actions
+            if final_state.client_adaptation
             else [],
         }
-
-        report_result = None
-        if post_report:
-            report_result = await self._post_validation_report(
-                state=state,
-                validation_status=validation_status,
-                checks=checks,
-            )
         result["validation_report"] = report_result
         return result
 
-    def _overall_status(
+    def _pre_report_status(
         self,
         *,
         state: ConsumerSyncState,
@@ -228,6 +240,30 @@ class ContractValidationRunner:
         if compatibility_status != "compatible":
             return "failed"
         if any(check.status != "passed" for check in checks):
+            return "failed"
+        return "passed"
+
+    def _overall_status(
+        self,
+        *,
+        state: ConsumerSyncState,
+        compatibility_status: str | None,
+        checks: list[ValidationCheck],
+        report_result: dict[str, Any] | None,
+    ) -> str:
+        if (
+            self._pre_report_status(
+                state=state,
+                compatibility_status=compatibility_status,
+                checks=checks,
+            )
+            != "passed"
+        ):
+            return "failed"
+        if not report_result or report_result.get("validation_status") != "passed":
+            return "failed"
+        rollout_status = state.rollout_status.status if state.rollout_status else None
+        if rollout_status != "canary_passable":
             return "failed"
         return "passed"
 
@@ -354,7 +390,7 @@ class ContractValidationRunner:
             "agent_name": "AgentVPS",
             "agent_version": get_agent_version(),
             "agent_commit": get_agent_commit(),
-            "client_behavior_version": "contract_driven_v1",
+            "client_behavior_version": self.manager.client_behavior_version(),
             "contract_version": state.contract.contract_version if state.contract else None,
             "response_contract_version": self._response_contract_version(state),
             "server_release": asdict(state.contract.server_release)
