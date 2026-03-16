@@ -57,6 +57,8 @@ class RemoteMCPClient:
         client_name: str,
         server_name: str,
         timeout_seconds: float = 25.0,
+        max_attempts: int = 2,
+        retry_backoff_seconds: float = 0.6,
     ):
         self.base_url = base_url.strip()
         self.access_client_id = access_client_id.strip()
@@ -64,8 +66,8 @@ class RemoteMCPClient:
         self.client_name = client_name
         self.server_name = server_name
         self.timeout_seconds = timeout_seconds
-        self.max_attempts = 2
-        self.retry_backoff_seconds = 0.6
+        self.max_attempts = max_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     @property
     def is_configured(self) -> bool:

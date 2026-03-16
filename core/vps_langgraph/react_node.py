@@ -15,7 +15,13 @@ import json
 import structlog
 
 from ..catalog.external_skill_contracts import get_external_skill_contract
-from ..integrations import detect_external_skill, should_delegate_specialist_to_codex
+from ..integrations import (
+    assess_specialist_health,
+    detect_external_skill,
+    emit_health_failure_progress,
+    format_specialist_health_failure,
+    should_delegate_specialist_to_codex,
+)
 from ..orchestration import RuntimeExecutionRequest, RuntimeProtocol, get_runtime_router
 from ..progress import emit_progress
 from ..skills.registry import get_skill_registry
@@ -122,6 +128,16 @@ async def node_react(state: AgentState) -> AgentState:
             try:
                 router = get_runtime_router()
                 contract = get_external_skill_contract(specialist_name)
+                health = await assess_specialist_health(user_message, specialist_name)
+                if not health.healthy:
+                    await emit_health_failure_progress(health)
+                    return {
+                        **state,
+                        "intent": "task",
+                        "action_required": False,
+                        "response": format_specialist_health_failure(health),
+                        "plan": None,
+                    }
                 use_codex = False
                 if router.has_protocol(RuntimeProtocol.CODEX_OPERATOR):
                     if contract and contract.response_owner == "specialist":
