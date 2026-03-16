@@ -140,22 +140,20 @@ def select_codex_execution_mode(message: str, specialist_name: str) -> CodexExec
         return "codex_operator"
 
     if specialist_name == "fleetintel_orchestrator":
-        if explicit_skill and _looks_like_deterministic_profile_request(msg):
-            return "direct_local"
         if explicit_skill:
-            return "codex_synthesizer"
-        return "codex_operator"
+            return "direct_local"
+        if _is_implicit_complex_multi_domain(msg):
+            return "codex_operator"
+        return "direct_local"
 
     if specialist_name == "fleetintel_analyst":
         if explicit_skill:
-            return "codex_synthesizer" if _wants_narrative_synthesis(msg) else "direct_local"
+            return "direct_local"
         if _is_implicit_complex_multi_domain(msg):
             return "codex_operator"
         return "direct_local"
 
     if specialist_name == "brazilcnpj":
-        if explicit_skill and _wants_narrative_synthesis(msg) and "cnpj" in msg:
-            return "codex_synthesizer"
         return "direct_local"
 
     return "direct_local"

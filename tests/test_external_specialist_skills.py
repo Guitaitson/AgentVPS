@@ -27,11 +27,15 @@ class _FakeClient:
 
 
 class _FakeSyncManager:
-    def __init__(self, preferred_tools=None):
+    def __init__(self, preferred_tools=None, fallback_tools=None):
         self._preferred_tools = preferred_tools or {}
+        self._fallback_tools = fallback_tools or {}
 
     def preferred_tools_for(self, service):
         return self._preferred_tools.get(service, [])
+
+    def fallback_tools_for(self, service):
+        return self._fallback_tools.get(service, [])
 
 
 def _config(name: str) -> SkillConfig:
@@ -75,14 +79,14 @@ def test_select_codex_execution_mode_for_specialist_requests():
             "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
             "fleetintel_analyst",
         )
-        == "codex_synthesizer"
+        == "direct_local"
     )
     assert (
         select_codex_execution_mode(
             "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me dizer sobre a conta.",
             "fleetintel_orchestrator",
         )
-        == "codex_synthesizer"
+        == "direct_local"
     )
     assert (
         select_codex_execution_mode(
@@ -96,7 +100,7 @@ def test_select_codex_execution_mode_for_specialist_requests():
             "Use BrazilCNPJ Enricher para validar este CNPJ (48.430.290/0001-30), mostrar socios, grupo economico e me dizer sobre ela, depois use o FleetIntel Orchestrator para falar da frota e o FleetIntel Analyst para me dar insights sobre.",
             "fleetintel_orchestrator",
         )
-        == "codex_synthesizer"
+        == "direct_local"
     )
     assert (
         select_codex_execution_mode(
@@ -110,7 +114,7 @@ def test_select_codex_execution_mode_for_specialist_requests():
             "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
             "fleetintel_analyst",
         )
-        is True
+        is False
     )
     assert (
         should_delegate_specialist_to_codex(
@@ -310,6 +314,13 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
             }
         return {}
 
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager(
+            {},
+            {"brazilcnpj": ["get_cached_cnpj_profile"]},
+        ),
+    )
     _patch_builder(
         monkeypatch,
         "core.skills._builtin.fleetintel_orchestrator.handler.build_specialist_mcp_client",
@@ -325,7 +336,7 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
         service == "brazilcnpj" and tool == "get_cached_cnpj_profile" for service, tool, _ in calls
     )
     assert "Prontidao FleetIntel: status=ok" in result
-    assert "Enriquecimento seletivo" in result
+    assert "Cadastro da empresa:" in result
 
 
 @pytest.mark.asyncio
@@ -373,6 +384,62 @@ async def test_fleetintel_orchestrator_uses_preferred_brief_surfaces(monkeypatch
         for service, tool, _ in calls
     )
     assert "Mudanca relevante" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_orchestrator_combined_prompt_prefers_account_brief_and_partner_fallback(
+    monkeypatch,
+):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        if service == "fleetintel" and tool_name == "get_client_readiness_status":
+            return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 8.0}
+        if service == "fleetintel" and tool_name == "get_fleet_account_brief":
+            return {"company_name": "ADDIANTE S.A.", "cnpj": "48430290000130"}
+        if service == "brazilcnpj" and tool_name == "health_check":
+            return {"status": "ok", "database_ok": True}
+        if service == "brazilcnpj" and tool_name == "get_company_registry_brief":
+            return {"company_name": "ADDIANTE S.A.", "cnpj": arguments["cnpj"], "uf": "SP"}
+        if service == "brazilcnpj" and tool_name == "get_group_context_brief":
+            return {"group_name": "Grupo Addiante", "member_count": 3}
+        if service == "brazilcnpj" and tool_name == "get_empresa_completa":
+            return {"socios": [{"nome": "Fulano de Tal", "qualificacao": "Administrador"}]}
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager(
+            {
+                "fleetintel": ["get_fleet_account_brief", "get_market_changes_brief"],
+                "brazilcnpj": ["get_company_registry_brief", "get_group_context_brief"],
+            },
+            {
+                "brazilcnpj": ["get_empresa_completa"],
+            },
+        ),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_orchestrator.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelOrchestratorSkill(_config("fleetintel_orchestrator"))
+    result = await skill.execute(
+        {
+            "query": "Use BrazilCNPJ Enricher para validar este CNPJ (48.430.290/0001-30), mostrar socios, grupo economico e me dizer sobre ela, depois use o FleetIntel Orchestrator para falar da frota."
+        }
+    )
+
+    assert ("fleetintel", "get_fleet_account_brief", {"cnpj": "48430290000130"}) in calls
+    assert ("brazilcnpj", "get_company_registry_brief", {"cnpj": "48430290000130"}) in calls
+    assert ("brazilcnpj", "get_group_context_brief", {"cnpj": "48430290000130"}) in calls
+    assert ("brazilcnpj", "get_empresa_completa", {"cnpj": "48430290000130"}) in calls
+    assert "Cadastro da empresa:" in result
+    assert "Socios:" in result
+    assert "Grupo economico:" in result
 
 
 @pytest.mark.asyncio
