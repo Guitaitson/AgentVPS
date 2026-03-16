@@ -401,15 +401,84 @@ async def test_fleetintel_orchestrator_combined_prompt_prefers_account_brief_and
         if service == "fleetintel" and tool_name == "get_client_readiness_status":
             return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 8.0}
         if service == "fleetintel" and tool_name == "get_fleet_account_brief":
-            return {"company_name": "ADDIANTE S.A.", "cnpj": "48430290000130"}
+            return {
+                "headline": "ADDIANTE S.A.",
+                "executive_summary": "A conta foi organizada em camadas de entidade e grupo efetivo.",
+                "supporting_data": {
+                    "account_layers": {
+                        "exact_entity": {
+                            "empresa": {
+                                "razao_social": "ADDIANTE S.A.",
+                                "cnpj": "48430290000130",
+                            },
+                            "resumo": {
+                                "total_emplacamentos": 914,
+                                "valor_total": 2921246934.76,
+                                "primeira_compra_historico": "2023-04-11",
+                                "ultima_compra_historico": "2026-02-24",
+                                "marcas_distintas": 7,
+                                "ufs_distintas": 1,
+                            },
+                        },
+                        "effective_group": {
+                            "groups": [
+                                {
+                                    "canonical_name": "Addiante",
+                                    "members": [{}, {}, {}, {}, {}],
+                                }
+                            ],
+                            "total_emplacamentos": 915,
+                            "emplacamentos_ano_corrente": 14,
+                        },
+                    }
+                },
+            }
         if service == "brazilcnpj" and tool_name == "health_check":
             return {"status": "ok", "database_ok": True}
         if service == "brazilcnpj" and tool_name == "get_company_registry_brief":
-            return {"company_name": "ADDIANTE S.A.", "cnpj": arguments["cnpj"], "uf": "SP"}
+            return {
+                "headline": "ADDIANTE S.A.",
+                "executive_summary": "Perfil cadastral resumido em entidade, societario e grupo.",
+                "supporting_data": {
+                    "company_layers": {
+                        "exact_entity": {
+                            "razao_social": "ADDIANTE S.A.",
+                            "cnpj": arguments["cnpj"],
+                            "uf": "PR",
+                            "porte": "05",
+                            "situacao_cadastral": "02",
+                            "cnae_principal": "7719599",
+                        }
+                    }
+                },
+            }
         if service == "brazilcnpj" and tool_name == "get_group_context_brief":
-            return {"group_name": "Grupo Addiante", "member_count": 3}
+            return {
+                "headline": "ADDIANTE S.A.",
+                "supporting_data": {
+                    "group_layers": {
+                        "effective_group": {
+                            "count": 1,
+                            "groups": [
+                                {
+                                    "canonical_name": "Addiante",
+                                    "members": [{}, {}, {}, {}, {}],
+                                }
+                            ],
+                        },
+                        "related_companies": [{}, {}, {}],
+                    }
+                },
+            }
         if service == "brazilcnpj" and tool_name == "get_empresa_completa":
-            return {"socios": [{"nome": "Fulano de Tal", "qualificacao": "Administrador"}]}
+            return {
+                "integrantes_qsa": [
+                    {
+                        "nome": "Fulano de Tal",
+                        "qualificacao_oficial": "16 - Presidente",
+                    }
+                ]
+            }
         return {}
 
     monkeypatch.setattr(
@@ -444,6 +513,12 @@ async def test_fleetintel_orchestrator_combined_prompt_prefers_account_brief_and
     assert "Cadastro da empresa:" in result
     assert "Socios:" in result
     assert "Grupo economico:" in result
+    assert "ADDIANTE S.A." in result
+    assert "914 emplacamentos" in result
+    assert "CNPJ 48430290000130" in result
+    assert "Grupo economico:" in result
+    assert "relacionadas monitoradas: 3" in result
+    assert "empresa | CNPJ -" not in result
 
 
 @pytest.mark.asyncio
