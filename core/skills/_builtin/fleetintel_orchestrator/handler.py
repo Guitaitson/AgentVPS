@@ -218,7 +218,10 @@ class FleetIntelOrchestratorSkill(SkillBase):
 
     @staticmethod
     def _preferred_tools(service: str) -> set[str]:
-        return set(get_consumer_sync_manager().preferred_tools_for(service))
+        manager = get_consumer_sync_manager()
+        if not manager.should_use_preferred_tools(service):
+            return set()
+        return set(manager.preferred_tools_for(service))
 
     @staticmethod
     def _fallback_tools(service: str) -> set[str]:

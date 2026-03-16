@@ -89,7 +89,10 @@ class BrazilCNPJSkill(SkillBase):
 
     @staticmethod
     def _preferred_tools() -> set[str]:
-        return set(get_consumer_sync_manager().preferred_tools_for("brazilcnpj"))
+        manager = get_consumer_sync_manager()
+        if not manager.should_use_preferred_tools("brazilcnpj"):
+            return set()
+        return set(manager.preferred_tools_for("brazilcnpj"))
 
     @staticmethod
     def _extract_cnpj(text: str) -> str | None:

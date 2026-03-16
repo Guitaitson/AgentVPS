@@ -27,15 +27,19 @@ class _FakeClient:
 
 
 class _FakeSyncManager:
-    def __init__(self, preferred_tools=None, fallback_tools=None):
+    def __init__(self, preferred_tools=None, fallback_tools=None, use_preferred_tools=True):
         self._preferred_tools = preferred_tools or {}
         self._fallback_tools = fallback_tools or {}
+        self._use_preferred_tools = use_preferred_tools
 
     def preferred_tools_for(self, service):
         return self._preferred_tools.get(service, [])
 
     def fallback_tools_for(self, service):
         return self._fallback_tools.get(service, [])
+
+    def should_use_preferred_tools(self, service):
+        return self._use_preferred_tools and bool(self._preferred_tools.get(service))
 
 
 def _config(name: str) -> SkillConfig:
@@ -438,6 +442,64 @@ async def test_fleetintel_orchestrator_combined_prompt_prefers_account_brief_and
     assert ("brazilcnpj", "get_group_context_brief", {"cnpj": "48430290000130"}) in calls
     assert ("brazilcnpj", "get_empresa_completa", {"cnpj": "48430290000130"}) in calls
     assert "Cadastro da empresa:" in result
+    assert "Socios:" in result
+    assert "Grupo economico:" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_orchestrator_ignores_preferred_tools_until_contract_is_compatible(
+    monkeypatch,
+):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        if service == "fleetintel" and tool_name == "get_client_readiness_status":
+            return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 8.0}
+        if service == "fleetintel" and tool_name == "empresa_profile":
+            return {"empresa": {"razao_social": "Empresa A", "cnpj": "48430290000130"}}
+        if service == "brazilcnpj" and tool_name == "health_check":
+            return {"status": "ok", "database_ok": True}
+        if service == "brazilcnpj" and tool_name == "get_empresa_completa":
+            return {
+                "razao_social": "Empresa A",
+                "cnpj": arguments["cnpj"],
+                "socios": [{"nome": "Fulano de Tal"}],
+            }
+        if service == "brazilcnpj" and tool_name == "get_grupo_economico":
+            return {"nome_grupo": "Grupo A", "empresas_relacionadas": ["Empresa A"]}
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager(
+            {
+                "fleetintel": ["get_fleet_account_brief"],
+                "brazilcnpj": ["get_company_registry_brief", "get_group_context_brief"],
+            },
+            {
+                "brazilcnpj": ["get_empresa_completa", "get_grupo_economico"],
+            },
+            use_preferred_tools=False,
+        ),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_orchestrator.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelOrchestratorSkill(_config("fleetintel_orchestrator"))
+    result = await skill.execute(
+        {
+            "query": "Use BrazilCNPJ Enricher para validar este CNPJ (48.430.290/0001-30), mostrar socios, grupo economico e me dizer sobre ela, depois use o FleetIntel Orchestrator para falar da frota."
+        }
+    )
+
+    assert ("fleetintel", "empresa_profile", {"cnpj": "48430290000130"}) in calls
+    assert ("brazilcnpj", "get_empresa_completa", {"cnpj": "48430290000130"}) in calls
+    assert ("brazilcnpj", "get_grupo_economico", {"cnpj": "48430290000130"}) in calls
+    assert not any(tool == "get_company_registry_brief" for _, tool, _ in calls)
     assert "Socios:" in result
     assert "Grupo economico:" in result
 

@@ -472,6 +472,22 @@ class ConsumerSyncManager:
             return current_state.client_adaptation.fallback_tools.get(service, [])
         return []
 
+    def compatibility_status(self, state: ConsumerSyncState | None = None) -> str | None:
+        current_state = state or self.load_state()
+        if current_state.client_adaptation:
+            return current_state.client_adaptation.compatibility_status
+        return None
+
+    def should_use_preferred_tools(
+        self,
+        service: str,
+        state: ConsumerSyncState | None = None,
+    ) -> bool:
+        current_state = state or self.load_state()
+        return self.compatibility_status(current_state) == "compatible" and bool(
+            self.preferred_tools_for(service, current_state)
+        )
+
 
 @lru_cache(maxsize=1)
 def get_consumer_sync_manager() -> ConsumerSyncManager:
