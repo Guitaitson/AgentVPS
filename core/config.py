@@ -186,6 +186,19 @@ class OrchestrationSettings(BaseSettings):
         description="A partir desse tempo sem resposta final o status do operador Codex vira anormal",
     )
 
+    specialist_preflight_ttl_seconds: int = Field(
+        default=300,
+        description="TTL em segundos para cache de saude dos especialistas externos",
+    )
+    specialist_preflight_timeout_seconds: int = Field(
+        default=8,
+        description="Timeout curto em segundos para preflight FleetIntel/BrazilCNPJ",
+    )
+    specialist_preflight_max_attempts: int = Field(
+        default=1,
+        description="Tentativas para preflight dos especialistas externos",
+    )
+
     timeout_seconds: int = Field(default=30, description="Timeout para delegaÃƒÂ§ÃƒÂµes externas")
 
 

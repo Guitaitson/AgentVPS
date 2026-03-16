@@ -43,6 +43,24 @@ class _FakeRouter:
         )
 
 
+class _DegradedAssessment:
+    healthy = False
+    snapshots = ()
+
+
+class _HealthyAssessment:
+    healthy = True
+    snapshots = ()
+
+
+async def _healthy_assessment(*_args, **_kwargs):
+    return _HealthyAssessment()
+
+
+async def _degraded_assessment(*_args, **_kwargs):
+    return _DegradedAssessment()
+
+
 @pytest.mark.asyncio
 async def test_node_react_prefers_codex_operator_for_complex_specialist_queries(monkeypatch):
     registry = _FakeRegistry()
@@ -59,6 +77,10 @@ async def test_node_react_prefers_codex_operator_for_complex_specialist_queries(
     monkeypatch.setattr(
         "core.vps_langgraph.react_node.get_runtime_router",
         lambda: _FakeRouter(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.assess_specialist_health",
+        _healthy_assessment,
     )
 
     state = {
@@ -106,6 +128,10 @@ async def test_node_react_prefers_codex_operator_when_external_contract_owns_res
         "core.vps_langgraph.react_node.get_runtime_router",
         lambda: _FakeRouter(),
     )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.assess_specialist_health",
+        _healthy_assessment,
+    )
 
     state = {
         "user_id": "u-1",
@@ -117,3 +143,46 @@ async def test_node_react_prefers_codex_operator_when_external_contract_owns_res
 
     assert "Operador Codex" in result["response"]
     assert registry.executed == []
+
+
+@pytest.mark.asyncio
+async def test_node_react_fail_fast_when_specialist_health_is_degraded(monkeypatch):
+    registry = _FakeRegistry()
+    progress_calls = []
+
+    async def _emit_failure_progress(_assessment):
+        progress_calls.append("emitted")
+
+    monkeypatch.setattr("core.vps_langgraph.react_node.get_skill_registry", lambda: registry)
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.detect_external_skill",
+        lambda _message: "fleetintel_orchestrator",
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_runtime_router",
+        lambda: _FakeRouter(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.assess_specialist_health",
+        _degraded_assessment,
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.emit_health_failure_progress",
+        _emit_failure_progress,
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.format_specialist_health_failure",
+        lambda _assessment: "Especialista externo indisponivel no momento.",
+    )
+
+    state = {
+        "user_id": "u-1",
+        "user_message": "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me responder.",
+        "conversation_history": [],
+    }
+
+    result = await node_react(state)
+
+    assert result["response"] == "Especialista externo indisponivel no momento."
+    assert registry.executed == []
+    assert progress_calls == ["emitted"]
