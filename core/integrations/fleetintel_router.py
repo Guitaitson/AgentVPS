@@ -184,6 +184,15 @@ def wants_raw_specialist_output(message: str) -> bool:
 
 def _looks_like_deterministic_profile_request(message: str) -> bool:
     has_cnpj = "cnpj" in message or bool(re.search(r"\b\d{14}\b", re.sub(r"\D", "", message)))
+    if not has_cnpj:
+        return False
+    if _wants_narrative_synthesis(message):
+        return False
+    if specialist_name_like_cross_domain(message):
+        return False
+    if "fleetintel analyst" in message:
+        return False
+
     deterministic_markers = (
         "perfil",
         "empresa",
@@ -194,7 +203,7 @@ def _looks_like_deterministic_profile_request(message: str) -> bool:
         "grupo economico",
         "grupo economico",
     )
-    return has_cnpj and any(marker in message for marker in deterministic_markers)
+    return any(marker in message for marker in deterministic_markers)
 
 
 def _wants_narrative_synthesis(message: str) -> bool:

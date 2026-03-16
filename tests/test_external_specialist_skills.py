@@ -85,6 +85,13 @@ def test_select_codex_execution_mode_for_specialist_requests():
     )
     assert (
         select_codex_execution_mode(
+            "Use BrazilCNPJ Enricher para validar este CNPJ (48.430.290/0001-30), mostrar socios, grupo economico e me dizer sobre ela, depois use o FleetIntel Orchestrator para falar da frota e o FleetIntel Analyst para me dar insights sobre.",
+            "fleetintel_orchestrator",
+        )
+        == "codex_synthesizer"
+    )
+    assert (
+        select_codex_execution_mode(
             "Quais contas devo priorizar por sinais de compra cruzando FleetIntel e CNPJ?",
             "fleetintel_orchestrator",
         )
