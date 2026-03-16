@@ -404,7 +404,12 @@ class FleetIntelOrchestratorSkill(SkillBase):
             lines.append(
                 f"- empresa: {empresa.get('razao_social') or 'empresa'} | CNPJ {empresa.get('cnpj', '-')}"
             )
-            if fleet_result.get("executive_summary"):
+            key_findings = fleet_result.get("key_findings") or []
+            if key_findings and isinstance(key_findings[0], dict):
+                why_it_matters = key_findings[0].get("why_it_matters")
+                if why_it_matters:
+                    lines.append(f"- leitura executiva: {why_it_matters}")
+            elif fleet_result.get("executive_summary"):
                 lines.append(f"- leitura executiva: {fleet_result['executive_summary']}")
             if resumo:
                 lines.append(
@@ -486,9 +491,6 @@ class FleetIntelOrchestratorSkill(SkillBase):
             if cnae:
                 details.append(f"CNAE {cnae}")
             lines.append(f"- {company} | " + " | ".join(details))
-            executive_summary = item.get("executive_summary")
-            if executive_summary:
-                lines.append(f"  resumo: {executive_summary}")
         return lines
 
     @staticmethod
@@ -547,9 +549,9 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 item.get("members") or item.get("group_members") or first_group.get("members") or []
             )
             total = (
-                item.get("member_count")
-                or effective_group.get("count")
-                or (len(members) if isinstance(members, list) else None)
+                len(members)
+                if isinstance(members, list) and members
+                else item.get("member_count") or effective_group.get("count")
             )
             if group_name:
                 found = True
@@ -590,8 +592,26 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 limitations.append("o retorno atual nao trouxe socios estruturados")
         if group_contexts:
             first = group_contexts[0] if isinstance(group_contexts[0], dict) else {}
+            supporting_data = first.get("supporting_data") if isinstance(first, dict) else {}
+            group_layers = (
+                supporting_data.get("group_layers") if isinstance(supporting_data, dict) else {}
+            )
+            effective_group = (
+                group_layers.get("effective_group") if isinstance(group_layers, dict) else {}
+            )
+            groups = effective_group.get("groups") if isinstance(effective_group, dict) else None
+            related = (
+                group_layers.get("related_companies") if isinstance(group_layers, dict) else None
+            )
             if not any(
-                first.get(key) for key in ("group_name", "nome_grupo", "members", "group_members")
+                (
+                    first.get("group_name"),
+                    first.get("nome_grupo"),
+                    first.get("members"),
+                    first.get("group_members"),
+                    groups,
+                    related,
+                )
             ):
                 limitations.append("o contexto de grupo economico veio sem detalhamento suficiente")
         return limitations
