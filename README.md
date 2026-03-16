@@ -268,7 +268,7 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 - se `initialize` ou `tools/call` retornarem `403` do Cloudflare Access, o AgentVPS executa consumer sync uma vez e repete a chamada so se houver bundle novo
 - nao ha compatibilidade reversa com bearer token legado nem com credenciais CF estaticas no AgentVPS
 - consultas FleetIntel/BrazilCNPJ usam retry curto para `502/503/504`, timeout e erro de conexao
-- em falha, o AgentVPS tenta preflight (`get_operations_status` ou `health_check`) antes de responder ao usuario
+- em falha, o AgentVPS tenta preflight (`get_client_readiness_status` no FleetIntel, `health_check` no BrazilCNPJ) antes de responder ao usuario
 - quando o preflight ja indica degradacao, o AgentVPS responde rapido e nao entra no `codex_operator` nem no caminho lento do especialista
 - se o runtime `codex_operator` for habilitado, ele exige Codex CLI instalado e autenticado no mesmo usuario do servico (`root` na VPS atual)
 - o operador Codex roda em diretório temporário isolado e só acessa especialistas allowlisted via `core.codex_operator_bridge`

@@ -7,6 +7,7 @@ from core.integrations import (
     extract_company_count_query,
     should_delegate_specialist_to_codex,
 )
+from core.integrations import specialist_health as specialist_health_module
 from core.skills._builtin.brazilcnpj.handler import BrazilCNPJSkill
 from core.skills._builtin.fleetintel.handler import FleetIntelSkill
 from core.skills._builtin.fleetintel_analyst.handler import FleetIntelAnalystSkill
@@ -200,8 +201,8 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
 
     async def fake_call(service, tool_name, arguments):
         calls.append((service, tool_name, arguments))
-        if service == "fleetintel" and tool_name == "get_operations_status":
-            return {"status": "ok", "freshness": "fresh"}
+        if service == "fleetintel" and tool_name == "get_client_readiness_status":
+            return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 12.5}
         if service == "fleetintel" and tool_name == "buying_signals":
             return {"items": [{"razao_social": "Empresa A", "cnpj": "12345678000199", "score": 91}]}
         if service == "brazilcnpj" and tool_name == "health_check":
@@ -224,11 +225,12 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
     skill = FleetIntelOrchestratorSkill(_config("fleetintel_orchestrator"))
     result = await skill.execute({"query": "priorizar contas e cruzar com cnpj 12.345.678/0001-99"})
 
-    assert ("fleetintel", "get_operations_status", {}) in calls
+    assert ("fleetintel", "get_client_readiness_status", {}) in calls
     assert ("brazilcnpj", "health_check", {}) in calls
     assert any(
         service == "brazilcnpj" and tool == "get_cached_cnpj_profile" for service, tool, _ in calls
     )
+    assert "Prontidao FleetIntel: status=ok" in result
     assert "Enriquecimento seletivo" in result
 
 
@@ -287,7 +289,7 @@ async def test_specialist_skills_return_consumer_sync_error(monkeypatch):
 @pytest.mark.asyncio
 async def test_fleetintel_orchestrator_degrades_with_remote_error(monkeypatch):
     async def fake_call(service, tool_name, arguments):
-        if service == "fleetintel" and tool_name == "get_operations_status":
+        if service == "fleetintel" and tool_name == "get_client_readiness_status":
             raise RemoteMCPError(
                 server_name="fleetintel",
                 stage="initialize",
@@ -308,3 +310,60 @@ async def test_fleetintel_orchestrator_degrades_with_remote_error(monkeypatch):
 
     assert "HTTP 502" in result
     assert "Preflight FleetIntel indisponivel" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_analyst_failure_uses_readiness_preflight(monkeypatch):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        if tool_name == "buying_signals":
+            raise RemoteMCPError(
+                server_name="fleetintel",
+                stage="tools/call",
+                error_type="timeout",
+                message="timeout",
+            )
+        if tool_name == "get_client_readiness_status":
+            return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 8.0}
+        raise AssertionError(f"unexpected tool {tool_name}")
+
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_analyst.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "quais contas devo priorizar agora?"})
+
+    assert calls == [
+        ("fleetintel", "buying_signals", {"limit": 10}),
+        ("fleetintel", "get_client_readiness_status", {}),
+    ]
+    assert "Preflight FleetIntel: status=ok snapshot_status=ready" in result
+
+
+@pytest.mark.asyncio
+async def test_specialist_health_uses_readiness_preflight(monkeypatch):
+    calls = []
+    specialist_health_module._HEALTH_CACHE.clear()
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        return {"status": "ok", "snapshot_status": "ready"}
+
+    monkeypatch.setattr(
+        specialist_health_module,
+        "build_specialist_mcp_client",
+        lambda service, **_kwargs: _FakeClient(service, fake_call),
+    )
+
+    assessment = await specialist_health_module.assess_specialist_health(
+        "Cruze FleetIntel e CNPJ para esta conta",
+        "fleetintel_orchestrator",
+    )
+
+    assert assessment.healthy is True
+    assert ("fleetintel", "get_client_readiness_status", {}) in calls

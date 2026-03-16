@@ -460,7 +460,7 @@ O snapshot local continua versionado como fallback operacional/manual, mas nao e
 
 Migracao de auth externa:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
-- FleetIntel/BrazilCNPJ agora usam retry curto para falhas transitórias (`502/503/504`, timeout e connect error) e resposta degradada com preflight; quando o preflight ja detecta degradacao, o AgentVPS falha rapido antes de delegar ao `codex_operator` ou ao caminho especialista lento
+- FleetIntel/BrazilCNPJ agora usam retry curto para falhas transitórias (`502/503/504`, timeout e connect error) e resposta degradada com preflight; o FleetIntel usa `get_client_readiness_status` como preflight padrao e o BrazilCNPJ usa `health_check`; quando o preflight ja detecta degradacao, o AgentVPS falha rapido antes de delegar ao `codex_operator` ou ao caminho especialista lento
 - use apenas os endpoints `https://agent-fleet.gtaitson.space/mcp` e `https://agent-cnpj.gtaitson.space/mcp`
 - a autenticacao externa agora vem do credential bundle retornado pelo consumer sync machine-pull
 - o bundle inclui os headers Cloudflare Access usados pelos clientes MCP externos

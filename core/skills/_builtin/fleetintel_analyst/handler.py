@@ -271,16 +271,12 @@ class FleetIntelAnalystSkill(SkillBase):
         tool_name: str,
     ) -> str:
         health_summary = ""
-        if tool_name != "get_operations_status":
+        if tool_name not in {"get_operations_status", "get_client_readiness_status"}:
             try:
-                health = await client.call_tool("get_operations_status", {})
-                if isinstance(health, dict):
-                    health_summary = (
-                        "\n"
-                        f"Preflight FleetIntel: status={health.get('status', '-')} "
-                        f"freshness={health.get('data_freshness') or health.get('freshness') or '-'} "
-                        f"generated_at={health.get('generated_at') or health.get('timestamp', '-')}"
-                    )
+                health = await client.call_tool("get_client_readiness_status", {})
+                summary = self._format_readiness_summary(health)
+                if summary:
+                    health_summary = f"\nPreflight FleetIntel: {summary}"
             except Exception:
                 health_summary = "\nPreflight FleetIntel indisponivel no momento."
 
@@ -292,6 +288,23 @@ class FleetIntelAnalystSkill(SkillBase):
             f"{health_summary}\n"
             "Posso tentar novamente depois ou seguir por outra leitura comercial."
         )
+
+    @staticmethod
+    def _format_readiness_summary(readiness: Any) -> str:
+        if not isinstance(readiness, dict):
+            return ""
+
+        parts = [f"status={readiness.get('status', '-')}"]
+        snapshot_status = readiness.get("snapshot_status")
+        if snapshot_status is not None:
+            parts.append(f"snapshot_status={snapshot_status}")
+        snapshot_age_seconds = readiness.get("snapshot_age_seconds")
+        if snapshot_age_seconds is not None:
+            parts.append(f"snapshot_age_seconds={snapshot_age_seconds}")
+        generated_at = readiness.get("generated_at")
+        if generated_at:
+            parts.append(f"generated_at={generated_at}")
+        return " ".join(parts)
 
     async def _maybe_refine_company_count(
         self,

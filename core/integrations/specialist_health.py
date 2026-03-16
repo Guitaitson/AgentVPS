@@ -174,7 +174,7 @@ def _build_preflight_client(service: str):
             max_attempts=orch.specialist_preflight_max_attempts,
             retry_backoff_seconds=0.3,
         ),
-        "get_operations_status" if service == "fleetintel" else "health_check",
+        "get_client_readiness_status" if service == "fleetintel" else "health_check",
     )
 
 
