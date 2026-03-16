@@ -108,8 +108,10 @@ Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (
 Roteamento externo:
 - `detect_external_skill()` decide entre `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator`
 - `RemoteMCPClient` encapsula autenticacao + initialize + tools/call para MCP remoto
+- `core/integrations/specialist_health.py` executa um preflight curto com cache de saude para FleetIntel/BrazilCNPJ antes de qualquer delegacao externa lenta
 - `configs/skills-catalog-sources.json` usa `fleetintel_skillpack_repo` como fonte primaria viva e mantem o snapshot versionado como fallback manual
 - O catalogo externo agora preserva `instructions_markdown` do `SKILL.md`; quando o contrato indica que a resposta pertence ao especialista, o `react_node` prioriza `codex_operator` para sintetizar a resposta final em vez de renderizar payload MCP localmente
+- Quando o preflight indica degradacao, o `react_node` responde com diagnostico operacional e nao entra no `codex_operator` nem na skill externa longa
 
 ### 4. Hook System
 
@@ -178,6 +180,7 @@ Runtime opcional `codex_operator`:
 - adapter: `core/orchestration/runtime_adapters.py`
 - bridge allowlisted: `core/codex_operator_bridge.py`
 - uso inicial: operar `fleetintel_analyst`, `fleetintel_orchestrator` e `brazilcnpj` em consultas mais ambiguas ou multi-etapas
+- gate previo: o runtime so e elegivel quando o preflight curto de FleetIntel/BrazilCNPJ estiver saudavel
 - isolamento: execucao do Codex em diretório temporário com `PYTHONPATH` apontando para o projeto; o runtime nao recebe workspace amplo do repositório
 - soberania: memória, approvals, resposta final e policy continuam no AgentVPS
 

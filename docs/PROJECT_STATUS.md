@@ -1,6 +1,6 @@
 # Project Status - Operational Snapshot
 
-Last updated: 2026-03-13
+Last updated: 2026-03-15
 
 ## Canonical Read Order
 
@@ -19,7 +19,7 @@ Last updated: 2026-03-13
 
 ## Master Plan Status (Strict 100% Gate)
 
-### Implemented and validated locally
+### Implemented and validated in production
 
 - Layered memory primitives (episodic, semantic, procedural, profile, goals)
 - Memory policy (TTL, retention, redaction, scope)
@@ -38,14 +38,16 @@ Last updated: 2026-03-13
 - Default catalog source now points to live FleetIntel GitHub discovery
 - External catalog updater now supports auto-apply with smoke and auto rollback for FleetIntel/BrazilCNPJ metadata updates
 - External FleetIntel contracts now persist `instructions_markdown`, and `react_node` can route `fleetintel-orchestrator` / `fleetintel-analyst` through `codex_operator` when the synced contract says the specialist owns the final response
+- External specialist health gate now fails fast before `codex_operator` or long specialist execution when FleetIntel/BrazilCNPJ preflight is degraded
 
 Validation baseline at review time:
-- targeted: `python -m pytest -q tests/test_runtime_adapters.py tests/test_runtime_control.py tests/test_external_specialist_skills.py tests/test_react_codex_operator.py` -> 24 passed
-- full suite: `python -m pytest -q` -> 266 passed, 2 skipped
+- targeted: `python -m pytest -q tests/test_react_codex_operator.py tests/test_runtime_adapters.py tests/test_external_specialist_skills.py tests/test_telegram_progress.py` -> 27 passed
+- production: `v0.6.3` deployed on VPS with fail-fast validated against degraded FleetIntel/BrazilCNPJ preflight
+- full suite at last broader runtime review: `python -m pytest -q` -> 266 passed, 2 skipped
 
 ## Decision Gate for Next Features
 
-Strict gate remains complete. FleetIntel/BrazilCNPJ integration cycle is now in implementation/validation.
+Strict gate remains complete. FleetIntel/BrazilCNPJ integration cycle is in operational hardening while upstream communication issues are handled in parallel by the FleetIntel project.
 
 ## Notes About Conflicting Historical Files
 

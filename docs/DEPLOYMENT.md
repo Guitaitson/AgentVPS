@@ -242,10 +242,14 @@ Checklist:
 - `ORCH_ENABLE_CODEX_OPERATOR=true`
 - `ORCH_CODEX_COMMAND=codex`
 - `ORCH_CODEX_WORKDIR=/opt/vps-agent`
+- `ORCH_SPECIALIST_PREFLIGHT_TTL_SECONDS=300`
+- `ORCH_SPECIALIST_PREFLIGHT_TIMEOUT_SECONDS=8`
+- `ORCH_SPECIALIST_PREFLIGHT_MAX_ATTEMPTS=1`
 - opcionalmente `ORCH_CODEX_MODEL=<modelo>`
 - `/runtimes list` mostra `codex_operator`
 
 O runtime usa `core.codex_operator_bridge` para limitar o Codex a especialistas allowlisted e roda em diretório temporário isolado.
+- Antes de delegar para o `codex_operator`, o AgentVPS roda um preflight curto de FleetIntel/BrazilCNPJ e falha rapido quando o especialista externo ja esta degradado.
 - nesse caso, o script agenda nova tentativa automatica alguns minutos depois
 - isso evita quebrar transcricao/ingestao longa por causa de release publicada
 
@@ -458,7 +462,7 @@ O snapshot local continua versionado como fallback operacional/manual, mas nao e
 
 Migracao de auth externa:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
-- FleetIntel/BrazilCNPJ agora usam retry curto para falhas transitórias (`502/503/504`, timeout e connect error) e resposta degradada com preflight quando o MCP responde mas a consulta principal falha
+- FleetIntel/BrazilCNPJ agora usam retry curto para falhas transitórias (`502/503/504`, timeout e connect error) e resposta degradada com preflight; quando o preflight ja detecta degradacao, o AgentVPS falha rapido antes de delegar ao `codex_operator` ou ao caminho especialista lento
 - use apenas os endpoints `https://agent-fleet.gtaitson.space/mcp` e `https://agent-cnpj.gtaitson.space/mcp`
 - a autenticacao externa agora e feita por Cloudflare Access Service Tokens
 - nao existe compatibilidade reversa com bearer token legado no lado AgentVPS
