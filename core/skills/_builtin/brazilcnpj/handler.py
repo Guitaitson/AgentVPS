@@ -12,6 +12,7 @@ from core.integrations import (
     RemoteMCPClient,
     RemoteMCPError,
     build_specialist_mcp_client,
+    get_consumer_sync_manager,
     render_result_block,
 )
 from core.skills.base import SkillBase
@@ -49,11 +50,14 @@ class BrazilCNPJSkill(SkillBase):
     def _route(self, query: str) -> tuple[str, dict[str, Any]]:
         msg = query.lower()
         cnpj = self._extract_cnpj(query)
+        preferred = self._preferred_tools()
 
         if any(keyword in msg for keyword in ("health", "saude", "status", "bootstrap")):
             return ("get_bootstrap_status" if "bootstrap" in msg else "health_check"), {}
         if "grupo economico" in msg:
             if cnpj:
+                if "get_group_context_brief" in preferred:
+                    return "get_group_context_brief", {"cnpj": cnpj}
                 return "get_grupo_economico", {"cnpj": cnpj}
             return "search_empresa", self._company_lookup_args(query)
         if any(keyword in msg for keyword in ("socio", "socios")):
@@ -68,16 +72,24 @@ class BrazilCNPJSkill(SkillBase):
             uf = self._extract_uf(msg)
             if uf:
                 args["uf"] = uf
+            if "search_companies_by_cnae_brief" in preferred:
+                return "search_companies_by_cnae_brief", args
             return "search_by_cnae", args
         if any(keyword in msg for keyword in ("enriquec", "atualiza", "refresh")) and cnpj:
             return "enrich_cnpj", {"cnpj": cnpj, "force_refresh": True}
         if any(keyword in msg for keyword in ("completa", "completo", "perfil completo")) and cnpj:
             return "get_empresa_completa", {"cnpj": cnpj}
         if cnpj:
+            if "get_company_registry_brief" in preferred:
+                return "get_company_registry_brief", {"cnpj": cnpj}
             if any(keyword in msg for keyword in ("cache", "rapido", "cached")):
                 return "get_cached_cnpj_profile", {"cnpj": cnpj}
             return "search_empresa", {"cnpj": cnpj, "limit": 5}
         return "search_empresa", self._company_lookup_args(query)
+
+    @staticmethod
+    def _preferred_tools() -> set[str]:
+        return set(get_consumer_sync_manager().preferred_tools_for("brazilcnpj"))
 
     @staticmethod
     def _extract_cnpj(text: str) -> str | None:
@@ -119,6 +131,21 @@ class BrazilCNPJSkill(SkillBase):
                 f"database_ok={result.get('database_ok')} "
                 f"schema_ok={result.get('schema_ok')}"
             )
+        if tool_name == "get_company_registry_brief" and isinstance(result, dict):
+            lines = ["BrazilCNPJ", ""]
+            lines.append(
+                f"Empresa: {result.get('company_name') or result.get('razao_social') or '-'}"
+            )
+            lines.append(f"CNPJ: {result.get('cnpj') or '-'}")
+            if result.get("uf"):
+                lines.append(f"UF: {result.get('uf')}")
+            if result.get("porte"):
+                lines.append(f"Porte: {result.get('porte')}")
+            if result.get("situacao_cadastral"):
+                lines.append(f"Situacao: {result.get('situacao_cadastral')}")
+            return "\n".join(lines)
+        if tool_name == "get_group_context_brief" and isinstance(result, dict):
+            return render_result_block("BrazilCNPJ", result, max_chars=1200)
         if tool_name == "search_empresa" and isinstance(result, dict):
             empresas = result.get("empresas") or result.get("results") or []
             if not empresas:
