@@ -81,14 +81,21 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
                 "client_adaptation": {
                     "compatibility_status": "compatible",
                     "compatibility_reason_codes": ["declared_capabilities_match"],
-                    "criteria": {"supports_contract_v1": True},
+                    "criteria": [
+                        {
+                            "code": "supports_contract_v1",
+                            "description": "Cliente suporta a contract_version publicada.",
+                            "required_value": "v1",
+                        }
+                    ],
                     "criteria_results": {"supports_contract_v1": True},
                     "response_contract_version_to_use": "client_brief_v1",
                     "recognized_client_behavior_version": "contract_driven_v1",
                     "recognized_response_contract_version": "client_brief_v1",
-                    "recognized_preferred_client_tools": {
-                        "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
-                    },
+                    "recognized_preferred_client_tools": [
+                        "get_client_readiness_status",
+                        "get_market_changes_brief",
+                    ],
                     "preferred_client_tools": {
                         "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
                         "brazilcnpj": ["health_check", "get_company_registry_brief"],
@@ -97,7 +104,13 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
                         "fleetintel": ["get_operations_status"],
                         "brazilcnpj": ["health_check"],
                     },
-                    "tool_surface": "client_brief_v1",
+                    "tool_surface": {
+                        "fleetintel": {
+                            "preflight": ["get_client_readiness_status"],
+                            "preferred_client_tools": ["get_market_changes_brief"],
+                            "fallback_tools": ["get_operations_status"],
+                        }
+                    },
                     "client_capabilities_seen": {
                         "supported_contract_versions": ["v1"],
                         "supported_response_contract_versions": ["client_brief_v1"],
@@ -110,7 +123,14 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
                 "rollout_status": {
                     "status": "canary_passable",
                     "reason": "validation accepted",
-                    "validation_requirements": ["validation-report=passed"],
+                    "validation_requirements": [
+                        {
+                            "name": "fleet_initialize",
+                            "service": "fleetintel",
+                            "kind": "initialize",
+                            "required": True,
+                        }
+                    ],
                     "latest_validation_summary": {"validation_status": "passed"},
                 },
             }
@@ -168,9 +188,18 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
     assert fleet_connection.access_client_id == "fleet-id"
     assert second.contract.contract_version == "v1"
     assert second.contract.server_release.version == "0.1.0"
+    assert second.client_adaptation.criteria[0]["code"] == "supports_contract_v1"
     assert second.client_adaptation.response_contract_version_to_use == "client_brief_v1"
     assert second.client_adaptation.recognized_client_behavior_version == "contract_driven_v1"
+    assert second.client_adaptation.recognized_preferred_client_tools == [
+        "get_client_readiness_status",
+        "get_market_changes_brief",
+    ]
+    assert second.client_adaptation.tool_surface["fleetintel"]["preflight"] == [
+        "get_client_readiness_status"
+    ]
     assert second.rollout_status.status == "canary_passable"
+    assert second.rollout_status.validation_requirements[0]["name"] == "fleet_initialize"
     assert manager.preferred_tools_for("fleetintel", second) == [
         "get_client_readiness_status",
         "get_market_changes_brief",
