@@ -43,6 +43,14 @@ class _FakeRouter:
         )
 
 
+class _NoCodexRouter:
+    def has_protocol(self, protocol):
+        return False
+
+    async def dispatch(self, request):  # pragma: no cover - defensive
+        raise AssertionError(f"unexpected dispatch: {request}")
+
+
 class _DegradedAssessment:
     healthy = False
     snapshots = ()
@@ -71,8 +79,8 @@ async def test_node_react_prefers_codex_operator_for_complex_specialist_queries(
         lambda _message: "fleetintel_analyst",
     )
     monkeypatch.setattr(
-        "core.vps_langgraph.react_node.should_delegate_specialist_to_codex",
-        lambda _message, _skill: True,
+        "core.vps_langgraph.react_node.select_codex_execution_mode",
+        lambda _message, _skill: "codex_operator",
     )
     monkeypatch.setattr(
         "core.vps_langgraph.react_node.get_runtime_router",
@@ -108,8 +116,8 @@ async def test_node_react_executes_specialist_directly_when_explicit_skill_bypas
         lambda _message: "fleetintel_orchestrator",
     )
     monkeypatch.setattr(
-        "core.vps_langgraph.react_node.should_delegate_specialist_to_codex",
-        lambda _message, _skill: False,
+        "core.vps_langgraph.react_node.select_codex_execution_mode",
+        lambda _message, _skill: "direct_local",
     )
     monkeypatch.setattr(
         "core.vps_langgraph.react_node.get_external_skill_contract",
@@ -150,6 +158,129 @@ async def test_node_react_executes_specialist_directly_when_explicit_skill_bypas
             {
                 "raw_input": "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me responder.",
                 "query": "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me responder.",
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_node_react_uses_codex_synthesizer_for_explicit_insight_queries(monkeypatch):
+    registry = _FakeRegistry()
+
+    monkeypatch.setattr("core.vps_langgraph.react_node.get_skill_registry", lambda: registry)
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.detect_external_skill",
+        lambda _message: "fleetintel_analyst",
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.select_codex_execution_mode",
+        lambda _message, _skill: "codex_synthesizer",
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.wants_raw_specialist_output",
+        lambda _message: False,
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_external_skill_contract",
+        lambda _skill: type(
+            "Contract",
+            (),
+            {
+                "external_name": "fleetintel-analyst",
+                "version": "abc123",
+                "execution_mode": "specialist_response",
+                "response_owner": "specialist",
+                "raw_output_policy": "on_user_request",
+                "description": "x",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_runtime_router",
+        lambda: _FakeRouter(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.assess_specialist_health",
+        _healthy_assessment,
+    )
+
+    state = {
+        "user_id": "u-1",
+        "user_message": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+        "conversation_history": [],
+    }
+
+    result = await node_react(state)
+
+    assert "Resposta sintetizada pelo Codex." in result["response"]
+    assert "Pontos principais:" in result["response"]
+    assert registry.executed == [
+        (
+            "fleetintel_analyst",
+            {
+                "raw_input": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+                "query": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_node_react_hides_raw_payload_when_synthesizer_unavailable(monkeypatch):
+    registry = _FakeRegistry()
+
+    monkeypatch.setattr("core.vps_langgraph.react_node.get_skill_registry", lambda: registry)
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.detect_external_skill",
+        lambda _message: "fleetintel_analyst",
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.select_codex_execution_mode",
+        lambda _message, _skill: "codex_synthesizer",
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.wants_raw_specialist_output",
+        lambda _message: False,
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_external_skill_contract",
+        lambda _skill: type(
+            "Contract",
+            (),
+            {
+                "external_name": "fleetintel-analyst",
+                "version": "abc123",
+                "execution_mode": "specialist_response",
+                "response_owner": "specialist",
+                "raw_output_policy": "on_user_request",
+                "description": "x",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.get_runtime_router",
+        lambda: _NoCodexRouter(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.assess_specialist_health",
+        _healthy_assessment,
+    )
+
+    state = {
+        "user_id": "u-1",
+        "user_message": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+        "conversation_history": [],
+    }
+
+    result = await node_react(state)
+
+    assert "nao vou despejar json cru" in result["response"].lower()
+    assert registry.executed == [
+        (
+            "fleetintel_analyst",
+            {
+                "raw_input": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+                "query": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
             },
         )
     ]

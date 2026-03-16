@@ -313,6 +313,89 @@ async def test_codex_operator_adapter_executes_codex_cli(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_codex_operator_adapter_supports_synthesizer_mode(monkeypatch, tmp_path):
+    recorded = {}
+
+    class _FakeProcess:
+        returncode = 0
+
+        async def communicate(self, prompt_bytes):
+            recorded["prompt"] = prompt_bytes.decode("utf-8")
+            output_index = recorded["command"].index("-o") + 1
+            output_path = recorded["command"][output_index]
+            with open(output_path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    '{"summary":"ok","answer":"Resposta executiva","confidence":0.91,'
+                    '"facts":["f1"],"tool_trace":[{"tool":"fleetintel_analyst","status":"ok"}],'
+                    '"unresolved_items":[],"requires_human_approval":false}'
+                )
+            return b"", b""
+
+        async def wait(self):
+            return 0
+
+    async def _fake_create_subprocess_exec(*command, **kwargs):
+        recorded["command"] = list(command)
+        recorded["kwargs"] = kwargs
+        return _FakeProcess()
+
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.shutil.which", lambda _cmd: "/usr/bin/codex"
+    )
+    monkeypatch.setattr("core.orchestration.runtime_adapters.os.path.exists", lambda _path: True)
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.get_external_skill_contract",
+        lambda _name: type(
+            "Contract",
+            (),
+            {
+                "external_name": "fleetintel-analyst",
+                "version": "abc123",
+                "execution_mode": "specialist_response",
+                "response_owner": "specialist",
+                "raw_output_policy": "on_user_request",
+                "description": "Contract test",
+                "instructions_markdown": "## Response Contract\nSummarize, do not dump raw JSON.",
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "core.orchestration.runtime_adapters.asyncio.create_subprocess_exec",
+        _fake_create_subprocess_exec,
+    )
+
+    adapter = CodexOperatorAdapter(
+        codex_command="codex",
+        workdir=str(tmp_path),
+        python_executable="/opt/vps-agent/core/venv/bin/python",
+        timeout_s=10,
+    )
+    result = await adapter.execute(
+        RuntimeExecutionRequest(
+            action="fleetintel_analyst",
+            args={
+                "query": "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+                "specialist_result": '{"items":[{"empresa":"A"}]}',
+            },
+            user_id="u1",
+            context={
+                "codex_mode": "synthesizer",
+                "specialist_result": '{"items":[{"empresa":"A"}]}',
+            },
+            context_keys=["codex_mode", "specialist_result"],
+            preferred_protocol=RuntimeProtocol.CODEX_OPERATOR,
+        )
+    )
+
+    assert result.success is True
+    assert result.output["answer"] == "Resposta executiva"
+    assert "Voce e o sintetizador Codex do AgentVPS." in recorded["prompt"]
+    assert "Nao chame especialistas novamente." in recorded["prompt"]
+    assert "Working data do especialista" in recorded["prompt"]
+    assert "run-skill" not in recorded["prompt"]
+
+
+@pytest.mark.asyncio
 async def test_codex_operator_adapter_accepts_valid_output_even_with_nonzero_exit(
     monkeypatch, tmp_path
 ):

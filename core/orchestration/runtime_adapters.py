@@ -552,6 +552,12 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
         return payload
 
     def _build_prompt(self, request: RuntimeExecutionRequest) -> str:
+        codex_mode = str((request.context or {}).get("codex_mode") or "operator").strip()
+        if codex_mode == "synthesizer":
+            return self._build_synthesizer_prompt(request)
+        return self._build_operator_prompt(request)
+
+    def _build_operator_prompt(self, request: RuntimeExecutionRequest) -> str:
         specialist_hint = request.action
         allowed_specialists = _allowed_codex_specialists(specialist_hint)
         contract = get_external_skill_contract(specialist_hint)
@@ -615,6 +621,50 @@ class CodexOperatorAdapter(AgentRuntimeAdapter):
             "Envelope da tarefa:\n"
             f"{json.dumps(envelope, ensure_ascii=False, indent=2)}\n"
             f"{contract_section}"
+        )
+
+    def _build_synthesizer_prompt(self, request: RuntimeExecutionRequest) -> str:
+        specialist_hint = request.action
+        contract = get_external_skill_contract(specialist_hint)
+        user_query = request.args.get("query") or request.args.get("raw_input") or request.action
+        specialist_result = request.args.get("specialist_result") or (request.context or {}).get(
+            "specialist_result"
+        )
+        contract_section = ""
+        if contract is not None:
+            contract_section = (
+                "\nContrato da skill externa sincronizada:\n"
+                f"- external_name: {contract.external_name}\n"
+                f"- version: {contract.version or '-'}\n"
+                f"- execution_mode: {contract.execution_mode}\n"
+                f"- response_owner: {contract.response_owner}\n"
+                f"- raw_output_policy: {contract.raw_output_policy}\n"
+            )
+            if contract.description:
+                contract_section += f"- description: {contract.description}\n"
+            if contract.instructions_markdown:
+                contract_section += (
+                    "\nInstrucoes publicadas da skill externa (fonte de verdade de dominio):\n"
+                    f"{contract.instructions_markdown[:12000]}\n"
+                )
+
+        return (
+            "Voce e o sintetizador Codex do AgentVPS.\n"
+            "Objetivo: transformar working data ja coletada por um especialista externo em resposta executiva para humano.\n"
+            "Regras obrigatorias:\n"
+            "1. Nao chame especialistas novamente.\n"
+            "2. Nao execute comandos, nao use bridge, nao rode diagnosticos.\n"
+            "3. Trate o resultado do especialista como working data, nao como resposta final.\n"
+            "4. Entregue uma resposta digestivel, executiva e sem JSON cru.\n"
+            "5. So mencione limitacoes reais do dado quando necessario.\n"
+            "6. So devolva JSON bruto se o usuario tiver pedido explicitamente raw/json/payload/bloco tecnico.\n"
+            "7. A saida final deve ser somente um objeto JSON valido aderente ao schema de saida.\n\n"
+            "Contexto da tarefa:\n"
+            f"- specialist_name: {specialist_hint}\n"
+            f"- user_query: {user_query}\n"
+            f"{contract_section}\n"
+            "Working data do especialista:\n"
+            f"{str(specialist_result)[:16000]}\n"
         )
 
 

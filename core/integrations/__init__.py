@@ -18,7 +18,9 @@ from .external_mcp import (
 from .fleetintel_router import (
     detect_external_skill,
     extract_company_count_query,
+    select_codex_execution_mode,
     should_delegate_specialist_to_codex,
+    wants_raw_specialist_output,
 )
 from .specialist_health import (
     assess_specialist_health,
@@ -38,7 +40,9 @@ __all__ = [
     "warmup_consumer_sync",
     "detect_external_skill",
     "extract_company_count_query",
+    "select_codex_execution_mode",
     "should_delegate_specialist_to_codex",
+    "wants_raw_specialist_output",
     "assess_specialist_health",
     "emit_health_failure_progress",
     "format_specialist_health_failure",
