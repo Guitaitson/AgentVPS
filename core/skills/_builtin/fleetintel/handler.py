@@ -3,20 +3,15 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from typing import Any, Dict, Optional, Tuple
 
 import structlog
 
-from core.integrations import RemoteMCPClient
+from core.integrations import ConsumerSyncError, RemoteMCPClient, build_specialist_mcp_client
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
-
-FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://agent-fleet.gtaitson.space/mcp")
-FLEETINTEL_CF_ACCESS_CLIENT_ID = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_ID", "")
-FLEETINTEL_CF_ACCESS_CLIENT_SECRET = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_SECRET", "")
 
 MAX_CHARS = 3000
 
@@ -33,18 +28,13 @@ class FleetIntelSkill(SkillBase):
 
         logger.info("fleetintel_execute", query=str(raw_input)[:100])
 
-        client = RemoteMCPClient(
-            base_url=FLEETINTEL_MCP_URL,
-            access_client_id=FLEETINTEL_CF_ACCESS_CLIENT_ID,
-            access_client_secret=FLEETINTEL_CF_ACCESS_CLIENT_SECRET,
-            client_name="agentvps-fleetintel",
-            server_name="fleetintel",
-        )
-        if not client.is_configured:
-            return (
-                "FleetIntel MCP nao configurado. Ajuste FLEETINTEL_MCP_URL, "
-                "FLEETINTEL_CF_ACCESS_CLIENT_ID e FLEETINTEL_CF_ACCESS_CLIENT_SECRET."
+        try:
+            client = build_specialist_mcp_client(
+                "fleetintel",
+                client_name="agentvps-fleetintel",
             )
+        except ConsumerSyncError as exc:
+            return str(exc)
 
         tool_name, tool_args = self._route(str(raw_input))
         logger.info("fleetintel_routing", tool=tool_name, args=tool_args)

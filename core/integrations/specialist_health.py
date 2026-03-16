@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import asdict, dataclass
 
 from core.config import get_settings
 from core.progress import emit_progress
 
-from .external_mcp import RemoteMCPClient, RemoteMCPError
+from .consumer_sync import (
+    ConsumerSyncError,
+    ConsumerSyncUnavailableError,
+    build_specialist_mcp_client,
+)
+from .external_mcp import RemoteMCPError
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,19 +129,8 @@ async def _get_service_health(service: str) -> ServiceHealthSnapshot:
         data["from_cache"] = True
         return ServiceHealthSnapshot(**data)
 
-    client, tool_name = _build_preflight_client(service)
-    if not client.is_configured:
-        snapshot = ServiceHealthSnapshot(
-            service=service,
-            healthy=False,
-            checked_at=now,
-            error_type="config",
-            message=f"{service} MCP nao configurado",
-        )
-        _HEALTH_CACHE[service] = snapshot
-        return snapshot
-
     try:
+        client, tool_name = _build_preflight_client(service)
         await client.call_tool(tool_name, {})
         snapshot = ServiceHealthSnapshot(service=service, healthy=True, checked_at=now)
     except RemoteMCPError as exc:
@@ -148,6 +141,14 @@ async def _get_service_health(service: str) -> ServiceHealthSnapshot:
             error_type=exc.error_type,
             status_code=exc.status_code,
             stage=exc.stage,
+            message=str(exc),
+        )
+    except (ConsumerSyncUnavailableError, ConsumerSyncError) as exc:
+        snapshot = ServiceHealthSnapshot(
+            service=service,
+            healthy=False,
+            checked_at=now,
+            error_type="consumer_sync",
             message=str(exc),
         )
     except Exception as exc:  # pragma: no cover
@@ -163,34 +164,17 @@ async def _get_service_health(service: str) -> ServiceHealthSnapshot:
     return snapshot
 
 
-def _build_preflight_client(service: str) -> tuple[RemoteMCPClient, str]:
+def _build_preflight_client(service: str):
     orch = get_settings().orchestration
-    if service == "fleetintel":
-        return (
-            RemoteMCPClient(
-                base_url=os.getenv("FLEETINTEL_MCP_URL", ""),
-                access_client_id=os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_ID", ""),
-                access_client_secret=os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_SECRET", ""),
-                client_name="agentvps-specialist-preflight-fleetintel",
-                server_name="fleetintel",
-                timeout_seconds=float(orch.specialist_preflight_timeout_seconds),
-                max_attempts=orch.specialist_preflight_max_attempts,
-                retry_backoff_seconds=0.3,
-            ),
-            "get_operations_status",
-        )
     return (
-        RemoteMCPClient(
-            base_url=os.getenv("BRAZILCNPJ_MCP_URL", ""),
-            access_client_id=os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_ID", ""),
-            access_client_secret=os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET", ""),
-            client_name="agentvps-specialist-preflight-brazilcnpj",
-            server_name="brazilcnpj",
+        build_specialist_mcp_client(
+            service,
+            client_name=f"agentvps-specialist-preflight-{service}",
             timeout_seconds=float(orch.specialist_preflight_timeout_seconds),
             max_attempts=orch.specialist_preflight_max_attempts,
             retry_backoff_seconds=0.3,
         ),
-        "health_check",
+        "get_operations_status" if service == "fleetintel" else "health_check",
     )
 
 

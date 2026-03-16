@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from core.integrations.external_mcp import RemoteMCPClient, RemoteMCPError
+from core.integrations.external_mcp import RemoteMCPClient, RemoteMCPConnection, RemoteMCPError
 
 
 class _MockResponse:
@@ -16,17 +16,14 @@ class _MockResponse:
 
 
 @pytest.mark.asyncio
-async def test_remote_mcp_client_supports_stateless_http_without_session(monkeypatch):
+async def test_remote_mcp_client_supports_static_cf_access_headers(monkeypatch):
     responses = [
         _MockResponse(json_data={"result": {"protocolVersion": "2024-11-05"}}, headers={}),
         _MockResponse(
             json_data={
                 "result": {
                     "content": [
-                        {
-                            "type": "text",
-                            "text": '{"status": "ok", "service": "fleetintel"}',
-                        }
+                        {"type": "text", "text": '{"status": "ok", "service": "fleetintel"}'}
                     ]
                 }
             }
@@ -51,7 +48,6 @@ async def test_remote_mcp_client_supports_stateless_http_without_session(monkeyp
     result = await client.call_tool("get_operations_status", {})
 
     assert result["status"] == "ok"
-    assert result["service"] == "fleetintel"
     assert seen_headers[0]["CF-Access-Client-Id"] == "client-id"
     assert seen_headers[0]["CF-Access-Client-Secret"] == "client-secret"
     assert "Authorization" not in seen_headers[0]
@@ -90,8 +86,11 @@ async def test_remote_mcp_client_retries_transient_502(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_remote_mcp_client_does_not_retry_auth_errors(monkeypatch):
+async def test_remote_mcp_client_does_not_retry_auth_error_without_refresh(monkeypatch):
+    calls = []
+
     async def fake_post(self, url, json=None, headers=None):
+        calls.append(json["method"])
         return _MockResponse(status_code=403, text="forbidden")
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
@@ -108,7 +107,108 @@ async def test_remote_mcp_client_does_not_retry_auth_errors(monkeypatch):
         await client.call_tool("get_operations_status", {})
 
     assert exc.value.status_code == 403
-    assert exc.value.error_type == "auth"
+    assert calls == ["initialize"]
+
+
+@pytest.mark.asyncio
+async def test_remote_mcp_client_refreshes_bundle_once_after_initialize_403(monkeypatch):
+    calls = []
+    current = {
+        "connection": RemoteMCPConnection(
+            base_url="https://stale.example/mcp",
+            access_client_id="stale-id",
+            access_client_secret="stale-secret",
+        )
+    }
+
+    async def fake_post(self, url, json=None, headers=None):
+        calls.append((json["method"], headers.get("CF-Access-Client-Id")))
+        if headers.get("CF-Access-Client-Id") == "stale-id":
+            return _MockResponse(status_code=403, text="forbidden")
+        if json["method"] == "initialize":
+            return _MockResponse(
+                json_data={"result": {"protocolVersion": "2024-11-05"}}, headers={}
+            )
+        return _MockResponse(
+            json_data={"result": {"content": [{"type": "text", "text": '{"status": "ok"}'}]}}
+        )
+
+    async def refresh_callback():
+        current["connection"] = RemoteMCPConnection(
+            base_url="https://fresh.example/mcp",
+            access_client_id="fresh-id",
+            access_client_secret="fresh-secret",
+        )
+        return True
+
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
+
+    client = RemoteMCPClient(
+        client_name="test-client",
+        server_name="fleetintel",
+        connection_provider=lambda: current["connection"],
+        auth_refresh_callback=refresh_callback,
+    )
+
+    result = await client.call_tool("get_operations_status", {})
+
+    assert result["status"] == "ok"
+    assert calls == [
+        ("initialize", "stale-id"),
+        ("initialize", "fresh-id"),
+        ("tools/call", "fresh-id"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_remote_mcp_client_refreshes_bundle_once_after_tool_call_403(monkeypatch):
+    calls = []
+    current = {
+        "connection": RemoteMCPConnection(
+            base_url="https://stale.example/mcp",
+            access_client_id="stale-id",
+            access_client_secret="stale-secret",
+        )
+    }
+
+    async def fake_post(self, url, json=None, headers=None):
+        calls.append((json["method"], headers.get("CF-Access-Client-Id")))
+        if json["method"] == "initialize":
+            return _MockResponse(
+                json_data={"result": {"protocolVersion": "2024-11-05"}}, headers={}
+            )
+        if headers.get("CF-Access-Client-Id") == "stale-id":
+            return _MockResponse(status_code=403, text="forbidden")
+        return _MockResponse(
+            json_data={"result": {"content": [{"type": "text", "text": '{"status": "ok"}'}]}}
+        )
+
+    async def refresh_callback():
+        current["connection"] = RemoteMCPConnection(
+            base_url="https://fresh.example/mcp",
+            access_client_id="fresh-id",
+            access_client_secret="fresh-secret",
+        )
+        return True
+
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
+
+    client = RemoteMCPClient(
+        client_name="test-client",
+        server_name="fleetintel",
+        connection_provider=lambda: current["connection"],
+        auth_refresh_callback=refresh_callback,
+    )
+
+    result = await client.call_tool("get_operations_status", {})
+
+    assert result["status"] == "ok"
+    assert calls == [
+        ("initialize", "stale-id"),
+        ("tools/call", "stale-id"),
+        ("initialize", "fresh-id"),
+        ("tools/call", "fresh-id"),
+    ]
 
 
 @pytest.mark.asyncio

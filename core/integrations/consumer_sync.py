@@ -1,0 +1,381 @@
+"""Consumer sync machine-pull for FleetIntel/BrazilCNPJ external credentials."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import subprocess
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import httpx
+import structlog
+
+from core.__version__ import __version__ as core_version
+from core.config import get_settings
+
+from .external_mcp import RemoteMCPClient, RemoteMCPConnection
+
+logger = structlog.get_logger()
+
+_STALE_RELEASE_ID = "stale-release"
+_STALE_BUNDLE_HASH = "stale-hash"
+_REQUIRED_BUNDLE_KEYS = {
+    "FLEETINTEL_MCP_URL",
+    "FLEETINTEL_CF_ACCESS_CLIENT_ID",
+    "FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+    "BRAZILCNPJ_MCP_URL",
+    "BRAZILCNPJ_CF_ACCESS_CLIENT_ID",
+    "BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET",
+}
+_SERVICE_KEY_MAP = {
+    "fleetintel": (
+        "FLEETINTEL_MCP_URL",
+        "FLEETINTEL_CF_ACCESS_CLIENT_ID",
+        "FLEETINTEL_CF_ACCESS_CLIENT_SECRET",
+    ),
+    "brazilcnpj": (
+        "BRAZILCNPJ_MCP_URL",
+        "BRAZILCNPJ_CF_ACCESS_CLIENT_ID",
+        "BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET",
+    ),
+}
+
+
+class ConsumerSyncError(RuntimeError):
+    """Base error for consumer sync failures."""
+
+
+class ConsumerSyncUnavailableError(ConsumerSyncError):
+    """Raised when FleetIntel disables or revokes the external consumer."""
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerSyncState:
+    current_release_id: str | None = None
+    current_bundle_hash: str | None = None
+    current_bundle: dict[str, Any] | None = None
+    last_sync_status: str | None = None
+    last_sync_at: str | None = None
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_state_path(path_str: str) -> Path:
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    return _repo_root() / path
+
+
+def _run_git(*args: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=_repo_root(),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return None
+    value = (result.stdout or "").strip()
+    return value or None
+
+
+def _agent_version() -> str:
+    exact_tag = _run_git("describe", "--tags", "--exact-match")
+    if exact_tag:
+        return exact_tag[1:] if exact_tag.startswith("v") else exact_tag
+    latest_tag = _run_git("describe", "--tags", "--abbrev=0")
+    if latest_tag:
+        return latest_tag[1:] if latest_tag.startswith("v") else latest_tag
+    return core_version
+
+
+def _agent_commit() -> str:
+    return _run_git("rev-parse", "--short", "HEAD") or ""
+
+
+class ConsumerSyncManager:
+    """Fetches and persists the current external credential bundle."""
+
+    def __init__(
+        self,
+        *,
+        sync_url: str,
+        consumer_slug: str,
+        bootstrap_secret: str | None,
+        state_file: str,
+        timeout_seconds: float,
+    ) -> None:
+        self.sync_url = sync_url.strip()
+        self.consumer_slug = consumer_slug.strip()
+        self.bootstrap_secret = (bootstrap_secret or "").strip()
+        self.state_path = _resolve_state_path(state_file)
+        self.timeout_seconds = timeout_seconds
+        self._sync_lock = asyncio.Lock()
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.sync_url and self.consumer_slug and self.bootstrap_secret)
+
+    def load_state(self) -> ConsumerSyncState:
+        if not self.state_path.is_file():
+            return ConsumerSyncState()
+        try:
+            payload = json.loads(self.state_path.read_text(encoding="utf-8"))
+        except Exception:
+            logger.warning("consumer_sync_state_invalid", path=str(self.state_path))
+            return ConsumerSyncState()
+        return ConsumerSyncState(
+            current_release_id=payload.get("current_release_id"),
+            current_bundle_hash=payload.get("current_bundle_hash"),
+            current_bundle=payload.get("current_bundle"),
+            last_sync_status=payload.get("last_sync_status"),
+            last_sync_at=payload.get("last_sync_at"),
+        )
+
+    def save_state(self, state: ConsumerSyncState) -> None:
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        self.state_path.write_text(
+            json.dumps(asdict(state), ensure_ascii=True, indent=2),
+            encoding="utf-8",
+        )
+
+    def _validate_bundle(self, bundle: dict[str, Any] | None) -> dict[str, Any]:
+        if not isinstance(bundle, dict):
+            raise ConsumerSyncError("Consumer sync nao retornou credential_bundle valido.")
+        values = bundle.get("values")
+        if not isinstance(values, dict):
+            raise ConsumerSyncError("Consumer sync nao retornou credential_bundle.values valido.")
+        missing = sorted(
+            key for key in _REQUIRED_BUNDLE_KEYS if not str(values.get(key) or "").strip()
+        )
+        if missing:
+            raise ConsumerSyncError(
+                "Credential bundle incompleto. Chaves ausentes: " + ", ".join(missing)
+            )
+        return values
+
+    def _sync_payload(self, state: ConsumerSyncState) -> dict[str, Any]:
+        return {
+            "consumer_slug": self.consumer_slug,
+            "agent_name": "AgentVPS",
+            "agent_version": _agent_version(),
+            "agent_commit": _agent_commit(),
+            "current_release_id": state.current_release_id or _STALE_RELEASE_ID,
+            "current_bundle_hash": state.current_bundle_hash or _STALE_BUNDLE_HASH,
+        }
+
+    async def sync(self, *, force_refresh: bool = False) -> ConsumerSyncState:
+        if not self.is_configured:
+            raise ConsumerSyncError(
+                "Consumer sync nao configurado. Ajuste CONSUMER_SYNC_URL, "
+                "CONSUMER_SLUG e CONSUMER_BOOTSTRAP_SECRET."
+            )
+
+        async with self._sync_lock:
+            state = self.load_state()
+            payload = self._sync_payload(state)
+            headers = {
+                "Authorization": f"Bearer {self.bootstrap_secret}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+            logger.info(
+                "consumer_sync_request",
+                sync_url=self.sync_url,
+                consumer_slug=self.consumer_slug,
+                force_refresh=force_refresh,
+                current_release_id=payload["current_release_id"],
+                current_bundle_hash=payload["current_bundle_hash"],
+            )
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                    response = await client.post(self.sync_url, json=payload, headers=headers)
+            except httpx.TimeoutException as exc:
+                raise ConsumerSyncError("Consumer sync expirou antes de responder.") from exc
+            except httpx.HTTPError as exc:
+                raise ConsumerSyncError("Falha de rede ao executar consumer sync.") from exc
+
+            if response.status_code >= 400:
+                excerpt = (response.text or "").strip().replace("\n", " ")[:240]
+                raise ConsumerSyncError(
+                    f"Consumer sync retornou HTTP {response.status_code}."
+                    + (f" Excerpt: {excerpt}" if excerpt else "")
+                )
+
+            try:
+                result = response.json()
+            except ValueError as exc:
+                raise ConsumerSyncError("Consumer sync retornou JSON invalido.") from exc
+
+            sync_status = str(result.get("sync_status") or "").strip()
+            now = datetime.now(timezone.utc).isoformat()
+            if sync_status == "bundle_update_required":
+                bundle = result.get("credential_bundle")
+                self._validate_bundle(bundle)
+                new_state = ConsumerSyncState(
+                    current_release_id=str(
+                        result.get("release_id") or state.current_release_id or ""
+                    ).strip()
+                    or None,
+                    current_bundle_hash=str(
+                        result.get("bundle_hash") or (bundle or {}).get("hash") or ""
+                    ).strip()
+                    or None,
+                    current_bundle=bundle,
+                    last_sync_status=sync_status,
+                    last_sync_at=now,
+                )
+            elif sync_status == "up_to_date":
+                if state.current_bundle is None:
+                    raise ConsumerSyncError(
+                        "Consumer sync retornou up_to_date mas nao existe credential bundle local."
+                    )
+                new_state = ConsumerSyncState(
+                    current_release_id=str(
+                        result.get("release_id") or state.current_release_id or ""
+                    ).strip()
+                    or None,
+                    current_bundle_hash=str(
+                        result.get("bundle_hash") or state.current_bundle_hash or ""
+                    ).strip()
+                    or None,
+                    current_bundle=state.current_bundle,
+                    last_sync_status=sync_status,
+                    last_sync_at=now,
+                )
+            elif sync_status in {"revoked", "disabled"}:
+                new_state = ConsumerSyncState(
+                    current_release_id=str(
+                        result.get("release_id") or state.current_release_id or ""
+                    ).strip()
+                    or None,
+                    current_bundle_hash=str(
+                        result.get("bundle_hash") or state.current_bundle_hash or ""
+                    ).strip()
+                    or None,
+                    current_bundle=state.current_bundle,
+                    last_sync_status=sync_status,
+                    last_sync_at=now,
+                )
+            else:
+                raise ConsumerSyncError(
+                    f"Consumer sync retornou sync_status invalido: {sync_status or '-'}"
+                )
+
+            self.save_state(new_state)
+            logger.info(
+                "consumer_sync_result",
+                sync_status=new_state.last_sync_status,
+                release_id=new_state.current_release_id,
+                bundle_hash=new_state.current_bundle_hash,
+            )
+            return new_state
+
+    async def ensure_bundle(self) -> ConsumerSyncState:
+        state = self.load_state()
+        if state.last_sync_status in {"revoked", "disabled"}:
+            raise ConsumerSyncUnavailableError(
+                "Especialista externo desabilitado pelo provider FleetIntel."
+            )
+        if state.current_bundle is None:
+            state = await self.sync()
+        if state.last_sync_status in {"revoked", "disabled"}:
+            raise ConsumerSyncUnavailableError(
+                "Especialista externo desabilitado pelo provider FleetIntel."
+            )
+        return state
+
+    def _connection_from_state(self, service: str, state: ConsumerSyncState) -> RemoteMCPConnection:
+        keys = _SERVICE_KEY_MAP.get(service)
+        if keys is None:
+            raise ConsumerSyncError(f"Servico externo desconhecido: {service}")
+        values = (state.current_bundle or {}).get("values") or {}
+        url_key, client_id_key, client_secret_key = keys
+        base_url = str(values.get(url_key) or "").strip()
+        access_client_id = str(values.get(client_id_key) or "").strip()
+        access_client_secret = str(values.get(client_secret_key) or "").strip()
+        if not (base_url and access_client_id and access_client_secret):
+            raise ConsumerSyncError(
+                f"Credential bundle local nao possui credenciais completas para {service}."
+            )
+        return RemoteMCPConnection(
+            base_url=base_url,
+            access_client_id=access_client_id,
+            access_client_secret=access_client_secret,
+        )
+
+    async def resolve_service_connection(self, service: str) -> RemoteMCPConnection:
+        state = await self.ensure_bundle()
+        return self._connection_from_state(service, state)
+
+    async def refresh_bundle_once(self, service: str) -> bool:
+        previous = self.load_state()
+        refreshed = await self.sync(force_refresh=True)
+        if refreshed.last_sync_status in {"revoked", "disabled"}:
+            raise ConsumerSyncUnavailableError(
+                f"Especialista externo {service} desabilitado pelo provider FleetIntel."
+            )
+        return bool(
+            refreshed.current_bundle_hash
+            and refreshed.current_bundle_hash != previous.current_bundle_hash
+        )
+
+
+@lru_cache(maxsize=1)
+def get_consumer_sync_manager() -> ConsumerSyncManager:
+    settings = get_settings().consumer_sync
+    return ConsumerSyncManager(
+        sync_url=settings.sync_url,
+        consumer_slug=settings.slug,
+        bootstrap_secret=settings.bootstrap_secret,
+        state_file=settings.state_file,
+        timeout_seconds=float(settings.timeout_seconds),
+    )
+
+
+def reset_consumer_sync_manager_for_tests() -> None:
+    get_consumer_sync_manager.cache_clear()
+
+
+def build_specialist_mcp_client(
+    service: str,
+    *,
+    client_name: str,
+    timeout_seconds: float = 25.0,
+    max_attempts: int = 2,
+    retry_backoff_seconds: float = 0.6,
+) -> RemoteMCPClient:
+    manager = get_consumer_sync_manager()
+    if not manager.is_configured:
+        raise ConsumerSyncError(
+            "Consumer sync nao configurado. Ajuste CONSUMER_SYNC_URL, "
+            "CONSUMER_SLUG e CONSUMER_BOOTSTRAP_SECRET."
+        )
+    return RemoteMCPClient(
+        client_name=client_name,
+        server_name=service,
+        timeout_seconds=timeout_seconds,
+        max_attempts=max_attempts,
+        retry_backoff_seconds=retry_backoff_seconds,
+        connection_provider=lambda: manager.resolve_service_connection(service),
+        auth_refresh_callback=lambda: manager.refresh_bundle_once(service),
+    )
+
+
+async def warmup_consumer_sync() -> None:
+    manager = get_consumer_sync_manager()
+    if not manager.is_configured:
+        return
+    try:
+        await manager.sync()
+    except Exception as exc:
+        logger.warning("consumer_sync_warmup_failed", error=str(exc))

@@ -5,13 +5,23 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from core.progress import emit_progress
 
-_CNPJ_RE = re.compile(r"\b\d{14}\b")
+_CNPJ_RE = re.compile(r"\d{14}")
+
+
+@dataclass(frozen=True, slots=True)
+class RemoteMCPConnection:
+    """Resolved connection payload for a remote MCP server."""
+
+    base_url: str
+    access_client_id: str
+    access_client_secret: str
 
 
 class RemoteMCPError(RuntimeError):
@@ -51,14 +61,16 @@ class RemoteMCPClient:
     def __init__(
         self,
         *,
-        base_url: str,
-        access_client_id: str,
-        access_client_secret: str,
+        base_url: str = "",
+        access_client_id: str = "",
+        access_client_secret: str = "",
         client_name: str,
         server_name: str,
         timeout_seconds: float = 25.0,
         max_attempts: int = 2,
         retry_backoff_seconds: float = 0.6,
+        connection_provider: Any | None = None,
+        auth_refresh_callback: Any | None = None,
     ):
         self.base_url = base_url.strip()
         self.access_client_id = access_client_id.strip()
@@ -68,18 +80,53 @@ class RemoteMCPClient:
         self.timeout_seconds = timeout_seconds
         self.max_attempts = max_attempts
         self.retry_backoff_seconds = retry_backoff_seconds
+        self.connection_provider = connection_provider
+        self.auth_refresh_callback = auth_refresh_callback
 
     @property
     def is_configured(self) -> bool:
+        if self.connection_provider is not None:
+            return True
         return bool(self.base_url and self.access_client_id and self.access_client_secret)
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> Any:
         if not self.is_configured:
             raise RuntimeError(f"{self.server_name} MCP is not configured")
 
+        refreshed_after_auth_failure = False
+        while True:
+            connection = await self._resolve_connection()
+            try:
+                return await self._call_tool_once(connection, tool_name, arguments or {})
+            except RemoteMCPError as exc:
+                if (
+                    exc.status_code == 403
+                    and not refreshed_after_auth_failure
+                    and self.auth_refresh_callback is not None
+                ):
+                    refreshed_after_auth_failure = True
+                    refreshed = await self._maybe_await(self.auth_refresh_callback())
+                    if refreshed:
+                        await emit_progress(
+                            "external_call",
+                            server=self.server_name,
+                            stage=exc.stage,
+                            status="refreshing_auth",
+                            tool=tool_name,
+                            error=exc.describe_short(),
+                        )
+                        continue
+                raise
+
+    async def _call_tool_once(
+        self,
+        connection: RemoteMCPConnection,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> Any:
         headers = {
-            "CF-Access-Client-Id": self.access_client_id,
-            "CF-Access-Client-Secret": self.access_client_secret,
+            "CF-Access-Client-Id": connection.access_client_id,
+            "CF-Access-Client-Secret": connection.access_client_secret,
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }
@@ -99,7 +146,7 @@ class RemoteMCPClient:
             "method": "tools/call",
             "params": {
                 "name": tool_name,
-                "arguments": arguments or {},
+                "arguments": arguments,
             },
         }
 
@@ -113,6 +160,7 @@ class RemoteMCPClient:
             )
             init_response = await self._post_with_retry(
                 client=client,
+                base_url=connection.base_url,
                 payload=initialize_payload,
                 headers=headers,
                 stage="initialize",
@@ -129,6 +177,7 @@ class RemoteMCPClient:
             )
             tool_response = await self._post_with_retry(
                 client=client,
+                base_url=connection.base_url,
                 payload=tool_payload,
                 headers=tool_headers,
                 stage="tools/call",
@@ -144,6 +193,7 @@ class RemoteMCPClient:
         self,
         *,
         client: httpx.AsyncClient,
+        base_url: str,
         payload: dict[str, Any],
         headers: dict[str, str],
         stage: str,
@@ -153,7 +203,7 @@ class RemoteMCPClient:
 
         for attempt in range(1, self.max_attempts + 1):
             try:
-                response = await client.post(self.base_url, json=payload, headers=headers)
+                response = await client.post(base_url, json=payload, headers=headers)
                 if response.status_code >= 400:
                     error = self._http_error(response=response, stage=stage)
                     if error.is_transient and attempt < self.max_attempts:
@@ -282,6 +332,26 @@ class RemoteMCPClient:
             response_excerpt=excerpt or None,
             message=f"{self.server_name} MCP returned HTTP {response.status_code} during {stage}",
         )
+
+    async def _resolve_connection(self) -> RemoteMCPConnection:
+        if self.connection_provider is not None:
+            connection = await self._maybe_await(self.connection_provider())
+            if not isinstance(connection, RemoteMCPConnection):
+                raise RuntimeError(
+                    f"{self.server_name} MCP connection provider returned invalid payload"
+                )
+            return connection
+        return RemoteMCPConnection(
+            base_url=self.base_url,
+            access_client_id=self.access_client_id,
+            access_client_secret=self.access_client_secret,
+        )
+
+    @staticmethod
+    async def _maybe_await(value: Any) -> Any:
+        if hasattr(value, "__await__"):
+            return await value
+        return value
 
 
 def extract_cnpjs(data: Any) -> list[str]:

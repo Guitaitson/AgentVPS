@@ -102,12 +102,10 @@ OPENROUTER_MODEL=minimax/minimax-m2.5
 OPENROUTER_MAX_TOKENS=2048
 OPENROUTER_TIMEOUT=30
 OPENROUTER_TEMPERATURE=0.7
-FLEETINTEL_MCP_URL=https://agent-fleet.gtaitson.space/mcp
-FLEETINTEL_CF_ACCESS_CLIENT_ID=seu-client-id-cloudflare-aqui
-FLEETINTEL_CF_ACCESS_CLIENT_SECRET=seu-client-secret-cloudflare-aqui
-BRAZILCNPJ_MCP_URL=https://agent-cnpj.gtaitson.space/mcp
-BRAZILCNPJ_CF_ACCESS_CLIENT_ID=seu-client-id-cloudflare-aqui
-BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET=seu-client-secret-cloudflare-aqui
+CONSUMER_SYNC_URL=https://request-access.gtaitson.space/api/consumer-sync/v1/sync
+CONSUMER_SLUG=agentvps
+CONSUMER_BOOTSTRAP_SECRET=bootstrap-secret-do-agentvps
+CONSUMER_SYNC_STATE_FILE=data/consumer-sync/agentvps.json
 ORCH_ENABLE_CODEX_OPERATOR=false
 ORCH_CODEX_COMMAND=codex
 ORCH_CODEX_WORKDIR=/opt/vps-agent
@@ -446,8 +444,8 @@ sudo docker exec repo-openclaw-gateway-1 timeout 10 \
 
 Para habilitar as skills externas em producao:
 
-- definir `FLEETINTEL_MCP_URL`, `FLEETINTEL_CF_ACCESS_CLIENT_ID` e `FLEETINTEL_CF_ACCESS_CLIENT_SECRET`
-- definir `BRAZILCNPJ_MCP_URL`, `BRAZILCNPJ_CF_ACCESS_CLIENT_ID` e `BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET`
+- definir `CONSUMER_SYNC_URL`, `CONSUMER_SLUG`, `CONSUMER_BOOTSTRAP_SECRET` e `CONSUMER_SYNC_STATE_FILE`
+- garantir permissao de escrita em `data/consumer-sync/` para persistir `current_release_id`, `current_bundle_hash` e `current_bundle`
 - opcionalmente ajustar `TELEGRAM_PROGRESS_MESSAGE_THRESHOLD_SECONDS` e `TELEGRAM_TYPING_INTERVAL_SECONDS` para o feedback visual do bot
 - manter `configs/skills-catalog-sources.json` com a fonte `fleetintel_skillpack_repo` habilitada
 - definir `CATALOG_GITHUB_TOKEN` para leitura do repo privado
@@ -464,8 +462,10 @@ Migracao de auth externa:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
 - FleetIntel/BrazilCNPJ agora usam retry curto para falhas transitórias (`502/503/504`, timeout e connect error) e resposta degradada com preflight; quando o preflight ja detecta degradacao, o AgentVPS falha rapido antes de delegar ao `codex_operator` ou ao caminho especialista lento
 - use apenas os endpoints `https://agent-fleet.gtaitson.space/mcp` e `https://agent-cnpj.gtaitson.space/mcp`
-- a autenticacao externa agora e feita por Cloudflare Access Service Tokens
-- nao existe compatibilidade reversa com bearer token legado no lado AgentVPS
+- a autenticacao externa agora vem do credential bundle retornado pelo consumer sync machine-pull
+- o bundle inclui os headers Cloudflare Access usados pelos clientes MCP externos
+- se uma chamada MCP externa receber `403`, o AgentVPS executa consumer sync uma vez e so repete a chamada se houver bundle novo
+- nao existe compatibilidade reversa com bearer token legado nem com credenciais CF estaticas no lado AgentVPS
 
 
 ## Captura de Contexto por Voz

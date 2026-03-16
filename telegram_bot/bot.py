@@ -24,6 +24,7 @@ from telegram.ext import (
 
 # VPS-Agent Core (nosso mÃƒÂ³dulo)
 from core.env import load_project_env
+from core.integrations import warmup_consumer_sync
 from core.vps_agent.agent import process_message_async
 
 # Telegram Log Handler (F0-06)
@@ -1047,6 +1048,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Inicializa e roda o bot com timeout otimizado."""
     logger.info("iniciando_bot", token=f"{TOKEN[:10]}...")
+    asyncio.run(warmup_consumer_sync())
 
     app = (
         Application.builder()

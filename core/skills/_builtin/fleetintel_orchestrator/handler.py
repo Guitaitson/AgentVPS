@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 
 import structlog
 
 from core.integrations import (
-    RemoteMCPClient,
+    ConsumerSyncError,
     RemoteMCPError,
+    build_specialist_mcp_client,
     extract_cnpjs,
     extract_company_count_query,
     render_result_block,
@@ -18,13 +18,6 @@ from core.integrations import (
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
-
-FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://agent-fleet.gtaitson.space/mcp")
-FLEETINTEL_CF_ACCESS_CLIENT_ID = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_ID", "")
-FLEETINTEL_CF_ACCESS_CLIENT_SECRET = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_SECRET", "")
-BRAZILCNPJ_MCP_URL = os.getenv("BRAZILCNPJ_MCP_URL", "https://agent-cnpj.gtaitson.space/mcp")
-BRAZILCNPJ_CF_ACCESS_CLIENT_ID = os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_ID", "")
-BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET = os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET", "")
 
 
 class FleetIntelOrchestratorSkill(SkillBase):
@@ -34,34 +27,30 @@ class FleetIntelOrchestratorSkill(SkillBase):
         if not query:
             return "Informe a pergunta comercial que deve cruzar FleetIntel e BrazilCNPJ."
 
-        fleet_client = RemoteMCPClient(
-            base_url=FLEETINTEL_MCP_URL,
-            access_client_id=FLEETINTEL_CF_ACCESS_CLIENT_ID,
-            access_client_secret=FLEETINTEL_CF_ACCESS_CLIENT_SECRET,
-            client_name="agentvps-fleetintel-orchestrator",
-            server_name="fleetintel",
-        )
-        cnpj_client = RemoteMCPClient(
-            base_url=BRAZILCNPJ_MCP_URL,
-            access_client_id=BRAZILCNPJ_CF_ACCESS_CLIENT_ID,
-            access_client_secret=BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET,
-            client_name="agentvps-brazilcnpj-orchestrator",
-            server_name="brazilcnpj",
-        )
-        if not fleet_client.is_configured:
-            return (
-                "FleetIntel MCP nao configurado. Ajuste FLEETINTEL_MCP_URL, "
-                "FLEETINTEL_CF_ACCESS_CLIENT_ID e FLEETINTEL_CF_ACCESS_CLIENT_SECRET."
+        try:
+            fleet_client = build_specialist_mcp_client(
+                "fleetintel",
+                client_name="agentvps-fleetintel-orchestrator",
             )
+            cnpj_client = build_specialist_mcp_client(
+                "brazilcnpj",
+                client_name="agentvps-brazilcnpj-orchestrator",
+            )
+        except ConsumerSyncError as exc:
+            return str(exc)
 
         logger.info("fleetintel_orchestrator_execute", query=query[:120])
         try:
             ops = await fleet_client.call_tool("get_operations_status", {})
+        except ConsumerSyncError as exc:
+            return str(exc)
         except RemoteMCPError as exc:
             return self._format_fleet_failure(error=exc, query=query)
         fleet_tool, fleet_args = self._route_fleet_query(query)
         try:
             fleet_result = await fleet_client.call_tool(fleet_tool, fleet_args)
+        except ConsumerSyncError as exc:
+            return str(exc)
         except RemoteMCPError as exc:
             return self._format_fleet_failure(error=exc, query=query, ops=ops, tool_name=fleet_tool)
 

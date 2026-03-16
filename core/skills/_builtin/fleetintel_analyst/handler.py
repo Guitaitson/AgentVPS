@@ -2,25 +2,22 @@
 
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 
 import structlog
 
 from core.integrations import (
+    ConsumerSyncError,
     RemoteMCPClient,
     RemoteMCPError,
+    build_specialist_mcp_client,
     extract_company_count_query,
     render_result_block,
 )
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
-
-FLEETINTEL_MCP_URL = os.getenv("FLEETINTEL_MCP_URL", "https://agent-fleet.gtaitson.space/mcp")
-FLEETINTEL_CF_ACCESS_CLIENT_ID = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_ID", "")
-FLEETINTEL_CF_ACCESS_CLIENT_SECRET = os.getenv("FLEETINTEL_CF_ACCESS_CLIENT_SECRET", "")
 
 
 class FleetIntelAnalystSkill(SkillBase):
@@ -32,23 +29,20 @@ class FleetIntelAnalystSkill(SkillBase):
                 "Informe uma pergunta sobre frota, emplacamentos, sinais de compra ou tendencias."
             )
 
-        client = RemoteMCPClient(
-            base_url=FLEETINTEL_MCP_URL,
-            access_client_id=FLEETINTEL_CF_ACCESS_CLIENT_ID,
-            access_client_secret=FLEETINTEL_CF_ACCESS_CLIENT_SECRET,
-            client_name="agentvps-fleetintel-analyst",
-            server_name="fleetintel",
-        )
-        if not client.is_configured:
-            return (
-                "FleetIntel MCP nao configurado. Ajuste FLEETINTEL_MCP_URL, "
-                "FLEETINTEL_CF_ACCESS_CLIENT_ID e FLEETINTEL_CF_ACCESS_CLIENT_SECRET."
+        try:
+            client = build_specialist_mcp_client(
+                "fleetintel",
+                client_name="agentvps-fleetintel-analyst",
             )
+        except ConsumerSyncError as exc:
+            return str(exc)
 
         tool_name, tool_args = self._route(query)
         logger.info("fleetintel_analyst_execute", tool=tool_name)
         try:
             result = await client.call_tool(tool_name, tool_args)
+        except ConsumerSyncError as exc:
+            return str(exc)
         except RemoteMCPError as exc:
             return await self._format_remote_failure(
                 client=client,
