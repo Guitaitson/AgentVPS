@@ -141,6 +141,7 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
         "get_market_changes_brief",
     ]
     assert manager.fallback_tools_for("fleetintel", second) == ["get_operations_status"]
+    assert manager.should_use_preferred_tools("fleetintel", second) is True
 
 
 @pytest.mark.asyncio
@@ -180,3 +181,51 @@ async def test_consumer_sync_marks_revoked_consumer_unavailable(monkeypatch):
     assert state.last_sync_status == "revoked"
     with pytest.raises(ConsumerSyncUnavailableError):
         await manager.ensure_bundle()
+
+
+@pytest.mark.asyncio
+async def test_consumer_sync_disables_preferred_tools_when_not_compatible(monkeypatch):
+    async def fake_post(self, url, json=None, headers=None):
+        return _MockResponse(
+            json_data={
+                "sync_status": "bundle_update_required",
+                "release_id": "rel-4",
+                "bundle_hash": "hash-4",
+                "credential_bundle": {
+                    "values": {
+                        "FLEETINTEL_MCP_URL": "https://agent-fleet.gtaitson.space/mcp",
+                        "FLEETINTEL_CF_ACCESS_CLIENT_ID": "fleet-id",
+                        "FLEETINTEL_CF_ACCESS_CLIENT_SECRET": "fleet-secret",
+                        "BRAZILCNPJ_MCP_URL": "https://agent-cnpj.gtaitson.space/mcp",
+                        "BRAZILCNPJ_CF_ACCESS_CLIENT_ID": "cnpj-id",
+                        "BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET": "cnpj-secret",
+                    }
+                },
+                "contract": {
+                    "contract_version": "v1",
+                    "response_contract_version": "client_brief_v1",
+                    "preferred_client_tools": {
+                        "fleetintel": ["get_client_readiness_status"],
+                    },
+                },
+                "client_adaptation": {
+                    "compatibility_status": "upgrade_recommended",
+                    "preferred_client_tools": {
+                        "fleetintel": ["get_client_readiness_status"],
+                    },
+                    "fallback_tools": {
+                        "fleetintel": ["get_operations_status"],
+                    },
+                    "required_actions": ["Use preferred_client_tools before promotion."],
+                },
+            }
+        )
+
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
+
+    manager = get_consumer_sync_manager()
+    state = await manager.sync()
+
+    assert manager.preferred_tools_for("fleetintel", state) == ["get_client_readiness_status"]
+    assert manager.should_use_preferred_tools("fleetintel", state) is False
+    assert manager.fallback_tools_for("fleetintel", state) == ["get_operations_status"]
