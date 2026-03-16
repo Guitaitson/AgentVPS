@@ -5,6 +5,7 @@ from core.integrations import (
     RemoteMCPError,
     detect_external_skill,
     extract_company_count_query,
+    select_codex_execution_mode,
     should_delegate_specialist_to_codex,
 )
 from core.integrations import specialist_health as specialist_health_module
@@ -60,10 +61,38 @@ def test_extract_company_count_query_for_company_year_volume():
     }
 
 
-def test_should_delegate_specialist_to_codex_for_complex_requests():
+def test_select_codex_execution_mode_for_specialist_requests():
+    assert (
+        select_codex_execution_mode(
+            "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
+            "fleetintel_analyst",
+        )
+        == "codex_synthesizer"
+    )
+    assert (
+        select_codex_execution_mode(
+            "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me dizer sobre a conta.",
+            "fleetintel_orchestrator",
+        )
+        == "codex_synthesizer"
+    )
+    assert (
+        select_codex_execution_mode(
+            "Use o FleetIntel Orchestrator para validar o CNPJ 23.373.000/0001-32 e mostrar socios.",
+            "fleetintel_orchestrator",
+        )
+        == "direct_local"
+    )
+    assert (
+        select_codex_execution_mode(
+            "Quais contas devo priorizar por sinais de compra cruzando FleetIntel e CNPJ?",
+            "fleetintel_orchestrator",
+        )
+        == "codex_operator"
+    )
     assert (
         should_delegate_specialist_to_codex(
-            "Use o FleetIntel para analisar o CNPJ 23.373.000/0001-32 e resumir sinais relevantes.",
+            "Use o FleetIntel Analyst para me dar os latest insights do FleetIntel.",
             "fleetintel_analyst",
         )
         is True

@@ -20,7 +20,8 @@ from ..integrations import (
     detect_external_skill,
     emit_health_failure_progress,
     format_specialist_health_failure,
-    should_delegate_specialist_to_codex,
+    select_codex_execution_mode,
+    wants_raw_specialist_output,
 )
 from ..orchestration import RuntimeExecutionRequest, RuntimeProtocol, get_runtime_router
 from ..progress import emit_progress
@@ -32,8 +33,8 @@ logger = structlog.get_logger()
 MAX_REACT_STEPS = 5  # Máximo de iterações tool→observation→thought
 
 
-def _render_codex_operator_response(payload: dict) -> str:
-    lines = ["Operador Codex", ""]
+def _render_codex_response(payload: dict, *, heading: str | None = None) -> str:
+    lines = [heading, ""] if heading else []
     answer = str(payload.get("answer") or payload.get("summary") or "").strip()
     if answer:
         lines.append(answer)
@@ -53,6 +54,29 @@ def _render_codex_operator_response(payload: dict) -> str:
         lines.append("")
         lines.append("Esta resposta pede aprovacao humana antes de qualquer acao sensivel.")
     return "\n".join(lines).strip()
+
+
+def _format_specialist_contract_mismatch(
+    specialist_name: str,
+    *,
+    codex_available: bool,
+) -> str:
+    specialist_label = {
+        "fleetintel_analyst": "FleetIntel Analyst",
+        "fleetintel_orchestrator": "FleetIntel Orchestrator",
+        "brazilcnpj": "BrazilCNPJ",
+    }.get(specialist_name, specialist_name)
+    if codex_available:
+        return (
+            f"{specialist_label}\n\n"
+            "A consulta trouxe working data tecnica, mas nao consegui consolidar isso em resposta executiva agora. "
+            "Nao vou despejar JSON cru aqui. Posso tentar novamente depois ou mostrar o payload se voce pedir explicitamente."
+        )
+    return (
+        f"{specialist_label}\n\n"
+        "Esta consulta pede sintese executiva do especialista externo, mas o sintetizador Codex nao esta disponivel no momento. "
+        "Nao vou despejar JSON cru aqui. Posso tentar novamente depois ou mostrar o payload se voce pedir explicitamente."
+    )
 
 
 def build_react_system_prompt() -> str:
@@ -138,10 +162,10 @@ async def node_react(state: AgentState) -> AgentState:
                         "response": format_specialist_health_failure(health),
                         "plan": None,
                     }
-                use_codex = router.has_protocol(
-                    RuntimeProtocol.CODEX_OPERATOR
-                ) and should_delegate_specialist_to_codex(user_message, specialist_name)
-                if use_codex:
+                codex_mode = select_codex_execution_mode(user_message, specialist_name)
+                raw_requested = wants_raw_specialist_output(user_message)
+                has_codex = router.has_protocol(RuntimeProtocol.CODEX_OPERATOR)
+                if has_codex and codex_mode == "codex_operator":
                     if specialist_name.startswith("fleetintel"):
                         await emit_progress("external_call", server="fleetintel", status="start")
                     elif specialist_name == "brazilcnpj":
@@ -163,6 +187,7 @@ async def node_react(state: AgentState) -> AgentState:
                                 },
                                 user_id=state.get("user_id", ""),
                                 context={
+                                    "codex_mode": "operator",
                                     "conversation_history": conversation_history[-6:],
                                     "user_message": user_message,
                                     "specialist_name": specialist_name,
@@ -191,7 +216,10 @@ async def node_react(state: AgentState) -> AgentState:
                                 **state,
                                 "intent": "task",
                                 "action_required": False,
-                                "response": _render_codex_operator_response(codex_result.output),
+                                "response": _render_codex_response(
+                                    codex_result.output,
+                                    heading="Operador Codex",
+                                ),
                                 "plan": None,
                             }
                         logger.warning(
@@ -207,6 +235,84 @@ async def node_react(state: AgentState) -> AgentState:
                     specialist_name,
                     {"raw_input": user_message, "query": user_message},
                 )
+                if codex_mode == "codex_synthesizer" and not raw_requested:
+                    if not has_codex:
+                        return {
+                            **state,
+                            "intent": "task",
+                            "action_required": False,
+                            "response": _format_specialist_contract_mismatch(
+                                specialist_name,
+                                codex_available=False,
+                            ),
+                            "plan": None,
+                        }
+                    await emit_progress(
+                        "routing",
+                        server="codex_operator",
+                        specialist=specialist_name,
+                        mode="synthesizer",
+                    )
+                    codex_result = await router.dispatch(
+                        RuntimeExecutionRequest(
+                            action=specialist_name,
+                            args={
+                                "query": user_message,
+                                "specialist_name": specialist_name,
+                                "specialist_result": str(specialist_result),
+                            },
+                            user_id=state.get("user_id", ""),
+                            context={
+                                "codex_mode": "synthesizer",
+                                "conversation_history": conversation_history[-6:],
+                                "user_message": user_message,
+                                "specialist_name": specialist_name,
+                                "specialist_result": str(specialist_result),
+                                "external_skill_contract": {
+                                    "external_name": contract.external_name,
+                                    "version": contract.version,
+                                    "execution_mode": contract.execution_mode,
+                                    "response_owner": contract.response_owner,
+                                    "raw_output_policy": contract.raw_output_policy,
+                                    "description": contract.description,
+                                }
+                                if contract
+                                else None,
+                            },
+                            context_keys=[
+                                "codex_mode",
+                                "conversation_history",
+                                "user_message",
+                                "specialist_name",
+                                "specialist_result",
+                                "external_skill_contract",
+                            ],
+                            preferred_protocol=RuntimeProtocol.CODEX_OPERATOR,
+                        )
+                    )
+                    if codex_result.success and isinstance(codex_result.output, dict):
+                        return {
+                            **state,
+                            "intent": "task",
+                            "action_required": False,
+                            "response": _render_codex_response(codex_result.output),
+                            "plan": None,
+                        }
+                    logger.warning(
+                        "react_codex_synthesizer_failed",
+                        skill=specialist_name,
+                        error=codex_result.error,
+                    )
+                    return {
+                        **state,
+                        "intent": "task",
+                        "action_required": False,
+                        "response": _format_specialist_contract_mismatch(
+                            specialist_name,
+                            codex_available=True,
+                        ),
+                        "plan": None,
+                    }
                 return {
                     **state,
                     "intent": "task",

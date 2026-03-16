@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from typing import Literal
 
 FLEET_KEYWORDS = [
     "camin",
@@ -81,6 +82,8 @@ COMPANY_VOLUME_NOUNS = [
     "unidad",
 ]
 
+CodexExecutionMode = Literal["direct_local", "codex_synthesizer", "codex_operator"]
+
 
 def detect_external_skill(message: str) -> str | None:
     msg = _normalize_text(message)
@@ -118,41 +121,114 @@ def detect_external_skill(message: str) -> str | None:
     return None
 
 
-def should_delegate_specialist_to_codex(message: str, specialist_name: str) -> bool:
+def select_codex_execution_mode(message: str, specialist_name: str) -> CodexExecutionMode:
     msg = _normalize_text(message)
-    explicit_specialist_markers = (
-        "skill fleetintel",
-        "skill fleetintel_analyst",
-        "fleetintel analyst",
-        "skill fleetintel_orchestrator",
-        "fleetintel orchestrator",
-        "skill brazilcnpj",
-        "brazilcnpj enricher",
-    )
-    if any(marker in msg for marker in explicit_specialist_markers):
-        return False
-    if "codex" in msg:
-        return True
-    if specialist_name == "fleetintel_orchestrator":
-        return True
-    if specialist_name not in {"fleetintel_analyst", "brazilcnpj"}:
-        return False
+    if wants_raw_specialist_output(msg):
+        return "direct_local"
 
-    complexity_markers = (
-        "resumir",
-        "resuma",
-        "analisar",
-        "analise",
-        "investigar",
-        "explique",
-        "por que",
-        "porque",
-        "o que mudou",
-        "sinais relevantes",
+    explicit_specialist_markers = {
+        "fleetintel": ("skill fleetintel", "use a skill fleetintel"),
+        "fleetintel_analyst": ("skill fleetintel_analyst", "fleetintel analyst"),
+        "fleetintel_orchestrator": ("skill fleetintel_orchestrator", "fleetintel orchestrator"),
+        "brazilcnpj": ("skill brazilcnpj", "brazilcnpj enricher"),
+    }
+    explicit_skill = any(
+        marker in msg for marker in explicit_specialist_markers.get(specialist_name, ())
     )
-    has_complexity = any(marker in msg for marker in complexity_markers)
-    has_multi_domain_hint = "cnpj" in msg and any(keyword in msg for keyword in FLEET_KEYWORDS)
-    return has_complexity and has_multi_domain_hint
+
+    if "codex" in msg:
+        return "codex_operator"
+
+    if specialist_name == "fleetintel_orchestrator":
+        if explicit_skill and _looks_like_deterministic_profile_request(msg):
+            return "direct_local"
+        if explicit_skill:
+            return "codex_synthesizer"
+        return "codex_operator"
+
+    if specialist_name == "fleetintel_analyst":
+        if explicit_skill:
+            return "codex_synthesizer" if _wants_narrative_synthesis(msg) else "direct_local"
+        if _is_implicit_complex_multi_domain(msg):
+            return "codex_operator"
+        return "direct_local"
+
+    if specialist_name == "brazilcnpj":
+        if explicit_skill and _wants_narrative_synthesis(msg) and "cnpj" in msg:
+            return "codex_synthesizer"
+        return "direct_local"
+
+    return "direct_local"
+
+
+def should_delegate_specialist_to_codex(message: str, specialist_name: str) -> bool:
+    return select_codex_execution_mode(message, specialist_name) in {
+        "codex_synthesizer",
+        "codex_operator",
+    }
+
+
+def wants_raw_specialist_output(message: str) -> bool:
+    return any(
+        marker in message
+        for marker in (
+            " raw",
+            "json",
+            "payload",
+            "bloco tecnico",
+            "bloco técnico",
+            "output cru",
+        )
+    )
+
+
+def _looks_like_deterministic_profile_request(message: str) -> bool:
+    has_cnpj = "cnpj" in message or bool(re.search(r"\b\d{14}\b", re.sub(r"\D", "", message)))
+    deterministic_markers = (
+        "perfil",
+        "empresa",
+        "validar",
+        "cadastro",
+        "socio",
+        "socios",
+        "grupo economico",
+        "grupo economico",
+    )
+    return has_cnpj and any(marker in message for marker in deterministic_markers)
+
+
+def _wants_narrative_synthesis(message: str) -> bool:
+    return any(
+        marker in message
+        for marker in (
+            "insights",
+            "o que mudou",
+            "resuma",
+            "resumir",
+            "resumo",
+            "analise",
+            "analisar",
+            "explique",
+            "priorizar",
+            "prioridade",
+            "sinais relevantes",
+            "unica resposta",
+            "única resposta",
+            "me dizer sobre",
+            "falar da frota",
+        )
+    )
+
+
+def _is_implicit_complex_multi_domain(message: str) -> bool:
+    return _wants_narrative_synthesis(message) and (
+        ("cnpj" in message and any(keyword in message for keyword in FLEET_KEYWORDS))
+        or specialist_name_like_cross_domain(message)
+    )
+
+
+def specialist_name_like_cross_domain(message: str) -> bool:
+    return any(keyword in message for keyword in ORCHESTRATION_KEYWORDS)
 
 
 def _normalize_text(value: str) -> str:
