@@ -80,6 +80,8 @@ Skills com `dangerous` requerem aprovação humana (configurável via `on-danger
 
 Os especialistas `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator` usam MCP remoto autenticado por Cloudflare Access Service Tokens e sao escolhidos automaticamente quando a pergunta pede inteligencia de frota, enriquecimento CNPJ ou cruzamento dos dois dominios.
 
+Antes de qualquer delegacao externa lenta, o AgentVPS roda um preflight curto de FleetIntel/BrazilCNPJ e falha rapido quando o especialista ja esta degradado.
+
 Opcionalmente, o runtime `codex_operator` pode atuar como operador local desses especialistas em consultas mais ambigüas ou multi-etapas. Nesse modo, o AgentVPS continua soberano em memória, políticas e resposta final; o Codex recebe apenas um envelope filtrado e só pode chamar especialistas allowlisted via bridge local.
 
 No Telegram, requests lentos agora mostram `typing` recorrente e uma unica mensagem de progresso editavel, em vez de parecerem travados.
@@ -255,6 +257,9 @@ ORCH_CODEX_MODEL=
 ORCH_CODEX_TIMEOUT_SECONDS=360
 ORCH_CODEX_HEARTBEAT_SECONDS=15
 ORCH_CODEX_ABNORMAL_AFTER_SECONDS=45
+ORCH_SPECIALIST_PREFLIGHT_TTL_SECONDS=300
+ORCH_SPECIALIST_PREFLIGHT_TIMEOUT_SECONDS=8
+ORCH_SPECIALIST_PREFLIGHT_MAX_ATTEMPTS=1
 ```
 
 Migracao de auth externa FleetIntel/BrazilCNPJ:
@@ -263,6 +268,7 @@ Migracao de auth externa FleetIntel/BrazilCNPJ:
 - nao ha compatibilidade reversa com bearer token legado no AgentVPS
 - consultas FleetIntel/BrazilCNPJ usam retry curto para `502/503/504`, timeout e erro de conexao
 - em falha, o AgentVPS tenta preflight (`get_operations_status` ou `health_check`) antes de responder ao usuario
+- quando o preflight ja indica degradacao, o AgentVPS responde rapido e nao entra no `codex_operator` nem no caminho lento do especialista
 - se o runtime `codex_operator` for habilitado, ele exige Codex CLI instalado e autenticado no mesmo usuario do servico (`root` na VPS atual)
 - o operador Codex roda em diretório temporário isolado e só acessa especialistas allowlisted via `core.codex_operator_bridge`
 
