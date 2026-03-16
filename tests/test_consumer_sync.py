@@ -57,6 +57,41 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
                     "text": "bundle text",
                     "hash": "hash-2",
                 },
+                "contract": {
+                    "contract_version": "v1",
+                    "response_contract_version": "client_brief_v1",
+                    "preferred_client_tools": {
+                        "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
+                        "brazilcnpj": ["health_check", "get_company_registry_brief"],
+                    },
+                    "legacy_tool_policy": {"raw_tools_default_for_clients": False},
+                    "release_change_summary": ["troca para surfaces brief"],
+                    "client_impact_summary": ["cliente deve usar preferred_client_tools"],
+                    "behavioral_change_flags": {"brief_surfaces_enabled": True},
+                    "refresh_policy": {"on_403": "sync_once_retry_once"},
+                    "error_semantics": {"http_403": "access"},
+                    "responsibility_boundary": {"specialist_output": "fleetintel"},
+                    "server_release": {
+                        "version": "0.1.0",
+                        "git_sha": "abc1234",
+                        "build_timestamp": "2026-03-16T15:42:44Z",
+                        "supported_contract_versions": ["v1"],
+                    },
+                },
+                "client_adaptation": {
+                    "compatibility_status": "compatible",
+                    "response_contract_version_to_use": "client_brief_v1",
+                    "preferred_client_tools": {
+                        "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
+                        "brazilcnpj": ["health_check", "get_company_registry_brief"],
+                    },
+                    "fallback_tools": {
+                        "fleetintel": ["get_operations_status"],
+                        "brazilcnpj": ["health_check"],
+                    },
+                    "required_actions": ["nenhuma"],
+                    "deprecation_notices": ["raw tools deprecated"],
+                },
             }
         ),
         _MockResponse(
@@ -92,10 +127,20 @@ async def test_consumer_sync_persists_bundle_update_then_up_to_date(monkeypatch,
     assert payload["current_release_id"] == "rel-2"
     assert payload["current_bundle_hash"] == "hash-2"
     assert payload["current_bundle"]["values"]["FLEETINTEL_CF_ACCESS_CLIENT_ID"] == "fleet-id"
+    assert payload["contract"]["contract_version"] == "v1"
+    assert payload["client_adaptation"]["compatibility_status"] == "compatible"
 
     fleet_connection = await manager.resolve_service_connection("fleetintel")
     assert fleet_connection.base_url == "https://agent-fleet.gtaitson.space/mcp"
     assert fleet_connection.access_client_id == "fleet-id"
+    assert second.contract.contract_version == "v1"
+    assert second.contract.server_release.version == "0.1.0"
+    assert second.client_adaptation.response_contract_version_to_use == "client_brief_v1"
+    assert manager.preferred_tools_for("fleetintel", second) == [
+        "get_client_readiness_status",
+        "get_market_changes_brief",
+    ]
+    assert manager.fallback_tools_for("fleetintel", second) == ["get_operations_status"]
 
 
 @pytest.mark.asyncio
