@@ -93,15 +93,15 @@ class ConsumerSyncContract:
 class ClientAdaptation:
     compatibility_status: str | None = None
     compatibility_reason_codes: list[str] = field(default_factory=list)
-    criteria: dict[str, Any] = field(default_factory=dict)
+    criteria: list[dict[str, Any]] = field(default_factory=list)
     criteria_results: dict[str, Any] = field(default_factory=dict)
     response_contract_version_to_use: str | None = None
     recognized_client_behavior_version: str | None = None
     recognized_response_contract_version: str | None = None
-    recognized_preferred_client_tools: dict[str, list[str]] = field(default_factory=dict)
+    recognized_preferred_client_tools: list[str] = field(default_factory=list)
     preferred_client_tools: dict[str, list[str]] = field(default_factory=dict)
     fallback_tools: dict[str, list[str]] = field(default_factory=dict)
-    tool_surface: str | None = None
+    tool_surface: dict[str, Any] = field(default_factory=dict)
     client_capabilities_seen: ClientCapabilities | None = None
     required_actions: list[str] = field(default_factory=list)
     deprecation_notices: list[str] = field(default_factory=list)
@@ -111,7 +111,7 @@ class ClientAdaptation:
 class RolloutStatus:
     status: str | None = None
     reason: str | None = None
-    validation_requirements: list[str] = field(default_factory=list)
+    validation_requirements: list[dict[str, Any]] = field(default_factory=list)
     latest_validation_summary: dict[str, Any] = field(default_factory=dict)
 
 
@@ -191,6 +191,12 @@ def _normalize_string_list(payload: Any) -> list[str]:
     return [str(item).strip() for item in payload if str(item).strip()]
 
 
+def _normalize_object_list(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
 def _parse_client_capabilities(payload: Any) -> ClientCapabilities | None:
     if not isinstance(payload, dict):
         return None
@@ -257,7 +263,7 @@ def _parse_client_adaptation(payload: Any) -> ClientAdaptation | None:
         compatibility_reason_codes=_normalize_string_list(
             payload.get("compatibility_reason_codes")
         ),
-        criteria=payload.get("criteria") if isinstance(payload.get("criteria"), dict) else {},
+        criteria=_normalize_object_list(payload.get("criteria")),
         criteria_results=payload.get("criteria_results")
         if isinstance(payload.get("criteria_results"), dict)
         else {},
@@ -273,12 +279,14 @@ def _parse_client_adaptation(payload: Any) -> ClientAdaptation | None:
             payload.get("recognized_response_contract_version") or ""
         ).strip()
         or None,
-        recognized_preferred_client_tools=_normalize_tool_mapping(
+        recognized_preferred_client_tools=_normalize_string_list(
             payload.get("recognized_preferred_client_tools")
         ),
         preferred_client_tools=_normalize_tool_mapping(payload.get("preferred_client_tools")),
         fallback_tools=_normalize_tool_mapping(payload.get("fallback_tools")),
-        tool_surface=str(payload.get("tool_surface") or "").strip() or None,
+        tool_surface=payload.get("tool_surface")
+        if isinstance(payload.get("tool_surface"), dict)
+        else {},
         client_capabilities_seen=_parse_client_capabilities(
             payload.get("client_capabilities_seen")
         ),
@@ -293,7 +301,7 @@ def _parse_rollout_status(payload: Any) -> RolloutStatus | None:
     return RolloutStatus(
         status=str(payload.get("status") or "").strip() or None,
         reason=str(payload.get("reason") or "").strip() or None,
-        validation_requirements=_normalize_string_list(payload.get("validation_requirements")),
+        validation_requirements=_normalize_object_list(payload.get("validation_requirements")),
         latest_validation_summary=payload.get("latest_validation_summary")
         if isinstance(payload.get("latest_validation_summary"), dict)
         else {},
