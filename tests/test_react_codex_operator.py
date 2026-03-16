@@ -97,7 +97,9 @@ async def test_node_react_prefers_codex_operator_for_complex_specialist_queries(
 
 
 @pytest.mark.asyncio
-async def test_node_react_prefers_codex_operator_when_external_contract_owns_response(monkeypatch):
+async def test_node_react_executes_specialist_directly_when_explicit_skill_bypasses_codex(
+    monkeypatch,
+):
     registry = _FakeRegistry()
 
     monkeypatch.setattr("core.vps_langgraph.react_node.get_skill_registry", lambda: registry)
@@ -141,8 +143,16 @@ async def test_node_react_prefers_codex_operator_when_external_contract_owns_res
 
     result = await node_react(state)
 
-    assert "Operador Codex" in result["response"]
-    assert registry.executed == []
+    assert result["response"] == "local specialist"
+    assert registry.executed == [
+        (
+            "fleetintel_orchestrator",
+            {
+                "raw_input": "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me responder.",
+                "query": "Use o FleetIntel Orchestrator para cruzar frota e CNPJ e me responder.",
+            },
+        )
+    ]
 
 
 @pytest.mark.asyncio
