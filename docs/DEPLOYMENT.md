@@ -103,6 +103,7 @@ OPENROUTER_MAX_TOKENS=2048
 OPENROUTER_TIMEOUT=30
 OPENROUTER_TEMPERATURE=0.7
 CONSUMER_SYNC_URL=https://request-access.gtaitson.space/api/consumer-sync/v1/sync
+CONSUMER_VALIDATION_REPORT_URL=https://consumer-sync.gtaitson.space/api/consumer-sync/v1/validation-report
 CONSUMER_SLUG=agentvps
 CONSUMER_BOOTSTRAP_SECRET=bootstrap-secret-do-agentvps
 CONSUMER_SYNC_STATE_FILE=data/consumer-sync/agentvps.json

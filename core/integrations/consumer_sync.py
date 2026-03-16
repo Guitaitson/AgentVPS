@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -54,12 +54,48 @@ class ConsumerSyncUnavailableError(ConsumerSyncError):
 
 
 @dataclass(frozen=True, slots=True)
+class ServerReleaseInfo:
+    version: str | None = None
+    git_sha: str | None = None
+    build_timestamp: str | None = None
+    supported_contract_versions: list[str] = field(default_factory=list)
+    source: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConsumerSyncContract:
+    contract_version: str | None = None
+    response_contract_version: str | None = None
+    preferred_client_tools: dict[str, list[str]] = field(default_factory=dict)
+    legacy_tool_policy: dict[str, Any] = field(default_factory=dict)
+    release_change_summary: list[str] = field(default_factory=list)
+    client_impact_summary: list[str] = field(default_factory=list)
+    behavioral_change_flags: dict[str, Any] = field(default_factory=dict)
+    refresh_policy: dict[str, Any] = field(default_factory=dict)
+    error_semantics: dict[str, Any] = field(default_factory=dict)
+    responsibility_boundary: dict[str, Any] = field(default_factory=dict)
+    server_release: ServerReleaseInfo | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ClientAdaptation:
+    compatibility_status: str | None = None
+    response_contract_version_to_use: str | None = None
+    preferred_client_tools: dict[str, list[str]] = field(default_factory=dict)
+    fallback_tools: dict[str, list[str]] = field(default_factory=dict)
+    required_actions: list[str] = field(default_factory=list)
+    deprecation_notices: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
 class ConsumerSyncState:
     current_release_id: str | None = None
     current_bundle_hash: str | None = None
     current_bundle: dict[str, Any] | None = None
     last_sync_status: str | None = None
     last_sync_at: str | None = None
+    contract: ConsumerSyncContract | None = None
+    client_adaptation: ClientAdaptation | None = None
 
 
 def _repo_root() -> Path:
@@ -102,6 +138,89 @@ def _agent_commit() -> str:
     return _run_git("rev-parse", "--short", "HEAD") or ""
 
 
+def get_agent_version() -> str:
+    return _agent_version()
+
+
+def get_agent_commit() -> str:
+    return _agent_commit()
+
+
+def _normalize_tool_mapping(payload: Any) -> dict[str, list[str]]:
+    if not isinstance(payload, dict):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for service, tools in payload.items():
+        if isinstance(tools, list):
+            normalized[str(service)] = [str(item).strip() for item in tools if str(item).strip()]
+    return normalized
+
+
+def _normalize_string_list(payload: Any) -> list[str]:
+    if not isinstance(payload, list):
+        return []
+    return [str(item).strip() for item in payload if str(item).strip()]
+
+
+def _parse_server_release(payload: Any) -> ServerReleaseInfo | None:
+    if not isinstance(payload, dict):
+        return None
+    return ServerReleaseInfo(
+        version=str(payload.get("version") or "").strip() or None,
+        git_sha=str(payload.get("git_sha") or "").strip() or None,
+        build_timestamp=str(payload.get("build_timestamp") or "").strip() or None,
+        supported_contract_versions=_normalize_string_list(
+            payload.get("supported_contract_versions")
+        ),
+        source=str(payload.get("source") or "").strip() or None,
+    )
+
+
+def _parse_contract(payload: Any) -> ConsumerSyncContract | None:
+    if not isinstance(payload, dict):
+        return None
+    return ConsumerSyncContract(
+        contract_version=str(payload.get("contract_version") or "").strip() or None,
+        response_contract_version=str(payload.get("response_contract_version") or "").strip()
+        or None,
+        preferred_client_tools=_normalize_tool_mapping(payload.get("preferred_client_tools")),
+        legacy_tool_policy=payload.get("legacy_tool_policy")
+        if isinstance(payload.get("legacy_tool_policy"), dict)
+        else {},
+        release_change_summary=_normalize_string_list(payload.get("release_change_summary")),
+        client_impact_summary=_normalize_string_list(payload.get("client_impact_summary")),
+        behavioral_change_flags=payload.get("behavioral_change_flags")
+        if isinstance(payload.get("behavioral_change_flags"), dict)
+        else {},
+        refresh_policy=payload.get("refresh_policy")
+        if isinstance(payload.get("refresh_policy"), dict)
+        else {},
+        error_semantics=payload.get("error_semantics")
+        if isinstance(payload.get("error_semantics"), dict)
+        else {},
+        responsibility_boundary=payload.get("responsibility_boundary")
+        if isinstance(payload.get("responsibility_boundary"), dict)
+        else {},
+        server_release=_parse_server_release(payload.get("server_release")),
+    )
+
+
+def _parse_client_adaptation(payload: Any) -> ClientAdaptation | None:
+    if not isinstance(payload, dict):
+        return None
+    return ClientAdaptation(
+        compatibility_status=str(payload.get("compatibility_status") or "").strip() or None,
+        response_contract_version_to_use=str(
+            payload.get("response_contract_version_to_use") or ""
+        ).strip()
+        or None,
+        preferred_client_tools=_normalize_tool_mapping(payload.get("preferred_client_tools")),
+        fallback_tools=_normalize_tool_mapping(payload.get("fallback_tools")),
+        required_actions=_normalize_string_list(payload.get("required_actions")),
+        deprecation_notices=_normalize_string_list(payload.get("deprecation_notices")),
+    )
+
+
 class ConsumerSyncManager:
     """Fetches and persists the current external credential bundle."""
 
@@ -139,6 +258,8 @@ class ConsumerSyncManager:
             current_bundle=payload.get("current_bundle"),
             last_sync_status=payload.get("last_sync_status"),
             last_sync_at=payload.get("last_sync_at"),
+            contract=_parse_contract(payload.get("contract")),
+            client_adaptation=_parse_client_adaptation(payload.get("client_adaptation")),
         )
 
     def save_state(self, state: ConsumerSyncState) -> None:
@@ -233,6 +354,8 @@ class ConsumerSyncManager:
                     current_bundle=bundle,
                     last_sync_status=sync_status,
                     last_sync_at=now,
+                    contract=_parse_contract(result.get("contract")),
+                    client_adaptation=_parse_client_adaptation(result.get("client_adaptation")),
                 )
             elif sync_status == "up_to_date":
                 if state.current_bundle is None:
@@ -251,6 +374,9 @@ class ConsumerSyncManager:
                     current_bundle=state.current_bundle,
                     last_sync_status=sync_status,
                     last_sync_at=now,
+                    contract=_parse_contract(result.get("contract")) or state.contract,
+                    client_adaptation=_parse_client_adaptation(result.get("client_adaptation"))
+                    or state.client_adaptation,
                 )
             elif sync_status in {"revoked", "disabled"}:
                 new_state = ConsumerSyncState(
@@ -265,6 +391,9 @@ class ConsumerSyncManager:
                     current_bundle=state.current_bundle,
                     last_sync_status=sync_status,
                     last_sync_at=now,
+                    contract=_parse_contract(result.get("contract")) or state.contract,
+                    client_adaptation=_parse_client_adaptation(result.get("client_adaptation"))
+                    or state.client_adaptation,
                 )
             else:
                 raise ConsumerSyncError(
@@ -318,16 +447,30 @@ class ConsumerSyncManager:
         return self._connection_from_state(service, state)
 
     async def refresh_bundle_once(self, service: str) -> bool:
-        previous = self.load_state()
         refreshed = await self.sync(force_refresh=True)
         if refreshed.last_sync_status in {"revoked", "disabled"}:
             raise ConsumerSyncUnavailableError(
                 f"Especialista externo {service} desabilitado pelo provider FleetIntel."
             )
-        return bool(
-            refreshed.current_bundle_hash
-            and refreshed.current_bundle_hash != previous.current_bundle_hash
-        )
+        return True
+
+    def preferred_tools_for(
+        self, service: str, state: ConsumerSyncState | None = None
+    ) -> list[str]:
+        current_state = state or self.load_state()
+        if current_state.client_adaptation:
+            tools = current_state.client_adaptation.preferred_client_tools.get(service)
+            if tools:
+                return tools
+        if current_state.contract:
+            return current_state.contract.preferred_client_tools.get(service, [])
+        return []
+
+    def fallback_tools_for(self, service: str, state: ConsumerSyncState | None = None) -> list[str]:
+        current_state = state or self.load_state()
+        if current_state.client_adaptation:
+            return current_state.client_adaptation.fallback_tools.get(service, [])
+        return []
 
 
 @lru_cache(maxsize=1)

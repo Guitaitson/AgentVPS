@@ -1,5 +1,6 @@
 """Integration helpers for external runtimes and MCP servers."""
 
+from .consumer_contract_validation import ContractValidationRunner, run_release_validation
 from .consumer_sync import (
     ConsumerSyncError,
     ConsumerSyncUnavailableError,
@@ -38,6 +39,8 @@ __all__ = [
     "get_consumer_sync_manager",
     "reset_consumer_sync_manager_for_tests",
     "warmup_consumer_sync",
+    "ContractValidationRunner",
+    "run_release_validation",
     "detect_external_skill",
     "extract_company_count_query",
     "select_codex_execution_mode",

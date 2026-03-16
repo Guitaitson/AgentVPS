@@ -216,6 +216,10 @@ class ConsumerSyncSettings(BaseSettings):
         default="https://request-access.gtaitson.space/api/consumer-sync/v1/sync",
         description="Endpoint efetivo do consumer sync machine-pull",
     )
+    validation_report_url: str = Field(
+        default="https://consumer-sync.gtaitson.space/api/consumer-sync/v1/validation-report",
+        description="Endpoint canonico para publicar o validation report do consumidor",
+    )
     slug: str = Field(default="agentvps", description="Consumer slug registrado no FleetIntel")
     bootstrap_secret: Optional[str] = Field(
         default=None,

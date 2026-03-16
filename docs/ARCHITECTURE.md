@@ -107,8 +107,9 @@ Skills `dangerous` passam por Tool Policy Engine e requerem aprovação humana (
 
 Roteamento externo:
 - `detect_external_skill()` decide entre `fleetintel_analyst`, `brazilcnpj` e `fleetintel_orchestrator`
-- `core/integrations/consumer_sync.py` faz machine-pull do credential bundle do consumidor `agentvps`, persiste `current_release_id`, `current_bundle_hash` e `current_bundle` em `data/consumer-sync/agentvps.json` e fornece as credenciais dinamicamente para FleetIntel/BrazilCNPJ
-- `RemoteMCPClient` encapsula initialize + tools/call para MCP remoto usando o bundle atual; em `403` do Cloudflare Access ele roda consumer sync uma vez e so repete a chamada se houver bundle novo
+- `core/integrations/consumer_sync.py` faz machine-pull do credential bundle do consumidor `agentvps`, persiste `current_release_id`, `current_bundle_hash`, `current_bundle`, `contract` e `client_adaptation` em `data/consumer-sync/agentvps.json` e fornece as credenciais dinamicamente para FleetIntel/BrazilCNPJ
+- `RemoteMCPClient` encapsula initialize + tools/call para MCP remoto usando o bundle atual; em `403` do Cloudflare Access ele roda consumer sync uma vez e repete a chamada uma unica vez
+- `core/integrations/consumer_contract_validation.py` executa a validacao canary da release publicada usando `preferred_client_tools` e envia o resultado estruturado para `validation-report`
 - `core/integrations/specialist_health.py` executa um preflight curto com cache de saude para FleetIntel/BrazilCNPJ antes de qualquer delegacao externa lenta, usando o mesmo bundle dinamico do consumer sync (`get_client_readiness_status` no FleetIntel e `health_check` no BrazilCNPJ)
 - `configs/skills-catalog-sources.json` usa `fleetintel_skillpack_repo` como fonte primaria viva e mantem o snapshot versionado como fallback manual
 - O catalogo externo agora preserva `instructions_markdown` do `SKILL.md`; quando o contrato indica que a resposta pertence ao especialista, o `react_node` prioriza `codex_operator` para sintetizar a resposta final em vez de renderizar payload MCP localmente
