@@ -138,12 +138,9 @@ async def node_react(state: AgentState) -> AgentState:
                         "response": format_specialist_health_failure(health),
                         "plan": None,
                     }
-                use_codex = False
-                if router.has_protocol(RuntimeProtocol.CODEX_OPERATOR):
-                    if contract and contract.response_owner == "specialist":
-                        use_codex = True
-                    elif should_delegate_specialist_to_codex(user_message, specialist_name):
-                        use_codex = True
+                use_codex = router.has_protocol(
+                    RuntimeProtocol.CODEX_OPERATOR
+                ) and should_delegate_specialist_to_codex(user_message, specialist_name)
                 if use_codex:
                     if specialist_name.startswith("fleetintel"):
                         await emit_progress("external_call", server="fleetintel", status="start")
