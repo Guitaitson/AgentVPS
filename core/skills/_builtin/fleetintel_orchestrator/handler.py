@@ -322,8 +322,20 @@ class FleetIntelOrchestratorSkill(SkillBase):
     @staticmethod
     def _format_fleet_result(*, fleet_tool: str, fleet_result: Any) -> str:
         if fleet_tool == "get_market_changes_brief" and isinstance(fleet_result, dict):
-            items = fleet_result.get("items") or fleet_result.get("changes") or []
+            items = (
+                fleet_result.get("key_findings")
+                or fleet_result.get("items")
+                or fleet_result.get("changes")
+                or fleet_result.get("supporting_data", {}).get("movements")
+                or []
+            )
             lines = ["Leitura de mercado:"]
+            headline = fleet_result.get("headline")
+            summary = fleet_result.get("executive_summary") or fleet_result.get("summary")
+            if headline:
+                lines.append(f"- headline: {headline}")
+            if summary:
+                lines.append(f"- resumo: {summary}")
             if isinstance(items, list) and items:
                 for item in items[:4]:
                     if isinstance(item, dict):
@@ -332,18 +344,21 @@ class FleetIntelOrchestratorSkill(SkillBase):
                             or item.get("title")
                             or item.get("summary")
                             or item.get("change")
+                            or item.get("why_it_matters")
                         )
-                        company = item.get("company_name") or item.get("razao_social")
+                        subject = item.get("subject") or {}
+                        company = (
+                            item.get("company_name")
+                            or item.get("razao_social")
+                            or subject.get("razao_social")
+                            or subject.get("title")
+                        )
                         if headline and company:
                             lines.append(f"- {company}: {headline}")
                         elif headline:
                             lines.append(f"- {headline}")
                     else:
                         lines.append(f"- {item}")
-                return "\n".join(lines)
-            summary = fleet_result.get("summary") or fleet_result.get("message")
-            if summary:
-                lines.append(str(summary))
                 return "\n".join(lines)
             return render_result_block("", fleet_result, max_chars=1000).strip()
         if fleet_tool == "get_account_prioritization_brief" and isinstance(fleet_result, dict):
@@ -366,22 +381,36 @@ class FleetIntelOrchestratorSkill(SkillBase):
             if fleet_result.get("error"):
                 return str(fleet_result.get("error"))
 
-            empresa = fleet_result.get("empresa") or {}
-            if not empresa and fleet_result.get("company_name"):
+            supporting_data = fleet_result.get("supporting_data") or {}
+            account_layers = supporting_data.get("account_layers") or {}
+            exact_entity = account_layers.get("exact_entity") or {}
+            empresa = (
+                fleet_result.get("empresa")
+                or exact_entity.get("empresa")
+                or {}
+            )
+            if not empresa and (fleet_result.get("company_name") or fleet_result.get("headline")):
                 empresa = {
-                    "razao_social": fleet_result.get("company_name"),
+                    "razao_social": fleet_result.get("company_name") or fleet_result.get("headline"),
                     "cnpj": fleet_result.get("cnpj"),
                 }
             resumo = (
                 fleet_result.get("entity_summary", {}).get("resumo")
                 or fleet_result.get("resumo")
+                or exact_entity.get("resumo")
                 or {}
             )
-            group_summary = fleet_result.get("group_summary") or {}
+            group_summary = (
+                fleet_result.get("group_summary")
+                or account_layers.get("effective_group")
+                or {}
+            )
             lines = ["Leitura de frota:"]
             lines.append(
                 f"- empresa: {empresa.get('razao_social') or 'empresa'} | CNPJ {empresa.get('cnpj', '-')}"
             )
+            if fleet_result.get("executive_summary"):
+                lines.append(f"- leitura executiva: {fleet_result['executive_summary']}")
             if resumo:
                 lines.append(
                     "- historico: "
@@ -407,11 +436,22 @@ class FleetIntelOrchestratorSkill(SkillBase):
                     )
             if group_summary:
                 members = group_summary.get("group_members") or []
+                if not members:
+                    groups = group_summary.get("groups") or []
+                    if groups and isinstance(groups[0], dict):
+                        members = groups[0].get("members") or []
                 lines.append(
                     "- grupo: "
                     f"{len(members)} membros, "
                     f"{group_summary.get('total_emplacamentos', 0)} emplacamentos totais"
                 )
+                groups = group_summary.get("groups") or []
+                if groups and isinstance(groups[0], dict) and groups[0].get("canonical_name"):
+                    lines.append(f"- grupo efetivo: {groups[0]['canonical_name']}")
+                if group_summary.get("emplacamentos_ano_corrente") is not None:
+                    lines.append(
+                        f"- ano corrente: {group_summary.get('emplacamentos_ano_corrente', 0)} emplacamentos"
+                    )
                 if group_summary.get("ultima_compra_grupo"):
                     lines.append(
                         f"- ultima compra do grupo: {group_summary['ultima_compra_grupo']}"
@@ -427,16 +467,33 @@ class FleetIntelOrchestratorSkill(SkillBase):
             if not isinstance(item, dict):
                 lines.append(f"- {item}")
                 continue
-            company = item.get("company_name") or item.get("razao_social") or "empresa"
-            cnpj = item.get("cnpj") or "-"
+            layers = (item.get("supporting_data") or {}).get("company_layers") or {}
+            exact_entity = layers.get("exact_entity") or {}
+            company = (
+                item.get("company_name")
+                or item.get("razao_social")
+                or item.get("headline")
+                or exact_entity.get("razao_social")
+                or "empresa"
+            )
+            cnpj = item.get("cnpj") or exact_entity.get("cnpj") or "-"
             details = [f"CNPJ {cnpj}"]
-            if item.get("uf"):
-                details.append(f"UF {item['uf']}")
-            if item.get("porte"):
-                details.append(f"porte {item['porte']}")
-            if item.get("situacao_cadastral"):
-                details.append(f"situacao {item['situacao_cadastral']}")
+            uf = item.get("uf") or exact_entity.get("uf")
+            porte = item.get("porte") or exact_entity.get("porte")
+            situacao = item.get("situacao_cadastral") or exact_entity.get("situacao_cadastral")
+            cnae = item.get("cnae_principal") or exact_entity.get("cnae_principal")
+            if uf:
+                details.append(f"UF {uf}")
+            if porte:
+                details.append(f"porte {porte}")
+            if situacao:
+                details.append(f"situacao {situacao}")
+            if cnae:
+                details.append(f"CNAE {cnae}")
             lines.append(f"- {company} | " + " | ".join(details))
+            executive_summary = item.get("executive_summary")
+            if executive_summary:
+                lines.append(f"  resumo: {executive_summary}")
         return lines
 
     @staticmethod
@@ -448,12 +505,22 @@ class FleetIntelOrchestratorSkill(SkillBase):
         for item in company_details[:1]:
             if not isinstance(item, dict):
                 continue
-            socios = item.get("socios") or item.get("quadro_societario") or []
+            socios = (
+                item.get("socios")
+                or item.get("quadro_societario")
+                or item.get("integrantes_qsa")
+                or []
+            )
             for socio in socios[:4]:
                 if not isinstance(socio, dict):
                     continue
                 name = socio.get("nome") or socio.get("name")
-                role = socio.get("qualificacao") or socio.get("role")
+                role = (
+                    socio.get("qualificacao")
+                    or socio.get("qualificacao_oficial")
+                    or socio.get("participant_role_label")
+                    or socio.get("role")
+                )
                 if name:
                     found = True
                     lines.append(f"- {name}" + (f" | {role}" if role else ""))
@@ -468,9 +535,24 @@ class FleetIntelOrchestratorSkill(SkillBase):
         for item in group_contexts[:1]:
             if not isinstance(item, dict):
                 continue
-            group_name = item.get("group_name") or item.get("nome_grupo")
-            members = item.get("members") or item.get("group_members") or []
-            total = item.get("member_count") or (
+            supporting_data = item.get("supporting_data") or {}
+            group_layers = supporting_data.get("group_layers") or {}
+            effective_group = item.get("effective_group") or group_layers.get("effective_group") or {}
+            groups = effective_group.get("groups") or []
+            first_group = groups[0] if groups and isinstance(groups[0], dict) else {}
+            group_name = (
+                item.get("group_name")
+                or item.get("nome_grupo")
+                or first_group.get("canonical_name")
+                or item.get("headline")
+            )
+            members = (
+                item.get("members")
+                or item.get("group_members")
+                or first_group.get("members")
+                or []
+            )
+            total = item.get("member_count") or effective_group.get("count") or (
                 len(members) if isinstance(members, list) else None
             )
             if group_name:
@@ -482,6 +564,10 @@ class FleetIntelOrchestratorSkill(SkillBase):
             elif total:
                 found = True
                 lines.append(f"- {total} empresas no contexto retornado")
+            related = group_layers.get("related_companies") or item.get("related_companies") or []
+            if isinstance(related, list) and related:
+                found = True
+                lines.append(f"- relacionadas monitoradas: {len(related)} no contexto adicional")
         return lines if found else []
 
     @staticmethod
@@ -498,7 +584,12 @@ class FleetIntelOrchestratorSkill(SkillBase):
             )
         if company_details:
             details = company_details[0] if isinstance(company_details[0], dict) else {}
-            socios = details.get("socios") or details.get("quadro_societario") or []
+            socios = (
+                details.get("socios")
+                or details.get("quadro_societario")
+                or details.get("integrantes_qsa")
+                or []
+            )
             if not socios:
                 limitations.append("o retorno atual nao trouxe socios estruturados")
         if group_contexts:
