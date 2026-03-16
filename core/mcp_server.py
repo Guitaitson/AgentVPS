@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from fastapi_mcp import FastApiMCP
 
 from core.env import load_project_env
+from core.integrations import warmup_consumer_sync
 from core.resource_manager.manager import (
     get_available_ram,
     get_tools_status,
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     """lifespan context manager for startup/shutdown"""
     # Startup
     print("[MCP] Starting VPS-Agent MCP Server...")
+    await warmup_consumer_sync()
     yield
     # Shutdown
     print("[MCP] Shutting down...")

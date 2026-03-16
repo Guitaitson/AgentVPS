@@ -202,6 +202,36 @@ class OrchestrationSettings(BaseSettings):
     timeout_seconds: int = Field(default=30, description="Timeout para delegaÃƒÂ§ÃƒÂµes externas")
 
 
+class ConsumerSyncSettings(BaseSettings):
+    """Configuracoes do consumer sync para credenciais externas FleetIntel/BrazilCNPJ."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="CONSUMER_",
+        env_file=ENV_FILE_CANDIDATES,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    sync_url: str = Field(
+        default="https://request-access.gtaitson.space/api/consumer-sync/v1/sync",
+        description="Endpoint efetivo do consumer sync machine-pull",
+    )
+    slug: str = Field(default="agentvps", description="Consumer slug registrado no FleetIntel")
+    bootstrap_secret: Optional[str] = Field(
+        default=None,
+        description="Bootstrap secret usado para obter o credential bundle externo",
+    )
+    state_file: str = Field(
+        default="data/consumer-sync/agentvps.json",
+        validation_alias="CONSUMER_SYNC_STATE_FILE",
+        description="Arquivo local com release_id, bundle_hash e credential bundle atual",
+    )
+    timeout_seconds: int = Field(
+        default=20,
+        description="Timeout HTTP do consumer sync em segundos",
+    )
+
+
 class IdentitySettings(BaseSettings):
     """ConfiguraÃƒÂ§ÃƒÂµes da alma/identidade do agente."""
 
@@ -382,6 +412,7 @@ class AppSettings(BaseSettings):
     qdrant: QdrantSettings = Field(default_factory=QdrantSettings)
     gateway: GatewaySettings = Field(default_factory=GatewaySettings)
     orchestration: OrchestrationSettings = Field(default_factory=OrchestrationSettings)
+    consumer_sync: ConsumerSyncSettings = Field(default_factory=ConsumerSyncSettings)
     identity: IdentitySettings = Field(default_factory=IdentitySettings)
     catalog: CatalogSettings = Field(default_factory=CatalogSettings)
     voice_context: VoiceContextSettings = Field(default_factory=VoiceContextSettings)
@@ -414,6 +445,7 @@ __all__ = [
     "QdrantSettings",
     "GatewaySettings",
     "OrchestrationSettings",
+    "ConsumerSyncSettings",
     "IdentitySettings",
     "CatalogSettings",
     "VoiceContextSettings",

@@ -244,12 +244,10 @@ TELEGRAM_TYPING_INTERVAL_SECONDS=4.0
 POSTGRES_PASSWORD=...         # Senha PostgreSQL
 OPENROUTER_API_KEY=...        # Chave OpenRouter
 OPENROUTER_MODEL=minimax/minimax-m2.5
-FLEETINTEL_MCP_URL=https://agent-fleet.gtaitson.space/mcp
-FLEETINTEL_CF_ACCESS_CLIENT_ID=...
-FLEETINTEL_CF_ACCESS_CLIENT_SECRET=...
-BRAZILCNPJ_MCP_URL=https://agent-cnpj.gtaitson.space/mcp
-BRAZILCNPJ_CF_ACCESS_CLIENT_ID=...
-BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET=...
+CONSUMER_SYNC_URL=https://request-access.gtaitson.space/api/consumer-sync/v1/sync
+CONSUMER_SLUG=agentvps
+CONSUMER_BOOTSTRAP_SECRET=...
+CONSUMER_SYNC_STATE_FILE=data/consumer-sync/agentvps.json
 ORCH_ENABLE_CODEX_OPERATOR=false
 ORCH_CODEX_COMMAND=codex
 ORCH_CODEX_WORKDIR=/opt/vps-agent
@@ -264,8 +262,11 @@ ORCH_SPECIALIST_PREFLIGHT_MAX_ATTEMPTS=1
 
 Migracao de auth externa FleetIntel/BrazilCNPJ:
 - o AgentVPS nao usa mais `FLEETINTEL_MCP_TOKEN`, `BRAZILCNPJ_MCP_TOKEN`, `MCP_AUTH_TOKEN` nem `BRAZIL_CNPJ_MCP_AUTH_TOKEN`
-- os clientes externos agora autenticam na borda Cloudflare com `CF-Access-Client-Id` e `CF-Access-Client-Secret`
-- nao ha compatibilidade reversa com bearer token legado no AgentVPS
+- o bootstrap de acesso externo agora usa `CONSUMER_SYNC_URL`, `CONSUMER_SLUG` e `CONSUMER_BOOTSTRAP_SECRET`
+- o bundle retornado pelo consumer sync traz `FLEETINTEL_MCP_URL`, `BRAZILCNPJ_MCP_URL` e os headers `CF-Access-Client-Id` / `CF-Access-Client-Secret`
+- o estado atual do bundle fica persistido em `data/consumer-sync/agentvps.json`
+- se `initialize` ou `tools/call` retornarem `403` do Cloudflare Access, o AgentVPS executa consumer sync uma vez e repete a chamada so se houver bundle novo
+- nao ha compatibilidade reversa com bearer token legado nem com credenciais CF estaticas no AgentVPS
 - consultas FleetIntel/BrazilCNPJ usam retry curto para `502/503/504`, timeout e erro de conexao
 - em falha, o AgentVPS tenta preflight (`get_operations_status` ou `health_check`) antes de responder ao usuario
 - quando o preflight ja indica degradacao, o AgentVPS responde rapido e nao entra no `codex_operator` nem no caminho lento do especialista

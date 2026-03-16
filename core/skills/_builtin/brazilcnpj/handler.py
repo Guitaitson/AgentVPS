@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 
 import structlog
 
-from core.integrations import RemoteMCPClient, RemoteMCPError, render_result_block
+from core.integrations import (
+    ConsumerSyncError,
+    RemoteMCPClient,
+    RemoteMCPError,
+    build_specialist_mcp_client,
+    render_result_block,
+)
 from core.skills.base import SkillBase
 
 logger = structlog.get_logger()
-
-BRAZILCNPJ_MCP_URL = os.getenv("BRAZILCNPJ_MCP_URL", "https://agent-cnpj.gtaitson.space/mcp")
-BRAZILCNPJ_CF_ACCESS_CLIENT_ID = os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_ID", "")
-BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET = os.getenv("BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET", "")
 
 _CNPJ_RE = re.compile(r"\b(\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}|\d{14})\b")
 
@@ -27,23 +28,20 @@ class BrazilCNPJSkill(SkillBase):
         if not query:
             return "Informe um CNPJ, empresa, socios, grupo economico ou CNAE para consulta."
 
-        client = RemoteMCPClient(
-            base_url=BRAZILCNPJ_MCP_URL,
-            access_client_id=BRAZILCNPJ_CF_ACCESS_CLIENT_ID,
-            access_client_secret=BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET,
-            client_name="agentvps-brazilcnpj",
-            server_name="brazilcnpj",
-        )
-        if not client.is_configured:
-            return (
-                "BrazilCNPJ MCP nao configurado. Ajuste BRAZILCNPJ_MCP_URL, "
-                "BRAZILCNPJ_CF_ACCESS_CLIENT_ID e BRAZILCNPJ_CF_ACCESS_CLIENT_SECRET."
+        try:
+            client = build_specialist_mcp_client(
+                "brazilcnpj",
+                client_name="agentvps-brazilcnpj",
             )
+        except ConsumerSyncError as exc:
+            return str(exc)
 
         tool_name, tool_args = self._route(query)
         logger.info("brazilcnpj_execute", tool=tool_name)
         try:
             result = await client.call_tool(tool_name, tool_args)
+        except ConsumerSyncError as exc:
+            return str(exc)
         except RemoteMCPError as exc:
             return await self._format_remote_failure(client=client, error=exc, tool_name=tool_name)
         return self._format(tool_name, result)
