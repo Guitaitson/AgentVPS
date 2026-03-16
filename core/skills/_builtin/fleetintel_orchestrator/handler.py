@@ -41,7 +41,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
 
         logger.info("fleetintel_orchestrator_execute", query=query[:120])
         try:
-            ops = await fleet_client.call_tool("get_operations_status", {})
+            readiness = await fleet_client.call_tool("get_client_readiness_status", {})
         except ConsumerSyncError as exc:
             return str(exc)
         except RemoteMCPError as exc:
@@ -52,7 +52,12 @@ class FleetIntelOrchestratorSkill(SkillBase):
         except ConsumerSyncError as exc:
             return str(exc)
         except RemoteMCPError as exc:
-            return self._format_fleet_failure(error=exc, query=query, ops=ops, tool_name=fleet_tool)
+            return self._format_fleet_failure(
+                error=exc,
+                query=query,
+                readiness=readiness,
+                tool_name=fleet_tool,
+            )
 
         needs_cnpj = self._needs_cnpj(query)
         cnpj_health = None
@@ -76,7 +81,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
 
         return self._format(
             query=query,
-            ops=ops,
+            readiness=readiness,
             fleet_tool=fleet_tool,
             fleet_result=fleet_result,
             cnpj_health=cnpj_health,
@@ -151,7 +156,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
         *,
         error: RemoteMCPError,
         query: str,
-        ops: Any | None = None,
+        readiness: Any | None = None,
         tool_name: str | None = None,
     ) -> str:
         lines = ["FleetIntel Orchestrator", ""]
@@ -162,12 +167,9 @@ class FleetIntelOrchestratorSkill(SkillBase):
             f"Falha FleetIntel: {'HTTP ' + str(error.status_code) if error.status_code else error.error_type} "
             f"na etapa `{error.stage}`."
         )
-        if isinstance(ops, dict):
-            lines.append(
-                "Preflight FleetIntel: "
-                f"status={ops.get('status', '-')} "
-                f"freshness={ops.get('data_freshness') or ops.get('freshness') or '-'}"
-            )
+        summary = FleetIntelOrchestratorSkill._format_readiness_summary(readiness)
+        if summary:
+            lines.append(f"Preflight FleetIntel: {summary}")
         else:
             lines.append("Preflight FleetIntel indisponivel no momento.")
         lines.append("Posso tentar novamente depois ou responder sem enriquecimento externo.")
@@ -177,19 +179,16 @@ class FleetIntelOrchestratorSkill(SkillBase):
         self,
         *,
         query: str,
-        ops: Any,
+        readiness: Any,
         fleet_tool: str,
         fleet_result: Any,
         cnpj_health: Any,
         enrichments: list[dict[str, Any]],
     ) -> str:
         lines = ["FleetIntel Orchestrator", ""]
-        if isinstance(ops, dict):
-            lines.append(
-                "Operacao FleetIntel: "
-                f"status={ops.get('status', '-')} "
-                f"freshness={ops.get('data_freshness') or ops.get('freshness') or '-'}"
-            )
+        summary = self._format_readiness_summary(readiness)
+        if summary:
+            lines.append(f"Prontidao FleetIntel: {summary}")
         lines.append(f"Consulta: {query}")
         lines.append(f"Tool principal: {fleet_tool}")
         lines.append("")
@@ -221,6 +220,23 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 lines.append(f"- {name or 'empresa'} | CNPJ {cnpj} | UF {uf} | porte {porte}")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_readiness_summary(readiness: Any) -> str:
+        if not isinstance(readiness, dict):
+            return ""
+
+        parts = [f"status={readiness.get('status', '-')}"]
+        snapshot_status = readiness.get("snapshot_status")
+        if snapshot_status is not None:
+            parts.append(f"snapshot_status={snapshot_status}")
+        snapshot_age_seconds = readiness.get("snapshot_age_seconds")
+        if snapshot_age_seconds is not None:
+            parts.append(f"snapshot_age_seconds={snapshot_age_seconds}")
+        generated_at = readiness.get("generated_at")
+        if generated_at:
+            parts.append(f"generated_at={generated_at}")
+        return " ".join(parts)
 
     @staticmethod
     def _format_fleet_result(*, fleet_tool: str, fleet_result: Any) -> str:

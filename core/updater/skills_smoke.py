@@ -37,7 +37,7 @@ SMOKE_SPECS: dict[str, SmokeSpec] = {
             "Cruze FleetIntel e BrazilCNPJ para o CNPJ 48.430.290/0001-30 "
             "e resuma empresa, grupo economico e frota."
         ),
-        expected_markers=("Operacao FleetIntel: status=", "BrazilCNPJ health: status="),
+        expected_markers=("Prontidao FleetIntel: status=", "BrazilCNPJ health: status="),
         reject_markers=("Falha FleetIntel:", "HTTP 502", "ERROR:", "indisponivel"),
     ),
     "brazilcnpj-enricher": SmokeSpec(
