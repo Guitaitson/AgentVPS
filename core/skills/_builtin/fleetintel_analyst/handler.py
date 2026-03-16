@@ -13,6 +13,7 @@ from core.integrations import (
     RemoteMCPError,
     build_specialist_mcp_client,
     extract_company_count_query,
+    get_consumer_sync_manager,
     render_result_block,
 )
 from core.skills.base import SkillBase
@@ -62,14 +63,19 @@ class FleetIntelAnalystSkill(SkillBase):
     def _route(self, query: str) -> tuple[str, dict[str, Any]]:
         msg = query.lower()
         company_count_args = extract_company_count_query(query)
+        preferred = self._preferred_tools()
         if company_count_args:
             return "count_empresa_registrations", company_count_args
         if any(
             keyword in msg
             for keyword in ("saude", "status operacional", "fresh", "sincron", "health")
         ):
+            if "get_client_readiness_status" in preferred:
+                return "get_client_readiness_status", {}
             return "get_operations_status", {}
         if any(keyword in msg for keyword in ("insights", "o que mudou", "ultimo sync")):
+            if "get_market_changes_brief" in preferred:
+                return "get_market_changes_brief", {"limit_items": 10}
             return "get_latest_insights", {"limit_items": 10}
         if any(keyword in msg for keyword in ("perguntas sugeridas", "sugestoes", "sugeridas")):
             return "list_suggested_questions", {"limit": 10}
@@ -84,6 +90,8 @@ class FleetIntelAnalystSkill(SkillBase):
                 "oportunidade",
             )
         ):
+            if "get_account_prioritization_brief" in preferred:
+                return "get_account_prioritization_brief", {"limit_items": 10}
             return "buying_signals", self._build_scope_args(msg, default_limit=10)
         if any(
             keyword in msg
@@ -96,11 +104,15 @@ class FleetIntelAnalystSkill(SkillBase):
             keyword in msg
             for keyword in ("market share", "participacao de mercado", "cota de mercado")
         ):
+            if "get_market_position_brief" in preferred:
+                return "get_market_position_brief", {"limit_items": 10}
             return "get_market_share", self._build_scope_args(msg, default_limit=10)
         if any(keyword in msg for keyword in ("comparar", " vs ", " versus ")):
             return "compare_empresas", self._build_compare_args(query)
         cnpj = self._extract_cnpj(query)
         if cnpj:
+            if "get_fleet_account_brief" in preferred:
+                return "get_fleet_account_brief", {"cnpj": cnpj}
             return "empresa_profile", {"cnpj": cnpj}
         if any(
             keyword in msg
@@ -108,6 +120,10 @@ class FleetIntelAnalystSkill(SkillBase):
         ):
             return "search_empresas", {"razao_social": query[:120], "limit": 5}
         return "top_empresas_by_registrations", self._build_scope_args(msg, default_limit=10)
+
+    @staticmethod
+    def _preferred_tools() -> set[str]:
+        return set(get_consumer_sync_manager().preferred_tools_for("fleetintel"))
 
     @staticmethod
     def _extract_cnpj(text: str) -> str | None:
@@ -146,6 +162,8 @@ class FleetIntelAnalystSkill(SkillBase):
         return args
 
     def _format(self, tool_name: str, result: Any) -> str:
+        if tool_name == "get_client_readiness_status" and isinstance(result, dict):
+            return "FleetIntel\n\n" + (self._format_readiness_summary(result) or "status=-")
         if tool_name == "get_operations_status" and isinstance(result, dict):
             freshness = result.get("data_freshness") or result.get("freshness") or "-"
             return (
@@ -220,8 +238,12 @@ class FleetIntelAnalystSkill(SkillBase):
             "buying_signals",
             "new_entrants",
             "top_empresas_by_registrations",
+            "get_account_prioritization_brief",
+            "get_market_position_brief",
         } and isinstance(result, dict):
             return self._format_ranked_result(tool_name, result)
+        if tool_name in {"get_market_changes_brief", "get_fleet_account_brief"}:
+            return render_result_block("FleetIntel", result, max_chars=1600)
         return render_result_block("FleetIntel", result)
 
     @staticmethod

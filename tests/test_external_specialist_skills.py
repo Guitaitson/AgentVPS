@@ -26,6 +26,14 @@ class _FakeClient:
         return await self._call_impl(self.server_name, tool_name, arguments or {})
 
 
+class _FakeSyncManager:
+    def __init__(self, preferred_tools=None):
+        self._preferred_tools = preferred_tools or {}
+
+    def preferred_tools_for(self, service):
+        return self._preferred_tools.get(service, [])
+
+
 def _config(name: str) -> SkillConfig:
     return SkillConfig(name=name, description=name, security_level=SecurityLevel.SAFE)
 
@@ -134,6 +142,31 @@ async def test_brazilcnpj_skill_routes_socios(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_brazilcnpj_skill_uses_preferred_company_registry_brief(monkeypatch):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        return {"company_name": "Empresa X", "cnpj": arguments["cnpj"], "uf": "SP"}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.brazilcnpj.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager({"brazilcnpj": ["get_company_registry_brief"]}),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.brazilcnpj.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = BrazilCNPJSkill(_config("brazilcnpj"))
+    result = await skill.execute({"query": "valide o CNPJ 12.345.678/0001-99"})
+
+    assert calls == [("brazilcnpj", "get_company_registry_brief", {"cnpj": "12345678000199"})]
+    assert "Empresa X" in result
+
+
+@pytest.mark.asyncio
 async def test_fleetintel_analyst_routes_priority_queries(monkeypatch):
     calls = []
 
@@ -152,6 +185,31 @@ async def test_fleetintel_analyst_routes_priority_queries(monkeypatch):
 
     assert calls == [("fleetintel", "buying_signals", {"limit": 10})]
     assert "Empresa A" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_analyst_uses_preferred_market_changes_brief(monkeypatch):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        return {"status": "ok", "items": [{"headline": "Mercado aquecido"}]}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager({"fleetintel": ["get_market_changes_brief"]}),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_analyst.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "quais os insights e o que mudou no mercado?"})
+
+    assert calls == [("fleetintel", "get_market_changes_brief", {"limit_items": 10})]
+    assert "Mercado aquecido" in result
 
 
 @pytest.mark.asyncio
@@ -268,6 +326,53 @@ async def test_fleetintel_orchestrator_uses_both_servers(monkeypatch):
     )
     assert "Prontidao FleetIntel: status=ok" in result
     assert "Enriquecimento seletivo" in result
+
+
+@pytest.mark.asyncio
+async def test_fleetintel_orchestrator_uses_preferred_brief_surfaces(monkeypatch):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        if service == "fleetintel" and tool_name == "get_client_readiness_status":
+            return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 12.5}
+        if service == "fleetintel" and tool_name == "get_market_changes_brief":
+            return {"items": [{"headline": "Mudanca relevante", "cnpj": "12345678000199"}]}
+        if service == "brazilcnpj" and tool_name == "health_check":
+            return {"status": "ok", "database_ok": True}
+        if service == "brazilcnpj" and tool_name == "get_company_registry_brief":
+            return {
+                "company_name": "Empresa A",
+                "cnpj": arguments["cnpj"],
+                "uf": "SP",
+                "porte": "M",
+            }
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager(
+            {
+                "fleetintel": ["get_market_changes_brief"],
+                "brazilcnpj": ["get_company_registry_brief"],
+            }
+        ),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_orchestrator.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelOrchestratorSkill(_config("fleetintel_orchestrator"))
+    result = await skill.execute({"query": "o que mudou e cruze com o cnpj 12.345.678/0001-99"})
+
+    assert ("fleetintel", "get_market_changes_brief", {"limit_items": 10}) in calls
+    assert any(
+        service == "brazilcnpj" and tool == "get_company_registry_brief"
+        for service, tool, _ in calls
+    )
+    assert "Mudanca relevante" in result
 
 
 @pytest.mark.asyncio

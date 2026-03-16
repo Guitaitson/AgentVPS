@@ -13,6 +13,7 @@ from core.integrations import (
     build_specialist_mcp_client,
     extract_cnpjs,
     extract_company_count_query,
+    get_consumer_sync_manager,
     render_result_block,
 )
 from core.skills.base import SkillBase
@@ -69,13 +70,16 @@ class FleetIntelOrchestratorSkill(SkillBase):
             candidate_cnpjs.insert(0, explicit_cnpj)
 
         if needs_cnpj and cnpj_client.is_configured:
+            cnpj_tool = (
+                "get_company_registry_brief"
+                if "get_company_registry_brief" in self._preferred_tools("brazilcnpj")
+                else "get_cached_cnpj_profile"
+            )
             try:
                 cnpj_health = await cnpj_client.call_tool("health_check", {})
                 if isinstance(cnpj_health, dict) and cnpj_health.get("status") == "ok":
                     for cnpj in candidate_cnpjs[:3]:
-                        enrichments.append(
-                            await cnpj_client.call_tool("get_cached_cnpj_profile", {"cnpj": cnpj})
-                        )
+                        enrichments.append(await cnpj_client.call_tool(cnpj_tool, {"cnpj": cnpj}))
             except RemoteMCPError as exc:
                 logger.warning("fleetintel_orchestrator_cnpj_degraded", error=str(exc))
 
@@ -123,6 +127,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
     def _route_fleet_query(self, query: str) -> tuple[str, dict[str, Any]]:
         msg = query.lower()
         company_count_args = extract_company_count_query(query)
+        preferred = self._preferred_tools("fleetintel")
         if company_count_args:
             return "count_empresa_registrations", company_count_args
         args: dict[str, Any] = {"limit": 5}
@@ -130,6 +135,8 @@ class FleetIntelOrchestratorSkill(SkillBase):
         if uf:
             args["uf"] = uf
         if any(keyword in msg for keyword in ("o que mudou", "ultimo sync", "insights")):
+            if "get_market_changes_brief" in preferred:
+                return "get_market_changes_brief", {"limit_items": 10}
             return "get_latest_insights", {"limit_items": 10}
         if any(
             keyword in msg
@@ -141,6 +148,8 @@ class FleetIntelOrchestratorSkill(SkillBase):
                 "prospeccao",
             )
         ):
+            if "get_account_prioritization_brief" in preferred:
+                return "get_account_prioritization_brief", {"limit_items": 10}
             return "buying_signals", args
         if any(keyword in msg for keyword in ("entrantes", "novo entrante")):
             return "new_entrants", args
@@ -148,8 +157,14 @@ class FleetIntelOrchestratorSkill(SkillBase):
             return "trend_analysis", args
         explicit_cnpj = self._extract_cnpj(query)
         if explicit_cnpj:
+            if "get_fleet_account_brief" in preferred:
+                return "get_fleet_account_brief", {"cnpj": explicit_cnpj}
             return "empresa_profile", {"cnpj": explicit_cnpj}
         return "top_empresas_by_registrations", args
+
+    @staticmethod
+    def _preferred_tools(service: str) -> set[str]:
+        return set(get_consumer_sync_manager().preferred_tools_for(service))
 
     @staticmethod
     def _format_fleet_failure(
@@ -240,11 +255,18 @@ class FleetIntelOrchestratorSkill(SkillBase):
 
     @staticmethod
     def _format_fleet_result(*, fleet_tool: str, fleet_result: Any) -> str:
-        if fleet_tool == "empresa_profile" and isinstance(fleet_result, dict):
+        if fleet_tool in {"empresa_profile", "get_fleet_account_brief"} and isinstance(
+            fleet_result, dict
+        ):
             if fleet_result.get("error"):
                 return str(fleet_result.get("error"))
 
             empresa = fleet_result.get("empresa") or {}
+            if not empresa and fleet_result.get("company_name"):
+                empresa = {
+                    "razao_social": fleet_result.get("company_name"),
+                    "cnpj": fleet_result.get("cnpj"),
+                }
             resumo = (
                 fleet_result.get("entity_summary", {}).get("resumo")
                 or fleet_result.get("resumo")
@@ -290,5 +312,7 @@ class FleetIntelOrchestratorSkill(SkillBase):
                         f"- ultima compra do grupo: {group_summary['ultima_compra_grupo']}"
                     )
             return "\n".join(lines)
+        if fleet_tool in {"get_market_changes_brief", "get_account_prioritization_brief"}:
+            return render_result_block("", fleet_result, max_chars=1400).strip()
 
         return render_result_block("", fleet_result, max_chars=1400).strip()
