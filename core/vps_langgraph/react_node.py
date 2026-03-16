@@ -26,6 +26,7 @@ from ..integrations import (
 from ..orchestration import RuntimeExecutionRequest, RuntimeProtocol, get_runtime_router
 from ..progress import emit_progress
 from ..skills.registry import get_skill_registry
+from .external_workflows import detect_external_workflow, run_external_workflow
 from .state import AgentState
 
 logger = structlog.get_logger()
@@ -143,6 +144,31 @@ async def node_react(state: AgentState) -> AgentState:
         message=user_message[:80],
         tools_count=len(tools),
     )
+
+    external_workflow = detect_external_workflow(user_message)
+    if external_workflow:
+        logger.info(
+            "react_external_workflow",
+            kind=external_workflow.kind,
+            steps=list(external_workflow.steps),
+            provider_composite_tool=external_workflow.provider_composite_tool,
+        )
+        try:
+            response = await run_external_workflow(
+                message=user_message,
+                registry=registry,
+                plan=external_workflow,
+            )
+            return {
+                **state,
+                "intent": "task",
+                "action_required": False,
+                "response": response,
+                "plan": None,
+            }
+        except Exception as workflow_err:
+            logger.error("react_external_workflow_error", error=str(workflow_err))
+            # Falhou; continua para o roteamento normal.
 
     specialist_name = detect_external_skill(user_message)
     if specialist_name:

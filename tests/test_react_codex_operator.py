@@ -327,3 +327,39 @@ async def test_node_react_fail_fast_when_specialist_health_is_degraded(monkeypat
     assert result["response"] == "Especialista externo indisponivel no momento."
     assert registry.executed == []
     assert progress_calls == ["emitted"]
+
+
+@pytest.mark.asyncio
+async def test_node_react_routes_combined_prompt_to_external_workflow(monkeypatch):
+    registry = _FakeRegistry()
+    async def _run_workflow(**_kwargs):
+        return "Resposta consolidada do workflow externo."
+
+    monkeypatch.setattr("core.vps_langgraph.react_node.get_skill_registry", lambda: registry)
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.detect_external_workflow",
+        lambda _message: type(
+            "WorkflowPlan",
+            (),
+            {
+                "kind": "account_360_plus_insights",
+                "steps": ("fleetintel_orchestrator", "fleetintel_analyst"),
+                "provider_composite_tool": None,
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "core.vps_langgraph.react_node.run_external_workflow",
+        _run_workflow,
+    )
+
+    state = {
+        "user_id": "u-1",
+        "user_message": "Use BrazilCNPJ Enricher e FleetIntel Analyst na mesma resposta.",
+        "conversation_history": [],
+    }
+
+    result = await node_react(state)
+
+    assert result["response"] == "Resposta consolidada do workflow externo."
+    assert registry.executed == []
