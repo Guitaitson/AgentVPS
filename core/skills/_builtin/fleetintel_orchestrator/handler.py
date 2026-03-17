@@ -67,6 +67,17 @@ class FleetIntelOrchestratorSkill(SkillBase):
         group_contexts: list[dict[str, Any]] = []
 
         candidate_cnpjs = extract_cnpjs(fleet_result)
+        if (
+            not candidate_cnpjs
+            and fleet_tool == "search_empresas"
+            and isinstance(fleet_result, dict)
+        ):
+            for item in fleet_result.get("empresas") or []:
+                if not isinstance(item, dict):
+                    continue
+                cnpj = re.sub(r"\D", "", str(item.get("cnpj") or ""))
+                if len(cnpj) == 14 and cnpj not in candidate_cnpjs:
+                    candidate_cnpjs.append(cnpj)
         explicit_cnpj = self._extract_cnpj(query)
         if explicit_cnpj and explicit_cnpj not in candidate_cnpjs:
             candidate_cnpjs.insert(0, explicit_cnpj)
@@ -164,11 +175,24 @@ class FleetIntelOrchestratorSkill(SkillBase):
         )
         return match.group(1).upper() if match else None
 
+    @staticmethod
+    def _extract_company_name(query: str) -> str | None:
+        match = re.search(
+            r"(?:sobre|empresa|conta)\s+(.+?)(?:,| com | e seus| e suas| e o grupo|$)",
+            query,
+            re.IGNORECASE,
+        )
+        if not match:
+            return None
+        candidate = match.group(1).strip(" .,:;")
+        return candidate or None
+
     def _route_fleet_query(self, query: str) -> tuple[str, dict[str, Any]]:
         msg = query.lower()
         company_count_args = extract_company_count_query(query)
         preferred = self._preferred_tools("fleetintel")
         explicit_cnpj = self._extract_cnpj(query)
+        company_name = self._extract_company_name(query)
         if company_count_args:
             return "count_empresa_registrations", company_count_args
         args: dict[str, Any] = {"limit": 5}
@@ -214,6 +238,19 @@ class FleetIntelOrchestratorSkill(SkillBase):
             if "get_fleet_account_brief" in preferred:
                 return "get_fleet_account_brief", {"cnpj": explicit_cnpj}
             return "empresa_profile", {"cnpj": explicit_cnpj}
+        if company_name and any(
+            keyword in msg
+            for keyword in (
+                "me dizer sobre",
+                "empresa",
+                "conta",
+                "perfil",
+                "socio",
+                "socios",
+                "grupo economico",
+            )
+        ):
+            return "search_empresas", {"razao_social": company_name[:120], "limit": 5}
         return "top_empresas_by_registrations", args
 
     @staticmethod
@@ -321,6 +358,24 @@ class FleetIntelOrchestratorSkill(SkillBase):
 
     @staticmethod
     def _format_fleet_result(*, fleet_tool: str, fleet_result: Any) -> str:
+        if fleet_tool == "search_empresas" and isinstance(fleet_result, dict):
+            companies = fleet_result.get("empresas") or fleet_result.get("items") or []
+            if not isinstance(companies, list) or not companies:
+                return render_result_block("", fleet_result, max_chars=1000).strip()
+            lines = ["Contas encontradas:"]
+            for item in companies[:3]:
+                if not isinstance(item, dict):
+                    lines.append(f"- {item}")
+                    continue
+                name = item.get("razao_social") or item.get("nome_fantasia") or "empresa"
+                cnpj = item.get("cnpj") or "-"
+                details = [f"CNPJ {cnpj}"]
+                if item.get("nome_fantasia"):
+                    details.append(f"fantasia {item['nome_fantasia']}")
+                if item.get("segmento_cliente"):
+                    details.append(f"segmento {item['segmento_cliente']}")
+                lines.append(f"- {name} | " + " | ".join(details))
+            return "\n".join(lines)
         if fleet_tool == "get_market_changes_brief" and isinstance(fleet_result, dict):
             items = (
                 fleet_result.get("key_findings")
