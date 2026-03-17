@@ -509,7 +509,9 @@ class ContractValidationRunner:
             cf_ray=response_payload["cf_ray"],
             body_excerpt=check.body_excerpt
             if check.status != "passed"
-            else None if case.consumable_without_raw_json else json.dumps(response_payload["payload"])[:400],
+            else None
+            if case.consumable_without_raw_json
+            else json.dumps(response_payload["payload"])[:400],
             suspected_layer=check.suspected_layer,
             retried=response_payload["retried"],
             retry_succeeded=response_payload["retry_succeeded"],
@@ -737,7 +739,9 @@ class ContractValidationRunner:
         return []
 
     @staticmethod
-    def _find_tool_spec(tool_catalog: dict[str, Any] | None, tool_name: str) -> dict[str, Any] | None:
+    def _find_tool_spec(
+        tool_catalog: dict[str, Any] | None, tool_name: str
+    ) -> dict[str, Any] | None:
         if not isinstance(tool_catalog, dict):
             return None
         for tool in tool_catalog.get("tools") or []:
@@ -756,7 +760,9 @@ class ContractValidationRunner:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         schema = {}
         if isinstance(account_360_tool, dict):
-            schema = account_360_tool.get("inputSchema") or account_360_tool.get("input_schema") or {}
+            schema = (
+                account_360_tool.get("inputSchema") or account_360_tool.get("input_schema") or {}
+            )
         properties = schema.get("properties") if isinstance(schema, dict) else {}
         keys = set(properties.keys()) if isinstance(properties, dict) else set()
 
@@ -825,14 +831,7 @@ class ContractValidationRunner:
             and bool(refinement)
         )
         consumable = bool(
-            disambiguation_ok
-            or (
-                headline
-                and (
-                    executive_summary
-                    or has_key_findings
-                )
-            )
+            disambiguation_ok or (headline and (executive_summary or has_key_findings))
         )
         return Account360Case(
             label=label,

@@ -63,7 +63,10 @@ async def test_remote_mcp_client_lists_tools(monkeypatch):
                     "tools": [
                         {
                             "name": "get_account_360_brief",
-                            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}},
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {"query": {"type": "string"}},
+                            },
                         }
                     ]
                 }
