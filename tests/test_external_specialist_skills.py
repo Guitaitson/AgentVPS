@@ -580,6 +580,63 @@ async def test_fleetintel_orchestrator_ignores_preferred_tools_until_contract_is
 
 
 @pytest.mark.asyncio
+async def test_fleetintel_orchestrator_searches_company_by_name_when_no_cnpj_is_present(
+    monkeypatch,
+):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        if service == "fleetintel" and tool_name == "get_client_readiness_status":
+            return {"status": "ok", "snapshot_status": "ready", "snapshot_age_seconds": 6.0}
+        if service == "fleetintel" and tool_name == "search_empresas":
+            return {
+                "empresas": [
+                    {
+                        "razao_social": "ADDIANTE S.A.",
+                        "cnpj": "48430290000130",
+                        "nome_fantasia": "ADDIANTE",
+                    }
+                ]
+            }
+        if service == "brazilcnpj" and tool_name == "health_check":
+            return {"status": "ok", "database_ok": True}
+        if service == "brazilcnpj" and tool_name == "get_company_registry_brief":
+            return {
+                "razao_social": "ADDIANTE S.A.",
+                "cnpj": "48430290000130",
+                "uf": "PR",
+            }
+        if service == "brazilcnpj" and tool_name == "get_empresa_completa":
+            return {"integrantes_qsa": [{"nome": "Fulano", "qualificacao_oficial": "16 - Presidente"}]}
+        return {}
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_orchestrator.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager(
+            {"brazilcnpj": ["get_company_registry_brief"]},
+            {"brazilcnpj": ["get_empresa_completa"]},
+        ),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_orchestrator.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelOrchestratorSkill(_config("fleetintel_orchestrator"))
+    result = await skill.execute(
+        {"query": "Use BrazilCNPJ Enricher e FleetIntel para me dizer sobre Addiante S.A. e seus socios."}
+    )
+
+    assert ("fleetintel", "search_empresas", {"razao_social": "Addiante S.A", "limit": 5}) in calls
+    assert ("brazilcnpj", "get_company_registry_brief", {"cnpj": "48430290000130"}) in calls
+    assert "Contas encontradas:" in result
+    assert "ADDIANTE S.A." in result
+    assert "Error executing tool top_empresas_by_registrations" not in result
+
+
+@pytest.mark.asyncio
 async def test_fleetintel_skill_routes_explicit_cnpj_to_empresa_profile(monkeypatch):
     calls = []
 
