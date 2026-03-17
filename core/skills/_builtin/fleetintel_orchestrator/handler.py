@@ -67,7 +67,11 @@ class FleetIntelOrchestratorSkill(SkillBase):
         group_contexts: list[dict[str, Any]] = []
 
         candidate_cnpjs = extract_cnpjs(fleet_result)
-        if not candidate_cnpjs and fleet_tool == "search_empresas" and isinstance(fleet_result, dict):
+        if (
+            not candidate_cnpjs
+            and fleet_tool == "search_empresas"
+            and isinstance(fleet_result, dict)
+        ):
             for item in fleet_result.get("empresas") or []:
                 if not isinstance(item, dict):
                     continue

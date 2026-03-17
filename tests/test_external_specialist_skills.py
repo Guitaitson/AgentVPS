@@ -608,7 +608,9 @@ async def test_fleetintel_orchestrator_searches_company_by_name_when_no_cnpj_is_
                 "uf": "PR",
             }
         if service == "brazilcnpj" and tool_name == "get_empresa_completa":
-            return {"integrantes_qsa": [{"nome": "Fulano", "qualificacao_oficial": "16 - Presidente"}]}
+            return {
+                "integrantes_qsa": [{"nome": "Fulano", "qualificacao_oficial": "16 - Presidente"}]
+            }
         return {}
 
     monkeypatch.setattr(
@@ -626,7 +628,9 @@ async def test_fleetintel_orchestrator_searches_company_by_name_when_no_cnpj_is_
 
     skill = FleetIntelOrchestratorSkill(_config("fleetintel_orchestrator"))
     result = await skill.execute(
-        {"query": "Use BrazilCNPJ Enricher e FleetIntel para me dizer sobre Addiante S.A. e seus socios."}
+        {
+            "query": "Use BrazilCNPJ Enricher e FleetIntel para me dizer sobre Addiante S.A. e seus socios."
+        }
     )
 
     assert ("fleetintel", "search_empresas", {"razao_social": "Addiante S.A", "limit": 5}) in calls
