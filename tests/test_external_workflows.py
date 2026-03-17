@@ -17,6 +17,20 @@ class _FakeRegistry:
         return self.outputs[name]
 
 
+class _FakeCompositeClient:
+    def __init__(self, tool_catalog, result):
+        self.tool_catalog = tool_catalog
+        self.result = result
+        self.calls = []
+
+    async def list_tools(self):
+        return self.tool_catalog
+
+    async def call_tool(self, tool_name, arguments=None):
+        self.calls.append((tool_name, arguments or {}))
+        return self.result
+
+
 class _FakeSyncManager:
     def __init__(self, preferred=None, use_preferred_tools=True):
         self._preferred = preferred or {}
@@ -102,3 +116,51 @@ def test_detect_external_workflow_marks_provider_composite_when_available(monkey
 
     assert plan is not None
     assert plan.provider_composite_tool == "get_account_360_brief"
+
+
+@pytest.mark.asyncio
+async def test_run_external_workflow_prefers_provider_composite_for_flexible_query(monkeypatch):
+    registry = _FakeRegistry({"fleetintel_orchestrator": "nao deveria rodar"})
+    client = _FakeCompositeClient(
+        {
+            "tools": [
+                {
+                    "name": "get_account_360_brief",
+                    "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}},
+                }
+            ]
+        },
+        {
+            "headline": "Conta 360 pronta",
+            "executive_summary": "Resumo pronto sem composicao local.",
+            "key_findings": [{"why_it_matters": "Ha contexto suficiente para abordagem inicial."}],
+        },
+    )
+
+    monkeypatch.setattr(
+        "core.vps_langgraph.external_workflows.build_specialist_mcp_client",
+        lambda *_args, **_kwargs: client,
+    )
+
+    result = await run_external_workflow(
+        message="Use BrazilCNPJ Enricher e FleetIntel para me dizer sobre Addiante S.A. e seus socios.",
+        registry=registry,
+        plan=ExternalWorkflowPlan(
+            kind="account_360",
+            steps=("fleetintel_orchestrator",),
+            response_mode="single_answer",
+            provider_composite_tool="get_account_360_brief",
+        ),
+    )
+
+    assert "Conta 360 pronta" in result
+    assert "Resumo pronto sem composicao local." in result
+    assert client.calls == [
+        (
+            "get_account_360_brief",
+            {
+                "query": "Use BrazilCNPJ Enricher e FleetIntel para me dizer sobre Addiante S.A. e seus socios."
+            },
+        )
+    ]
+    assert registry.executed == []

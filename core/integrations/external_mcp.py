@@ -97,7 +97,15 @@ class RemoteMCPClient:
         while True:
             connection = await self._resolve_connection()
             try:
-                return await self._call_tool_once(connection, tool_name, arguments or {})
+                return await self._call_jsonrpc_once(
+                    connection=connection,
+                    method_name="tools/call",
+                    method_params={
+                        "name": tool_name,
+                        "arguments": arguments or {},
+                    },
+                    progress_name=tool_name,
+                )
             except RemoteMCPError as exc:
                 if (
                     exc.status_code == 403
@@ -118,11 +126,47 @@ class RemoteMCPClient:
                         continue
                 raise
 
-    async def _call_tool_once(
+    async def list_tools(self) -> Any:
+        if not self.is_configured:
+            raise RuntimeError(f"{self.server_name} MCP is not configured")
+
+        refreshed_after_auth_failure = False
+        while True:
+            connection = await self._resolve_connection()
+            try:
+                return await self._call_jsonrpc_once(
+                    connection=connection,
+                    method_name="tools/list",
+                    method_params={},
+                    progress_name="tools/list",
+                )
+            except RemoteMCPError as exc:
+                if (
+                    exc.status_code == 403
+                    and not refreshed_after_auth_failure
+                    and self.auth_refresh_callback is not None
+                ):
+                    refreshed_after_auth_failure = True
+                    refreshed = await self._maybe_await(self.auth_refresh_callback())
+                    if refreshed:
+                        await emit_progress(
+                            "external_call",
+                            server=self.server_name,
+                            stage=exc.stage,
+                            status="refreshing_auth",
+                            tool="tools/list",
+                            error=exc.describe_short(),
+                        )
+                        continue
+                raise
+
+    async def _call_jsonrpc_once(
         self,
+        *,
         connection: RemoteMCPConnection,
-        tool_name: str,
-        arguments: dict[str, Any],
+        method_name: str,
+        method_params: dict[str, Any],
+        progress_name: str,
     ) -> Any:
         headers = {
             "CF-Access-Client-Id": connection.access_client_id,
@@ -140,14 +184,11 @@ class RemoteMCPClient:
                 "clientInfo": {"name": self.client_name, "version": "1.0"},
             },
         }
-        tool_payload = {
+        method_payload = {
             "jsonrpc": "2.0",
             "id": "call-1",
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments,
-            },
+            "method": method_name,
+            "params": method_params,
         }
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -156,7 +197,7 @@ class RemoteMCPClient:
                 server=self.server_name,
                 stage="initialize",
                 status="start",
-                tool=tool_name,
+                tool=progress_name,
             )
             init_response = await self._post_with_retry(
                 client=client,
@@ -164,30 +205,30 @@ class RemoteMCPClient:
                 payload=initialize_payload,
                 headers=headers,
                 stage="initialize",
-                tool_name=tool_name,
+                tool_name=progress_name,
             )
             session_id = init_response.headers.get("mcp-session-id")
-            tool_headers = {**headers, "mcp-session-id": session_id} if session_id else headers
+            method_headers = {**headers, "mcp-session-id": session_id} if session_id else headers
             await emit_progress(
                 "external_call",
                 server=self.server_name,
-                stage="tools/call",
+                stage=method_name,
                 status="start",
-                tool=tool_name,
+                tool=progress_name,
             )
-            tool_response = await self._post_with_retry(
+            method_response = await self._post_with_retry(
                 client=client,
                 base_url=connection.base_url,
-                payload=tool_payload,
-                headers=tool_headers,
-                stage="tools/call",
-                tool_name=tool_name,
+                payload=method_payload,
+                headers=method_headers,
+                stage=method_name,
+                tool_name=progress_name,
             )
 
-        content_type = tool_response.headers.get("content-type", "")
+        content_type = method_response.headers.get("content-type", "")
         if "text/event-stream" in content_type:
-            return self._parse_sse(tool_response.text)
-        return self._extract_result(tool_response.json())
+            return self._parse_sse(method_response.text)
+        return self._extract_result(method_response.json())
 
     async def _post_with_retry(
         self,

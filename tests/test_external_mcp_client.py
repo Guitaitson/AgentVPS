@@ -54,6 +54,45 @@ async def test_remote_mcp_client_supports_static_cf_access_headers(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_remote_mcp_client_lists_tools(monkeypatch):
+    responses = [
+        _MockResponse(json_data={"result": {"protocolVersion": "2024-11-05"}}, headers={}),
+        _MockResponse(
+            json_data={
+                "result": {
+                    "tools": [
+                        {
+                            "name": "get_account_360_brief",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {"query": {"type": "string"}},
+                            },
+                        }
+                    ]
+                }
+            }
+        ),
+    ]
+
+    async def fake_post(self, url, json=None, headers=None):
+        return responses.pop(0)
+
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
+
+    client = RemoteMCPClient(
+        base_url="https://example.com/mcp",
+        access_client_id="client-id",
+        access_client_secret="client-secret",
+        client_name="test-client",
+        server_name="fleetintel",
+    )
+
+    result = await client.list_tools()
+
+    assert result["tools"][0]["name"] == "get_account_360_brief"
+
+
+@pytest.mark.asyncio
 async def test_remote_mcp_client_retries_transient_502(monkeypatch):
     responses = [
         _MockResponse(json_data={"result": {"protocolVersion": "2024-11-05"}}, headers={}),
