@@ -691,6 +691,50 @@ async def test_fleetintel_analyst_failure_uses_readiness_preflight(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_fleetintel_analyst_formats_market_changes_brief_without_raw_dump(monkeypatch):
+    calls = []
+
+    async def fake_call(service, tool_name, arguments):
+        calls.append((service, tool_name, arguments))
+        if tool_name != "get_market_changes_brief":
+            raise AssertionError(f"unexpected tool {tool_name}")
+        return {
+            "headline": "Mudancas relevantes no mercado",
+            "executive_summary": "Houve movimentacoes relevantes na base recente.",
+            "key_findings": [
+                {
+                    "subject": {"razao_social": "ADDIANTE S.A."},
+                    "why_it_matters": "A conta acelerou a atividade no recorte mais recente.",
+                }
+            ],
+            "recommended_next_steps": [
+                "Revisar a conta prioritaria",
+                "Atualizar abordagem comercial",
+            ],
+        }
+
+    monkeypatch.setattr(
+        "core.skills._builtin.fleetintel_analyst.handler.get_consumer_sync_manager",
+        lambda: _FakeSyncManager({"fleetintel": ["get_market_changes_brief"]}),
+    )
+    _patch_builder(
+        monkeypatch,
+        "core.skills._builtin.fleetintel_analyst.handler.build_specialist_mcp_client",
+        fake_call,
+    )
+
+    skill = FleetIntelAnalystSkill(_config("fleetintel_analyst"))
+    result = await skill.execute({"query": "quais sao os latest insights do fleetintel?"})
+
+    assert calls == [("fleetintel", "get_market_changes_brief", {"limit_items": 10})]
+    assert "Headline: Mudancas relevantes no mercado" in result
+    assert "Resumo: Houve movimentacoes relevantes na base recente." in result
+    assert "ADDIANTE S.A.: A conta acelerou a atividade no recorte mais recente." in result
+    assert "Proximos passos:" in result
+    assert "{'" not in result
+
+
+@pytest.mark.asyncio
 async def test_specialist_health_uses_readiness_preflight(monkeypatch):
     calls = []
     specialist_health_module._HEALTH_CACHE.clear()

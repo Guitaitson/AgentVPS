@@ -245,8 +245,57 @@ class FleetIntelAnalystSkill(SkillBase):
             "get_market_position_brief",
         } and isinstance(result, dict):
             return self._format_ranked_result(tool_name, result)
-        if tool_name in {"get_market_changes_brief", "get_fleet_account_brief"}:
-            return render_result_block("FleetIntel", result, max_chars=1600)
+        if tool_name == "get_market_changes_brief" and isinstance(result, dict):
+            lines = ["FleetIntel", ""]
+            headline = result.get("headline")
+            summary = result.get("executive_summary") or result.get("summary")
+            if headline:
+                lines.append(f"Headline: {headline}")
+            if summary:
+                lines.append(f"Resumo: {summary}")
+            findings = (
+                result.get("key_findings")
+                or result.get("items")
+                or result.get("changes")
+                or result.get("supporting_data", {}).get("movements")
+                or []
+            )
+            if isinstance(findings, list) and findings:
+                lines.append("")
+                lines.append("Pontos principais:")
+                for item in findings[:4]:
+                    if not isinstance(item, dict):
+                        continue
+                    detail = (
+                        item.get("why_it_matters")
+                        or item.get("headline")
+                        or item.get("title")
+                        or item.get("summary")
+                    )
+                    subject = item.get("subject") or {}
+                    company = subject.get("razao_social") or subject.get("title")
+                    if detail and company:
+                        lines.append(f"- {company}: {detail}")
+                    elif detail:
+                        lines.append(f"- {detail}")
+            next_steps = result.get("recommended_next_steps") or []
+            if isinstance(next_steps, list) and next_steps:
+                lines.append("")
+                lines.append("Proximos passos:")
+                for item in next_steps[:3]:
+                    lines.append(f"- {item}")
+            return "\n".join(lines)
+        if tool_name == "get_fleet_account_brief" and isinstance(result, dict):
+            headline = result.get("headline") or result.get("company_name") or "Conta"
+            lines = ["FleetIntel", "", f"Conta: {headline}"]
+            findings = result.get("key_findings") or []
+            for item in findings[:3]:
+                if not isinstance(item, dict):
+                    continue
+                detail = item.get("why_it_matters") or item.get("title")
+                if detail:
+                    lines.append(f"- {detail}")
+            return "\n".join(lines)
         return render_result_block("FleetIntel", result)
 
     @staticmethod
