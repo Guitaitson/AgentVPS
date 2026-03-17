@@ -138,15 +138,15 @@ async def _try_provider_composite(
 ) -> str | None:
     if not plan.provider_composite_tool:
         return None
-    cnpj = _extract_cnpj(message)
-    if not cnpj:
-        return None
     try:
         client = build_specialist_mcp_client(
             "fleetintel",
             client_name="agentvps-fleetintel-workflow",
         )
-        result = await client.call_tool(plan.provider_composite_tool, {"cnpj": cnpj})
+        arguments = await _resolve_account_360_arguments(client=client, message=message)
+        if not arguments:
+            return None
+        result = await client.call_tool(plan.provider_composite_tool, arguments)
     except (ConsumerSyncError, RemoteMCPError, RuntimeError) as exc:
         logger.warning("external_workflow_composite_fallback", error=str(exc))
         return None
@@ -162,6 +162,7 @@ def _format_brief_result(result: object) -> str:
     lines: list[str] = []
     headline = str(result.get("headline") or "").strip()
     executive_summary = str(result.get("executive_summary") or "").strip()
+    refinement_instruction = str(result.get("refinement_instruction") or "").strip()
     if headline:
         lines.append(headline)
     if executive_summary:
@@ -185,6 +186,29 @@ def _format_brief_result(result: object) -> str:
         for item in next_steps[:3]:
             lines.append(f"- {item}")
 
+    shortlist = result.get("shortlist") or result.get("candidates") or []
+    if isinstance(shortlist, list) and shortlist:
+        lines.append("")
+        lines.append("Opcoes encontradas:")
+        for item in shortlist[:4]:
+            if not isinstance(item, dict):
+                lines.append(f"- {item}")
+                continue
+            title = (
+                item.get("headline")
+                or item.get("company_name")
+                or item.get("razao_social")
+                or item.get("name")
+                or "opcao"
+            )
+            cnpj = item.get("cnpj")
+            suffix = f" | CNPJ {cnpj}" if cnpj else ""
+            lines.append(f"- {title}{suffix}")
+
+    if refinement_instruction:
+        lines.append("")
+        lines.append(f"Refine assim: {refinement_instruction}")
+
     limitations = result.get("limitations") or []
     if isinstance(limitations, list) and limitations:
         lines.append("")
@@ -193,6 +217,65 @@ def _format_brief_result(result: object) -> str:
             lines.append(f"- {item}")
 
     return "\n".join(line for line in lines if line is not None).strip()
+
+
+async def _resolve_account_360_arguments(
+    *,
+    client: object,
+    message: str,
+) -> dict[str, str] | None:
+    list_tools = getattr(client, "list_tools", None)
+    query = message.strip()
+    cnpj = _extract_cnpj(message)
+    if not callable(list_tools):
+        return {"cnpj": cnpj} if cnpj else {"query": query}
+
+    try:
+        catalog = await list_tools()
+    except Exception:
+        return {"cnpj": cnpj} if cnpj else {"query": query}
+
+    tool_spec = _find_tool_spec(catalog, "get_account_360_brief")
+    input_schema = {}
+    if isinstance(tool_spec, dict):
+        input_schema = tool_spec.get("inputSchema") or tool_spec.get("input_schema") or {}
+    properties = input_schema.get("properties") if isinstance(input_schema, dict) else {}
+    property_names = set(properties.keys()) if isinstance(properties, dict) else set()
+
+    if cnpj and "cnpj" in property_names:
+        return {"cnpj": cnpj}
+    for generic in ("query", "input", "target"):
+        if generic in property_names:
+            return {generic: query}
+    if cnpj:
+        return {"cnpj": cnpj}
+    for semantic_key in (
+        "company_name",
+        "razao_social",
+        "legal_name",
+        "trade_name",
+        "nome_fantasia",
+        "partner_name",
+        "socio_name",
+        "shareholder_name",
+    ):
+        if semantic_key in property_names:
+            return {semantic_key: query}
+    return {"query": query}
+
+
+def _find_tool_spec(catalog: object, tool_name: str) -> dict[str, object] | None:
+    if isinstance(catalog, dict):
+        tools = catalog.get("tools")
+        if isinstance(tools, list):
+            for tool in tools:
+                if isinstance(tool, dict) and tool.get("name") == tool_name:
+                    return tool
+    if isinstance(catalog, list):
+        for tool in catalog:
+            if isinstance(tool, dict) and tool.get("name") == tool_name:
+                return tool
+    return None
 
 
 def _compose_sections(

@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 import pytest
@@ -72,8 +73,8 @@ def _sync_payload(
             "contract_version": "v1",
             "response_contract_version": "client_brief_v1",
             "preferred_client_tools": {
-                "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
-                "brazilcnpj": ["health_check", "get_company_registry_brief"],
+                "fleetintel": ["get_client_readiness_status", "get_account_360_brief"],
+                "brazilcnpj": [],
             },
             "legacy_tool_policy": {"raw_tools_default_for_clients": False},
             "release_change_summary": ["brief tools published"],
@@ -102,16 +103,16 @@ def _sync_payload(
             "recognized_client_behavior_version": "contract_driven_v1",
             "recognized_response_contract_version": "client_brief_v1",
             "recognized_preferred_client_tools": {
-                "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
-                "brazilcnpj": ["health_check", "get_company_registry_brief"],
+                "fleetintel": ["get_client_readiness_status", "get_account_360_brief"],
+                "brazilcnpj": [],
             },
             "preferred_client_tools": {
-                "fleetintel": ["get_client_readiness_status", "get_market_changes_brief"],
-                "brazilcnpj": ["health_check", "get_company_registry_brief"],
+                "fleetintel": ["get_client_readiness_status", "get_account_360_brief"],
+                "brazilcnpj": [],
             },
             "fallback_tools": {
                 "fleetintel": ["get_operations_status"],
-                "brazilcnpj": ["health_check"],
+                "brazilcnpj": [],
             },
             "tool_surface": "client_brief_v1",
             "client_capabilities_seen": {
@@ -140,8 +141,9 @@ def _initialize_response(session_id="session-1"):
 
 
 def _tool_response(payload, *, session_id="session-1"):
+    encoded = json.dumps(str(payload))
     return _MockResponse(
-        text=f'data: {{"result": {{"content": [{{"type": "text", "text": "{payload}"}}]}}}}',
+        text=f'data: {{"result": {{"content": [{{"type": "text", "text": {encoded}}}]}}}}',
         headers={
             "server": "cloudflare",
             "cf-ray": "ray-2",
@@ -177,14 +179,43 @@ async def test_run_release_validation_posts_passed_report_when_contract_is_compa
             )
         if (json or {}).get("method") == "initialize":
             return _initialize_response()
+        if (json or {}).get("method") == "tools/list":
+            return _MockResponse(
+                json_data={
+                    "result": {
+                        "tools": [
+                            {
+                                "name": "get_account_360_brief",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "cnpj": {"type": "string"},
+                                        "query": {"type": "string"},
+                                    },
+                                },
+                            }
+                        ]
+                    }
+                },
+                headers={
+                    "server": "cloudflare",
+                    "cf-ray": "ray-list",
+                    "mcp-session-id": "session-1",
+                },
+            )
         tool_name = json["params"]["name"]
-        payload_by_tool = {
-            "get_client_readiness_status": '{"status":"ok"}',
-            "get_market_changes_brief": '{"status":"ok","items":[{"headline":"Mercado aquecido"}]}',
-            "health_check": '{"status":"ok","database_ok":true}',
-            "get_company_registry_brief": '{"cnpj":"48430290000130","company_name":"Empresa X"}',
-        }
-        return _tool_response(payload_by_tool[tool_name])
+        if tool_name == "get_client_readiness_status":
+            return _tool_response('{"status":"ok","snapshot_status":"ready"}')
+        if tool_name == "get_account_360_brief":
+            arguments = json["params"]["arguments"]
+            if "cnpj" in arguments:
+                return _tool_response(
+                    '{"status":"ok","brief_type":"account_360_brief","headline":"ADDIANTE S.A.","executive_summary":"Conta pronta para abordagem.","key_findings":[{"why_it_matters":"Ha sinais claros de atividade."}]}'
+                )
+            return _tool_response(
+                '{"status":"needs_disambiguation","brief_type":"account_360_disambiguation","headline":"Refine a conta alvo","shortlist":[{"company_name":"ADDIANTE S.A.","cnpj":"48430290000130"}],"refinement_instruction":"Informe o CNPJ ou a razao social completa."}'
+            )
+        raise AssertionError(f"unexpected tool {tool_name}")
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
 
@@ -197,8 +228,13 @@ async def test_run_release_validation_posts_passed_report_when_contract_is_compa
     assert result["sync"]["rollout_status"]["status"] == "canary_passable"
     assert result["sync"]["preferred_client_tools_used"]["fleetintel"] == [
         "get_client_readiness_status",
-        "get_market_changes_brief",
+        "get_account_360_brief",
     ]
+    assert result["tool_catalog"]["tool_names"] == ["get_account_360_brief"]
+    assert result["account_360_cases"][0]["input_used"] == {"cnpj": "48430290000130"}
+    assert result["account_360_cases"][0]["consumable_without_raw_json"] is True
+    assert result["account_360_cases"][1]["status"] == "needs_disambiguation"
+    assert result["account_360_cases"][1]["brief_type"] == "account_360_disambiguation"
     assert result["validation_report"]["http_status"] == 200
     assert result["validation_report"]["validation_run_id"] == "run-123"
     assert posted_reports[0]["client_behavior_version"] == "contract_driven_v1"
@@ -206,10 +242,10 @@ async def test_run_release_validation_posts_passed_report_when_contract_is_compa
     assert {check["name"] for check in result["checks"]} >= {
         "fleet_initialize",
         "cnpj_initialize",
+        "fleet_tools_list",
         "fleet_client_readiness",
-        "fleet_market_changes_brief",
-        "cnpj_health_check",
-        "cnpj_company_registry_brief",
+        "fleet_account_360_strong",
+        "fleet_account_360_flexible",
     }
 
 
